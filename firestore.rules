@@ -1,0 +1,357 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthedAs(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function isNumber(x) {
+      return x is number && x == x; // NaN check
+    }
+
+    function isTimestamp(x) {
+      return x is timestamp;
+    }
+
+    function hasOnlyKeys(data, keys) {
+      return data.keys().hasOnly(keys);
+    }
+
+    function hasAnyNewBalance(userId, accountId) {
+      return existsAfter(/databases/$(database)/documents/users/$(userId)/accounts/$(accountId));
+    }
+
+    function getTxBefore(userId, txId) {
+      return get(/databases/$(database)/documents/users/$(userId)/transactions/$(txId));
+    }
+    function getTxAfter(userId, txId) {
+      return getAfter(/databases/$(database)/documents/users/$(userId)/transactions/$(txId));
+    }
+
+    function effectForAccount(tx, accountId) {
+      // Returns the signed delta a transaction applies to a given account.
+      // Only valid for status == "active".
+      return tx.kind == "income" && tx.accountId == accountId ? tx.amount :
+             tx.kind == "expense" && tx.accountId == accountId ? (0 - tx.amount) :
+             tx.kind == "transfer" && tx.fromAccountId == accountId ? (0 - tx.amount) :
+             tx.kind == "transfer" && tx.toAccountId == accountId ? tx.amount :
+             0;
+    }
+
+    function expectedDeltaFromTxChange(userId, txId, accountId) {
+      let before = getTxBefore(userId, txId);
+      let after = getTxAfter(userId, txId);
+      // Create
+      return !before.exists() && after.exists() && after.data.status == "active"
+        ? effectForAccount(after.data, accountId)
+        : // Edit (active -> active)
+          before.exists() && after.exists() &&
+          before.data.status == "active" && after.data.status == "active"
+          ? (effectForAccount(after.data, accountId) - effectForAccount(before.data, accountId))
+          : // Soft-delete (active -> deleted)
+            before.exists() && after.exists() &&
+            before.data.status == "active" && after.data.status == "deleted"
+            ? (0 - effectForAccount(before.data, accountId))
+            : 0;
+    }
+
+    function isAccountDocValidCreate(accountId) {
+      return request.resource.data.schemaVersion == 1
+        && request.resource.data.id == accountId
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 1
+        && request.resource.data.name.size() <= 64
+        && request.resource.data.type in ["cash", "bank", "card"]
+        && (!("currency" in request.resource.data) || (request.resource.data.currency is string && request.resource.data.currency.size() == 3))
+        && isNumber(request.resource.data.balance)
+        && isTimestamp(request.resource.data.createdAt)
+        && isTimestamp(request.resource.data.updatedAt)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function isAccountUpdateAllowedWithBalanceMutation(userId, accountId) {
+      // Balance-changing updates must be tied to a transaction mutation.
+      let txId = request.resource.data.balanceMutationId;
+      return txId is string
+        && txId.size() >= 1
+        && getTxAfter(userId, txId).exists()
+        && getTxAfter(userId, txId).data.id == txId
+        && getTxAfter(userId, txId).data.schemaVersion == 1
+        && getTxAfter(userId, txId).data.updatedAt == request.time
+        && (request.resource.data.balance - resource.data.balance)
+           == expectedDeltaFromTxChange(userId, txId, accountId);
+    }
+
+    function isAccountDocValidUpdate(userId, accountId) {
+      // Allow renames/type changes without touching balance.
+      let balanceChanged = request.resource.data.balance != resource.data.balance;
+      let allowedKeys = ["schemaVersion","id","name","type","currency","balance","balanceMutationId","createdAt","updatedAt"];
+      return request.resource.data.schemaVersion == 1
+        && request.resource.data.id == accountId
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 1
+        && request.resource.data.name.size() <= 64
+        && request.resource.data.type in ["cash", "bank", "card"]
+        && (!("currency" in request.resource.data) || (request.resource.data.currency is string && request.resource.data.currency.size() == 3))
+        && isNumber(request.resource.data.balance)
+        && request.resource.data.createdAt == resource.data.createdAt
+        && isTimestamp(request.resource.data.updatedAt)
+        && request.resource.data.updatedAt == request.time
+        && hasOnlyKeys(request.resource.data, allowedKeys)
+        && (!balanceChanged || isAccountUpdateAllowedWithBalanceMutation(userId, accountId));
+    }
+
+    function isCategoryDocValid(categoryId) {
+      return request.resource.data.schemaVersion == 1
+        && request.resource.data.id == categoryId
+        && request.resource.data.kind in ["income", "expense"]
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 1
+        && request.resource.data.name.size() <= 48
+        && isTimestamp(request.resource.data.createdAt)
+        && isTimestamp(request.resource.data.updatedAt)
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function isBudgetDocValidCreate(budgetId) {
+      return request.resource.data.schemaVersion == 1
+        && request.resource.data.id == budgetId
+        && request.resource.data.month is string
+        && request.resource.data.month.matches('^\\d{4}-\\d{2}$')
+        && (!('categoryId' in request.resource.data) || request.resource.data.categoryId is string)
+        && isNumber(request.resource.data.limitAmount)
+        && request.resource.data.limitAmount > 0
+        && request.resource.data.currency is string
+        && request.resource.data.currency.size() == 3
+        && isTimestamp(request.resource.data.createdAt)
+        && isTimestamp(request.resource.data.updatedAt)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function isBudgetDocValidUpdate(budgetId) {
+      let allowedKeys = ["schemaVersion","id","month","categoryId","limitAmount","currency","createdAt","updatedAt"];
+      return request.resource.data.schemaVersion == 1
+        && request.resource.data.id == budgetId
+        && request.resource.data.month == resource.data.month
+        && request.resource.data.currency == resource.data.currency
+        && (!('categoryId' in request.resource.data) || request.resource.data.categoryId is string)
+        && (!('categoryId' in resource.data) || request.resource.data.categoryId == resource.data.categoryId)
+        && isNumber(request.resource.data.limitAmount)
+        && request.resource.data.limitAmount > 0
+        && request.resource.data.createdAt == resource.data.createdAt
+        && isTimestamp(request.resource.data.updatedAt)
+        && request.resource.data.updatedAt == request.time
+        && hasOnlyKeys(request.resource.data, allowedKeys);
+    }
+
+    function isTransactionDocShapeValid(txId) {
+      return request.resource.data.schemaVersion == 1
+        && request.resource.data.id == txId
+        && request.resource.data.kind in ["income", "expense", "transfer"]
+        && request.resource.data.status in ["active", "deleted"]
+        && isNumber(request.resource.data.amount)
+        && request.resource.data.amount > 0
+        && (!("currency" in request.resource.data) || (request.resource.data.currency is string && request.resource.data.currency.size() == 3))
+        && (!("fromCurrency" in request.resource.data) || (request.resource.data.fromCurrency is string && request.resource.data.fromCurrency.size() == 3))
+        && (!("toCurrency" in request.resource.data) || (request.resource.data.toCurrency is string && request.resource.data.toCurrency.size() == 3))
+        && isTimestamp(request.resource.data.occurredAt)
+        && isTimestamp(request.resource.data.createdAt)
+        && isTimestamp(request.resource.data.updatedAt)
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function isIncomeExpenseTxValid() {
+      return request.resource.data.kind in ["income", "expense"]
+        && request.resource.data.accountId is string
+        && request.resource.data.categoryId is string
+        && (!("currency" in request.resource.data) || request.resource.data.currency is string);
+    }
+
+    function isTransferTxValid() {
+      return request.resource.data.kind == "transfer"
+        && request.resource.data.fromAccountId is string
+        && request.resource.data.toAccountId is string
+        && request.resource.data.fromAccountId != request.resource.data.toAccountId
+        && (!("fromCurrency" in request.resource.data) || request.resource.data.fromCurrency is string)
+        && (!("toCurrency" in request.resource.data) || request.resource.data.toCurrency is string);
+    }
+
+    function validateBalanceForTxCreate(userId, txId) {
+      let after = getTxAfter(userId, txId).data;
+      return after.status == "active"
+        && (
+          (after.kind in ["income", "expense"]
+            && exists(/databases/$(database)/documents/users/$(userId)/accounts/$(after.accountId))
+            && existsAfter(/databases/$(database)/documents/users/$(userId)/accounts/$(after.accountId))
+            && (!("currency" in after) || after.currency == (getAfter(/databases/$(database)/documents/users/$(userId)/accounts/$(after.accountId)).data.currency))
+            && (getAfter(/databases/$(database)/documents/users/$(userId)/accounts/$(after.accountId)).data.balance
+                - get(/databases/$(database)/documents/users/$(userId)/accounts/$(after.accountId)).data.balance)
+               == effectForAccount(after, after.accountId)
+            && getAfter(/databases/$(database)/documents/users/$(userId)/accounts/$(after.accountId)).data.balanceMutationId == txId
+          )
+          ||
+          (after.kind == "transfer"
+            && exists(/databases/$(database)/documents/users/$(userId)/accounts/$(after.fromAccountId))
+            && exists(/databases/$(database)/documents/users/$(userId)/accounts/$(after.toAccountId))
+            && existsAfter(/databases/$(database)/documents/users/$(userId)/accounts/$(after.fromAccountId))
+            && existsAfter(/databases/$(database)/documents/users/$(userId)/accounts/$(after.toAccountId))
+            && (!("fromCurrency" in after) || after.fromCurrency == (getAfter(/databases/$(database)/documents/users/$(userId)/accounts/$(after.fromAccountId)).data.currency))
+            && (!("toCurrency" in after) || after.toCurrency == (getAfter(/databases/$(database)/documents/users/$(userId)/accounts/$(after.toAccountId)).data.currency))
+            && (getAfter(/databases/$(database)/documents/users/$(userId)/accounts/$(after.fromAccountId)).data.balance
+                - get(/databases/$(database)/documents/users/$(userId)/accounts/$(after.fromAccountId)).data.balance)
+               == (0 - after.amount)
+            && (getAfter(/databases/$(database)/documents/users/$(userId)/accounts/$(after.toAccountId)).data.balance
+                - get(/databases/$(database)/documents/users/$(userId)/accounts/$(after.toAccountId)).data.balance)
+               == after.amount
+            && getAfter(/databases/$(database)/documents/users/$(userId)/accounts/$(after.fromAccountId)).data.balanceMutationId == txId
+            && getAfter(/databases/$(database)/documents/users/$(userId)/accounts/$(after.toAccountId)).data.balanceMutationId == txId
+          )
+        );
+    }
+
+    function validateBalanceForTxUpdate(userId, txId) {
+      let before = getTxBefore(userId, txId).data;
+      let after = getTxAfter(userId, txId).data;
+
+      // Disallow changing kind or account linkage on edit/delete.
+      let linkageOk =
+        before.kind == after.kind
+        && (
+          (after.kind in ["income","expense"] && before.accountId == after.accountId)
+          ||
+          (after.kind == "transfer"
+            && before.fromAccountId == after.fromAccountId
+            && before.toAccountId == after.toAccountId)
+        );
+
+      if (!linkageOk) return false;
+
+      // active -> active (edit)
+      if (before.status == "active" && after.status == "active") {
+        if (after.kind in ["income","expense"]) {
+          let aId = after.accountId;
+          return (getAfter(/databases/$(database)/documents/users/$(userId)/accounts/$(aId)).data.balance
+                  - get(/databases/$(database)/documents/users/$(userId)/accounts/$(aId)).data.balance)
+                 == expectedDeltaFromTxChange(userId, txId, aId)
+              && (!("currency" in after) || after.currency == (getAfter(/databases/$(database)/documents/users/$(userId)/accounts/$(aId)).data.currency))
+              && getAfter(/databases/$(database)/documents/users/$(userId)/accounts/$(aId)).data.balanceMutationId == txId;
+        }
+        // transfer
+        let fromId = after.fromAccountId;
+        let toId = after.toAccountId;
+        return (getAfter(/databases/$(database)/documents/users/$(userId)/accounts/$(fromId)).data.balance
+                - get(/databases/$(database)/documents/users/$(userId)/accounts/$(fromId)).data.balance)
+               == expectedDeltaFromTxChange(userId, txId, fromId)
+            && (getAfter(/databases/$(database)/documents/users/$(userId)/accounts/$(toId)).data.balance
+                - get(/databases/$(database)/documents/users/$(userId)/accounts/$(toId)).data.balance)
+               == expectedDeltaFromTxChange(userId, txId, toId)
+            && (!("fromCurrency" in after) || after.fromCurrency == (getAfter(/databases/$(database)/documents/users/$(userId)/accounts/$(fromId)).data.currency))
+            && (!("toCurrency" in after) || after.toCurrency == (getAfter(/databases/$(database)/documents/users/$(userId)/accounts/$(toId)).data.currency))
+            && getAfter(/databases/$(database)/documents/users/$(userId)/accounts/$(fromId)).data.balanceMutationId == txId
+            && getAfter(/databases/$(database)/documents/users/$(userId)/accounts/$(toId)).data.balanceMutationId == txId;
+      }
+
+      // active -> deleted (soft delete)
+      if (before.status == "active" && after.status == "deleted") {
+        if (after.kind in ["income","expense"]) {
+          let aId = after.accountId;
+          return (getAfter(/databases/$(database)/documents/users/$(userId)/accounts/$(aId)).data.balance
+                  - get(/databases/$(database)/documents/users/$(userId)/accounts/$(aId)).data.balance)
+                 == expectedDeltaFromTxChange(userId, txId, aId)
+              && (!("currency" in after) || after.currency == (getAfter(/databases/$(database)/documents/users/$(userId)/accounts/$(aId)).data.currency))
+              && getAfter(/databases/$(database)/documents/users/$(userId)/accounts/$(aId)).data.balanceMutationId == txId
+              && isTimestamp(request.resource.data.deletedAt);
+        }
+        let fromId = after.fromAccountId;
+        let toId = after.toAccountId;
+        return (getAfter(/databases/$(database)/documents/users/$(userId)/accounts/$(fromId)).data.balance
+                - get(/databases/$(database)/documents/users/$(userId)/accounts/$(fromId)).data.balance)
+               == expectedDeltaFromTxChange(userId, txId, fromId)
+            && (getAfter(/databases/$(database)/documents/users/$(userId)/accounts/$(toId)).data.balance
+                - get(/databases/$(database)/documents/users/$(userId)/accounts/$(toId)).data.balance)
+               == expectedDeltaFromTxChange(userId, txId, toId)
+            && (!("fromCurrency" in after) || after.fromCurrency == (getAfter(/databases/$(database)/documents/users/$(userId)/accounts/$(fromId)).data.currency))
+            && (!("toCurrency" in after) || after.toCurrency == (getAfter(/databases/$(database)/documents/users/$(userId)/accounts/$(toId)).data.currency))
+            && getAfter(/databases/$(database)/documents/users/$(userId)/accounts/$(fromId)).data.balanceMutationId == txId
+            && getAfter(/databases/$(database)/documents/users/$(userId)/accounts/$(toId)).data.balanceMutationId == txId
+            && isTimestamp(request.resource.data.deletedAt);
+      }
+
+      return false;
+    }
+
+    match /users/{userId} {
+      allow read: if isAuthedAs(userId);
+      allow write: if false;
+
+      match /profile/{docId} {
+        allow read: if isAuthedAs(userId);
+        allow create, update: if isAuthedAs(userId)
+          && request.resource.data.schemaVersion == 1
+          && isTimestamp(request.resource.data.updatedAt)
+          && request.resource.data.updatedAt == request.time;
+        allow delete: if false;
+      }
+
+      match /accounts/{accountId} {
+        allow read: if isAuthedAs(userId);
+        allow create: if isAuthedAs(userId) && isAccountDocValidCreate(accountId);
+        allow update: if isAuthedAs(userId) && isAccountDocValidUpdate(userId, accountId);
+        allow delete: if isAuthedAs(userId);
+      }
+
+      match /categories/{categoryId} {
+        allow read: if isAuthedAs(userId);
+        allow create: if isAuthedAs(userId)
+          && isCategoryDocValid(categoryId)
+          && request.resource.data.createdAt == request.time;
+        allow update: if isAuthedAs(userId)
+          && isCategoryDocValid(categoryId)
+          && request.resource.data.createdAt == resource.data.createdAt;
+        allow delete: if isAuthedAs(userId);
+      }
+
+      match /transactions/{transactionId} {
+        allow read: if isAuthedAs(userId);
+
+        allow create: if isAuthedAs(userId)
+          && isTransactionDocShapeValid(transactionId)
+          && request.resource.data.createdAt == request.time
+          && (
+            (isIncomeExpenseTxValid() && request.resource.data.status == "active")
+            || (isTransferTxValid() && request.resource.data.status == "active")
+          )
+          && validateBalanceForTxCreate(userId, transactionId);
+
+        allow update: if isAuthedAs(userId)
+          && isTransactionDocShapeValid(transactionId)
+          && request.resource.data.createdAt == resource.data.createdAt
+          && getTxBefore(userId, transactionId).exists()
+          && (
+            // active -> active (edit)
+            (resource.data.status == "active" && request.resource.data.status == "active")
+            ||
+            // active -> deleted (soft delete)
+            (resource.data.status == "active" && request.resource.data.status == "deleted")
+          )
+          && (
+            (isIncomeExpenseTxValid() || isTransferTxValid())
+          )
+          && validateBalanceForTxUpdate(userId, transactionId);
+
+        allow delete: if false;
+      }
+
+      match /budgets/{budgetId} {
+        allow read: if isAuthedAs(userId);
+        allow create: if isAuthedAs(userId) && isBudgetDocValidCreate(budgetId);
+        allow update: if isAuthedAs(userId) && isBudgetDocValidUpdate(budgetId);
+        allow delete: if isAuthedAs(userId);
+      }
+    }
+  }
+}
+
+
