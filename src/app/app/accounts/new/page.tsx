@@ -27,6 +27,7 @@ const schema = z.object({
   type: z.enum(["cash", "bank", "card"]),
   currency: z.string().min(3).max(3),
   initialBalance: z.number().finite(),
+  includeInTotals: z.boolean(),
 });
 
 type Values = z.infer<typeof schema>;
@@ -42,6 +43,7 @@ export default function NewAccountPage() {
       type: "cash",
       currency: DEFAULT_CURRENCY,
       initialBalance: 0,
+      includeInTotals: true,
     },
   });
 
@@ -141,6 +143,22 @@ export default function NewAccountPage() {
               />
             </div>
 
+            <div className="flex items-center gap-2">
+              <input
+                id="includeInTotals"
+                type="checkbox"
+                className="h-4 w-4 accent-primary"
+                checked={Boolean(form.watch("includeInTotals"))}
+                onChange={(e) =>
+                  form.setValue("includeInTotals", e.target.checked, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
+                }
+              />
+              <Label htmlFor="includeInTotals">Include in total balance</Label>
+            </div>
+
             <Button type="submit" disabled={form.formState.isSubmitting}>
               {form.formState.isSubmitting ? "Creating…" : "Create"}
             </Button>
@@ -150,5 +168,7 @@ export default function NewAccountPage() {
     </div>
   );
 }
+
+
 
 

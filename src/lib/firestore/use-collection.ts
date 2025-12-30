@@ -17,8 +17,15 @@ export function useRealtimeQuery<T = DocumentData>(
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<Error | null>(null);
 
+  // Keep the latest mapper without forcing re-subscribe if the caller recreates `map`.
+  const mapRef = React.useRef(map);
+  React.useEffect(() => {
+    mapRef.current = map;
+  }, [map]);
+
   React.useEffect(() => {
     let unsub: Unsubscribe | null = null;
+    let active = true;
     if (!query) {
       setData(null);
       setLoading(false);
@@ -32,17 +39,30 @@ export function useRealtimeQuery<T = DocumentData>(
     unsub = onSnapshot(
       query,
       (snap) => {
-        setData(map(snap));
+        if (!active) return;
+        setData(mapRef.current(snap));
         setLoading(false);
       },
       (err) => {
+        if (!active) return;
         setError(err);
         setLoading(false);
       },
     );
 
-    return () => unsub?.();
-  }, [query, map]);
+    return () => {
+      active = false;
+      if (!unsub) return;
+      // Firestore has had rare "internal assertion" issues during dev reload / rapid resubscribe.
+      // Never let cleanup throw and crash the whole app.
+      try {
+        unsub();
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn("Firestore unsubscribe threw; ignored during cleanup.", e);
+      }
+    };
+  }, [query]);
 
   return { data, loading, error };
 }

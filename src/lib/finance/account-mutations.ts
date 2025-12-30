@@ -8,6 +8,8 @@ const updateAccountInputSchema = z.object({
   name: z.string().min(1).max(64),
   type: z.enum(["cash", "bank", "card"]),
   currency: z.string().min(3).max(3).optional(),
+  balance: z.number().finite().optional(),
+  includeInTotals: z.boolean().optional(),
 });
 
 export async function updateAccount(
@@ -25,6 +27,10 @@ export async function updateAccount(
       name: values.name,
       type: values.type,
       ...(values.currency ? { currency: values.currency.toUpperCase() } : {}),
+      ...(values.balance !== undefined ? { balance: values.balance } : {}),
+      ...(values.includeInTotals === undefined
+        ? {}
+        : { includeInTotals: values.includeInTotals }),
       updatedAt: serverTimestamp(),
     });
   });

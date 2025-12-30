@@ -4,6 +4,7 @@ import {
   initializeFirestore,
   persistentLocalCache,
   persistentMultipleTabManager,
+  memoryLocalCache,
   type Firestore,
 } from "firebase/firestore";
 import { getClientEnv } from "@/lib/env";
@@ -35,12 +36,17 @@ export function getFirebaseAuth() {
 
 export function getFirebaseDb() {
   if (_db) return _db;
-  // Offline-first: Firestore persistent local cache (multi-tab safe).
-  // Note: must be initialized exactly once per app.
+  // Use memory cache in development to avoid cache issues after rule changes
+  // Switch back to persistentLocalCache for production
+  const isDev = process.env.NODE_ENV === 'development';
+  const isBrowser = typeof window !== 'undefined';
+
   _db = initializeFirestore(getFirebaseApp(), {
-    localCache: persistentLocalCache({
-      tabManager: persistentMultipleTabManager(),
-    }),
+    localCache: (isDev || !isBrowser)
+      ? memoryLocalCache()
+      : persistentLocalCache({
+        tabManager: persistentMultipleTabManager(),
+      }),
   });
   return _db;
 }

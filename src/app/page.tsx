@@ -1,9 +1,18 @@
-import { redirect } from "next/navigation";
-import { getServerSessionUid } from "@/lib/auth/server-session";
+"use client";
 
-export const dynamic = "force-dynamic";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth/auth-provider";
 
-export default async function Home() {
-  const uid = await getServerSessionUid();
-  redirect(uid ? "/app" : "/login");
+export default function Home() {
+  const router = useRouter();
+  const { user, loading } = useAuth();
+
+  useEffect(() => {
+    if (!loading) {
+      router.replace(user ? "/app" : "/login");
+    }
+  }, [user, loading, router]);
+
+  return null;
 }

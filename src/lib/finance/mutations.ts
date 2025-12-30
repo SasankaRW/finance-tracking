@@ -1,18 +1,21 @@
 import {
   Timestamp,
+  deleteField,
   runTransaction,
   serverTimestamp,
 } from "firebase/firestore";
 import { z } from "zod";
 import { getFirebaseDb } from "@/lib/firebase/client";
-import { accountDoc, transactionDoc } from "@/lib/firestore/refs";
+import { accountDoc, eventDoc, transactionDoc } from "@/lib/firestore/refs";
+import { DEFAULT_CURRENCY } from "@/shared/currency";
 import { newId } from "@/shared/ids";
 
 const createAccountInputSchema = z.object({
   name: z.string().min(1).max(64),
   type: z.enum(["cash", "bank", "card"]),
-  currency: z.string().min(3).max(3).default("USD"),
+  currency: z.string().min(3).max(3).default(DEFAULT_CURRENCY),
   initialBalance: z.number().finite().default(0),
+  includeInTotals: z.boolean().optional().default(true),
 });
 
 export async function createAccount(
@@ -33,6 +36,7 @@ export async function createAccount(
       type: values.type,
       currency: values.currency.toUpperCase(),
       balance: values.initialBalance,
+      includeInTotals: values.includeInTotals,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
@@ -46,6 +50,7 @@ const createIncomeExpenseInputSchema = z.object({
   amount: z.number().positive().finite(),
   accountId: z.string().min(1),
   categoryId: z.string().min(1),
+  eventId: z.string().min(1).optional(),
   occurredAt: z.date(),
   note: z.string().max(280).optional(),
 });
@@ -66,6 +71,11 @@ export async function createIncomeOrExpense(
     const aSnap = await trx.get(aRef);
     if (!aSnap.exists()) throw new Error("Account not found");
 
+    if (values.eventId) {
+      const eSnap = await trx.get(eventDoc(uid, values.eventId));
+      if (!eSnap.exists()) throw new Error("Event not found");
+    }
+
     const currency = ((aSnap.data() as any).currency ?? "USD") as string;
     const prev = aSnap.data().balance as number;
     const next =
@@ -80,6 +90,7 @@ export async function createIncomeOrExpense(
       currency,
       accountId: values.accountId,
       categoryId: values.categoryId,
+      ...(values.eventId ? { eventId: values.eventId } : {}),
       occurredAt,
       ...(values.note ? { note: values.note } : {}),
       createdAt: serverTimestamp(),
@@ -178,6 +189,7 @@ const editTxInputSchema = z.object({
   occurredAt: z.date().optional(),
   note: z.string().max(280).nullable().optional(),
   categoryId: z.string().min(1).optional(), // income/expense only
+  eventId: z.string().min(1).nullable().optional(), // income/expense only
 });
 
 export async function editTransaction(
@@ -211,6 +223,14 @@ export async function editTransaction(
       if (values.categoryId && typeof t.categoryId !== "string") {
         throw new Error("Cannot set category on this transaction");
       }
+
+      if (values.eventId !== undefined) {
+        if (values.eventId) {
+          const eSnap = await trx.get(eventDoc(uid, values.eventId));
+          if (!eSnap.exists()) throw new Error("Event not found");
+        }
+      }
+
       const aRef = accountDoc(uid, t.accountId as string);
       const aSnap = await trx.get(aRef);
       if (!aSnap.exists()) throw new Error("Account not found");
@@ -230,6 +250,11 @@ export async function editTransaction(
       trx.update(tRef, {
         amount: newAmount,
         categoryId: values.categoryId ?? t.categoryId,
+        ...(values.eventId === undefined
+          ? {}
+          : values.eventId
+            ? { eventId: values.eventId }
+            : { eventId: deleteField() }),
         occurredAt: values.occurredAt
           ? Timestamp.fromDate(values.occurredAt)
           : t.occurredAt,

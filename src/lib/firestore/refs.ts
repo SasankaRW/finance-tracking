@@ -41,4 +41,20 @@ export function budgetDoc(uid: string, budgetId: string) {
   return doc(getFirebaseDb(), "users", uid, "budgets", budgetId);
 }
 
+export function subscriptionsCol(uid: string) {
+  return collection(getFirebaseDb(), "users", uid, "subscriptions");
+}
+
+export function subscriptionDoc(uid: string, subscriptionId: string) {
+  return doc(getFirebaseDb(), "users", uid, "subscriptions", subscriptionId);
+}
+
+export function eventsCol(uid: string) {
+  return collection(getFirebaseDb(), "users", uid, "events");
+}
+
+export function eventDoc(uid: string, eventId: string) {
+  return doc(getFirebaseDb(), "users", uid, "events", eventId);
+}
+
 

@@ -98,6 +98,46 @@ This prevents “manual” balance overwrites from a compromised client.
 - `npm run build`: production build
 - `npm run start`: start production server
 
+### Mobile (Android APK)
+Your web app can be exported as an Android APK using Capacitor. The project is already configured!
+
+**Prerequisites:**
+- Android Studio installed
+- Android SDK configured
+- Java JDK installed
+
+**Build the APK:**
+
+1. **Build and sync the web app to Android:**
+   ```bash
+   npm run mobile:build
+   ```
+   This builds your Next.js app and syncs it to the Android project.
+
+2. **Build the APK (choose one method):**
+
+   **Option A: Using Gradle directly (faster):**
+   ```bash
+   npm run mobile:apk
+   ```
+   The APK will be generated at: `android/app/build/outputs/apk/debug/app-debug.apk`
+
+   **Option B: Using Android Studio (recommended for first-time setup):**
+   ```bash
+   npm run mobile:open
+   ```
+   This opens Android Studio. Then:
+   - Wait for Gradle sync to complete
+   - Click "Build" → "Build Bundle(s) / APK(s)" → "Build APK(s)"
+   - Or use "Run" to install on a connected device/emulator
+
+**For release builds:**
+- Open Android Studio (`npm run mobile:open`)
+- Build → Generate Signed Bundle / APK
+- Follow the signing wizard
+
+**Note:** The web app is exported as static files, so all features that work in the browser will work in the mobile app. Firebase authentication and Firestore will work the same way.
+
 ---
 
 ## Notes for React Native (Expo) reuse
