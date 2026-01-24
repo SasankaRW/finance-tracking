@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Landmark, Layers, List, LogOut, Target, Repeat, MapPin } from "lucide-react";
+import { Landmark, Layers, List, LogOut, Target, Repeat, MapPin, Calendar, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { signOutEverywhere } from "@/lib/auth/auth-actions";
@@ -11,10 +11,8 @@ import { useAuth } from "@/lib/auth/auth-provider";
 const navItems = [
   { href: "/app", label: "Dashboard", icon: Layers },
   { href: "/app/transactions", label: "Transactions", icon: List },
-  { href: "/app/accounts", label: "Accounts", icon: Landmark },
-  { href: "/app/subscriptions", label: "Subscriptions", icon: Repeat },
-  { href: "/app/budgets", label: "Budgets", icon: Target },
-  { href: "/app/events", label: "Trips", icon: MapPin },
+  { href: "/app/planning", label: "Planning", icon: Target },
+  { href: "/app/events", label: "Events", icon: Calendar },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -64,6 +62,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="hidden text-sm text-muted-foreground lg:block truncate max-w-[200px]">
               {user?.email}
             </div>
+            <Link href="/app/settings">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9"
+                aria-label="Settings"
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+            </Link>
             <Button
               variant="ghost"
               size="icon"

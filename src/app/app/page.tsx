@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   startOfMonth,
   endOfMonth,
+  subMonths,
   format,
 } from "date-fns";
 import {
@@ -38,17 +39,29 @@ import { useFxRates } from "@/lib/fx/use-fx-rates";
 import { CreateTransactionDialog } from "@/app/app/transactions/create-transaction-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useTrends, useQuickStats, useSparklineData } from "@/lib/finance/use-trends";
+import { SparklineChart } from "@/components/sparkline-chart";
+import { AnimatedNumber } from "@/components/animated-number";
 
 export default function DashboardPage() {
-  const { accounts } = useAccounts();
+  const { accounts, loading: accountsLoading } = useAccounts();
   const { data: fxUsd } = useFxRates("USD", [HOME_CURRENCY]);
   const usdToLkr = fxUsd?.rates?.[HOME_CURRENCY] ?? null;
   const start = React.useMemo(() => startOfMonth(new Date()), []);
   const end = React.useMemo(() => endOfMonth(new Date()), []);
-  const { transactions } = useTransactions({ start, end });
+  const { transactions, loading: transactionsLoading } = useTransactions({});
+  const currentMonthTransactions = React.useMemo(() => {
+    return (transactions as any[]).filter((t: any) => {
+      const date = t.occurredAt instanceof Timestamp ? t.occurredAt.toDate() : new Date(t.occurredAt);
+      return date >= start && date <= end;
+    });
+  }, [transactions, start, end]);
   const monthKey = React.useMemo(() => format(new Date(), "yyyy-MM"), []);
   const monthName = React.useMemo(() => format(new Date(), "MMMM yyyy"), []);
-  const { budgets } = useBudgets(monthKey);
+  const { budgets, loading: budgetsLoading } = useBudgets(monthKey);
+
+  const isLoading = accountsLoading || transactionsLoading || budgetsLoading;
   const { categories: expenseCategories } = useCategories("expense");
 
   const totalBalance = React.useMemo(
@@ -78,6 +91,11 @@ export default function DashboardPage() {
       }
       return { totalBalanceLkr: total, missingUsdRate: missingRate, hasUnsupportedCurrency: unsupported };
     }, [accounts, usdToLkr]);
+
+  // Trend calculations (after totalBalanceLkr is defined)
+  const trends = useTrends(transactions as any[]);
+  const quickStats = useQuickStats(transactions as any[], totalBalanceLkr);
+  const sparklineData = useSparklineData(transactions as any[], 30);
   const cashInHand = React.useMemo(
     () =>
       accounts
@@ -124,26 +142,26 @@ export default function DashboardPage() {
   const monthTotals = React.useMemo(() => {
     let income = 0;
     let expense = 0;
-    for (const t of transactions as any[]) {
+    for (const t of currentMonthTransactions as any[]) {
       if (t.kind === "income") income += t.amount ?? 0;
       if (t.kind === "expense") expense += t.amount ?? 0;
     }
     return { income, expense, net: income - expense };
-  }, [transactions]);
+  }, [currentMonthTransactions]);
 
   const txCounts = React.useMemo(() => {
     let incomeCount = 0;
     let expenseCount = 0;
-    for (const t of transactions as any[]) {
+    for (const t of currentMonthTransactions as any[]) {
       if (t.kind === "income") incomeCount++;
       if (t.kind === "expense") expenseCount++;
     }
-    return { income: incomeCount, expense: expenseCount, total: transactions.length };
-  }, [transactions]);
+    return { income: incomeCount, expense: expenseCount, total: currentMonthTransactions.length };
+  }, [currentMonthTransactions]);
 
   const expenseByCategory = React.useMemo(() => {
     const map = new Map<string, number>();
-    for (const t of transactions as any[]) {
+    for (const t of currentMonthTransactions as any[]) {
       if (t.kind !== "expense") continue;
       const key = t.categoryId ?? "uncategorized";
       map.set(key, (map.get(key) ?? 0) + (t.amount ?? 0));
@@ -157,7 +175,7 @@ export default function DashboardPage() {
       }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 6);
-  }, [transactions, expenseCategories]);
+  }, [currentMonthTransactions, expenseCategories]);
 
   const budgetStatus = React.useMemo(() => {
     const overallBudget = (budgets as any[]).find((b) => !b.categoryId);
@@ -173,7 +191,7 @@ export default function DashboardPage() {
     }> = [];
 
     const spentByCategory = new Map<string, number>();
-    for (const t of transactions as any[]) {
+    for (const t of currentMonthTransactions as any[]) {
       if (t.kind !== "expense") continue;
       const id = t.categoryId ?? "uncategorized";
       spentByCategory.set(id, (spentByCategory.get(id) ?? 0) + (t.amount ?? 0));
@@ -194,7 +212,7 @@ export default function DashboardPage() {
     }
 
     return { overallLimit, overallCurrency, perCategory, totalSpent: monthTotals.expense };
-  }, [budgets, transactions, expenseCategories, monthTotals.expense]);
+  }, [budgets, currentMonthTransactions, expenseCategories, monthTotals.expense]);
 
   const chartData = React.useMemo(
     () => [
@@ -239,7 +257,7 @@ export default function DashboardPage() {
       {/* Primary Stats Row */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* Total Balance - Primary Card */}
-        <Card className="relative overflow-hidden border-2 border-primary/20">
+        <Card className="stat-card stagger-1 relative overflow-hidden border-2 border-primary/20 shadow-sm">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -251,29 +269,51 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="pb-4">
-            <div className="text-3xl font-bold tracking-tight">
-              {missingUsdRate || hasUnsupportedCurrency
-                ? "—"
-                : formatMoney(totalBalanceLkr, HOME_CURRENCY)}
-            </div>
-            {balancesByCurrency.length > 1 && (
-              <div className="mt-2 flex flex-wrap gap-1">
-                {balancesByCurrency.map(([cur, bal]) => (
-                  <Badge key={cur} variant="outline" className="text-xs font-mono">
-                    {formatMoney(bal, cur)}
-                  </Badge>
-                ))}
+            {isLoading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-8 w-32" />
+                <Skeleton className="h-8 w-full" />
+                <div className="flex gap-1">
+                  <Skeleton className="h-5 w-16" />
+                  <Skeleton className="h-5 w-16" />
+                </div>
               </div>
+            ) : (
+              <>
+                <div className="text-3xl font-bold tracking-tight">
+                  {missingUsdRate || hasUnsupportedCurrency
+                    ? "—"
+                    : formatMoney(totalBalanceLkr, HOME_CURRENCY)}
+                </div>
+                {sparklineData.values.length > 0 && (
+                  <div className="mt-3">
+                    <SparklineChart
+                      data={sparklineData.values}
+                      color="hsl(var(--primary))"
+                      height={32}
+                    />
+                  </div>
+                )}
+                {balancesByCurrency.length > 1 && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {balancesByCurrency.map(([cur, bal]) => (
+                      <Badge key={cur} variant="outline" className="text-xs font-mono">
+                        {formatMoney(bal, cur)}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                  <span>{accountSummary.total} accounts</span>
+                  {usdToLkr && <span className="opacity-60">• 1 USD ≈ {usdToLkr.toFixed(0)} LKR</span>}
+                </div>
+              </>
             )}
-            <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-              <span>{accountSummary.total} accounts</span>
-              {usdToLkr && <span className="opacity-60">• 1 USD ≈ {usdToLkr.toFixed(0)} LKR</span>}
-            </div>
           </CardContent>
         </Card>
 
         {/* Cash in Hand */}
-        <Card>
+        <Card className="stat-card stagger-2 shadow-sm">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -285,19 +325,38 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="pb-4">
-            <div className="text-2xl font-bold">
-              {cashMissingUsdRate || cashUnsupportedCurrency
-                ? "—"
-                : formatMoney(cashInHandLkr, HOME_CURRENCY)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              {accountSummary.cash} cash account{accountSummary.cash !== 1 ? "s" : ""}
-            </p>
+            {isLoading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-8 w-24" />
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+            ) : (
+              <>
+                <div className="text-2xl font-bold">
+                  {cashMissingUsdRate || cashUnsupportedCurrency
+                    ? "—"
+                    : formatMoney(cashInHandLkr, HOME_CURRENCY)}
+                </div>
+                {sparklineData.values.length > 0 && (
+                  <div className="mt-3">
+                    <SparklineChart
+                      data={sparklineData.values}
+                      color="hsl(168 76% 42%)"
+                      height={32}
+                    />
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground mt-2">
+                  {accountSummary.cash} cash account{accountSummary.cash !== 1 ? "s" : ""}
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
 
         {/* Income Card */}
-        <Card>
+        <Card className="stat-card stagger-3 shadow-sm">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -309,19 +368,42 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="pb-4">
-            <div className="text-2xl font-bold text-emerald-600">
-              +{formatMoney(monthTotals.income)}
-            </div>
-            <div className="mt-2 flex items-center gap-2">
-              <Badge variant="secondary" className="text-xs">
-                {txCounts.income} transactions
-              </Badge>
-            </div>
+            {isLoading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-8 w-24" />
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-5 w-20" />
+              </div>
+            ) : (
+              <>
+                <div className="text-2xl font-bold text-emerald-600">
+                  +{formatMoney(monthTotals.income)}
+                </div>
+                {trends.incomePercentChange !== 0 && (
+                  <div className={`flex items-center gap-1 mt-2 text-sm ${trends.incomeChange >= 0 ? "text-emerald-600" : "text-rose-600"
+                    }`}>
+                    {trends.incomeChange >= 0 ? (
+                      <TrendingUp className="h-3.5 w-3.5" />
+                    ) : (
+                      <TrendingDown className="h-3.5 w-3.5" />
+                    )}
+                    <span className="font-medium">
+                      {Math.abs(trends.incomePercentChange).toFixed(0)}% vs last month
+                    </span>
+                  </div>
+                )}
+                <div className="mt-2 flex items-center gap-2">
+                  <Badge variant="secondary" className="text-xs">
+                    {txCounts.income} transactions
+                  </Badge>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
         {/* Expenses Card */}
-        <Card>
+        <Card className="stat-card stagger-4 shadow-sm">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -333,46 +415,151 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="pb-4">
-            <div className="text-2xl font-bold text-rose-600">
-              -{formatMoney(monthTotals.expense)}
-            </div>
-            <div className="mt-2 flex items-center gap-2">
-              <Badge variant="secondary" className="text-xs">
-                {txCounts.expense} transactions
-              </Badge>
-            </div>
+            {isLoading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-8 w-24" />
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-5 w-20" />
+              </div>
+            ) : (
+              <>
+                <div className="text-2xl font-bold text-rose-600">
+                  -{formatMoney(monthTotals.expense)}
+                </div>
+                {trends.expensePercentChange !== 0 && (
+                  <div className={`flex items-center gap-1 mt-2 text-sm ${trends.expenseChange <= 0 ? "text-emerald-600" : "text-rose-600"
+                    }`}>
+                    {trends.expenseChange <= 0 ? (
+                      <TrendingDown className="h-3.5 w-3.5" />
+                    ) : (
+                      <TrendingUp className="h-3.5 w-3.5" />
+                    )}
+                    <span className="font-medium">
+                      {Math.abs(trends.expensePercentChange).toFixed(0)}% vs last month
+                    </span>
+                  </div>
+                )}
+                <div className="mt-2 flex items-center gap-2">
+                  <Badge variant="secondary" className="text-xs">
+                    {txCounts.expense} transactions
+                  </Badge>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Net Change Banner */}
-      <Card className={`border-l-4 ${monthTotals.net >= 0 ? "border-l-emerald-500" : "border-l-rose-500"}`}>
-        <CardContent className="py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {monthTotals.net >= 0 ? (
-                <TrendingUp className="h-5 w-5 text-emerald-600" />
-              ) : (
-                <TrendingDown className="h-5 w-5 text-rose-600" />
-              )}
-              <div>
-                <p className="text-sm font-medium">Monthly Net Change</p>
+      {/* Quick Stats Card */}
+      <Card className="card-hover border-l-4 border-l-blue-500 shadow-sm">
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+              <Target className="h-5 w-5 text-blue-600" />
+            </div>
+            <div>
+              <CardTitle className="text-base">Quick Stats</CardTitle>
+              <CardDescription>Your financial snapshot for {monthName}</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-8 w-32" />
+                <Skeleton className="h-3 w-20" />
+              </div>
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-8 w-16" />
+                <Skeleton className="h-3 w-20" />
+              </div>
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-8 w-32" />
+                <Skeleton className="h-3 w-20" />
+              </div>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">Avg. Daily Spending</p>
+                <p className="text-lg font-bold tabular-nums">
+                  {formatMoney(quickStats.averageDailySpending)}
+                </p>
                 <p className="text-xs text-muted-foreground">
-                  {monthTotals.net >= 0 ? "You're saving money this month" : "Spending exceeds income"}
+                  Per day this month
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">Days Remaining</p>
+                <p className="text-lg font-bold tabular-nums">
+                  {quickStats.daysRemainingInMonth}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Until month end
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">Projected Balance</p>
+                <p className={`text-lg font-bold tabular-nums ${quickStats.projectedMonthEnd >= quickStats.currentBalance
+                  ? "text-emerald-600"
+                  : "text-rose-600"
+                  }`}>
+                  {formatMoney(quickStats.projectedMonthEnd)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  at current rate
                 </p>
               </div>
             </div>
-            <div className={`text-2xl font-bold ${monthTotals.net >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
-              {monthTotals.net >= 0 ? "+" : ""}{formatMoney(monthTotals.net)}
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Net Change Banner */}
+      <Card className={`card-hover border-l-4 ${monthTotals.net >= 0 ? "border-l-emerald-500" : "border-l-rose-500"}`}>
+        <CardContent className="py-4">
+          {isLoading ? (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-10 w-10 rounded-full" />
+                <div className="space-y-1">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-3 w-48" />
+                </div>
+              </div>
+              <Skeleton className="h-8 w-32" />
             </div>
-          </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {monthTotals.net >= 0 ? (
+                  <TrendingUp className="h-5 w-5 text-emerald-600" />
+                ) : (
+                  <TrendingDown className="h-5 w-5 text-rose-600" />
+                )}
+                <div>
+                  <p className="text-sm font-medium">Monthly Net Change</p>
+                  <p className="text-xs text-muted-foreground">
+                    {monthTotals.net >= 0 ? "You're saving money this month" : "Spending exceeds income"}
+                  </p>
+                </div>
+              </div>
+              <div className={`text-2xl font-bold ${monthTotals.net >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                {monthTotals.net >= 0 ? "+" : ""}{formatMoney(monthTotals.net)}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
       {/* Charts Row */}
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Income vs Expenses */}
-        <Card>
+        <Card className="shadow-sm">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div>
@@ -382,59 +569,71 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3 mb-4">
-              <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                    <TrendingUp className="h-5 w-5 text-emerald-600" />
+            {isLoading ? (
+              <div className="space-y-4">
+                <div className="space-y-3">
+                  <Skeleton className="h-16 w-full rounded-lg" />
+                  <Skeleton className="h-16 w-full rounded-lg" />
+                </div>
+                <Skeleton className="h-48 w-full rounded-lg" />
+              </div>
+            ) : (
+              <>
+                <div className="space-y-3 mb-4">
+                  <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                        <TrendingUp className="h-5 w-5 text-emerald-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Income</p>
+                        <p className="text-xs text-muted-foreground">{txCounts.income} transactions</p>
+                      </div>
+                    </div>
+                    <span className="text-lg font-bold text-emerald-600">
+                      {formatMoney(monthTotals.income)}
+                    </span>
                   </div>
-                  <div>
-                    <p className="text-sm font-medium">Income</p>
-                    <p className="text-xs text-muted-foreground">{txCounts.income} transactions</p>
+                  <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-lg bg-rose-500/10 flex items-center justify-center">
+                        <TrendingDown className="h-5 w-5 text-rose-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Expenses</p>
+                        <p className="text-xs text-muted-foreground">{txCounts.expense} transactions</p>
+                      </div>
+                    </div>
+                    <span className="text-lg font-bold text-rose-600">
+                      {formatMoney(monthTotals.expense)}
+                    </span>
                   </div>
                 </div>
-                <span className="text-lg font-bold text-emerald-600">
-                  {formatMoney(monthTotals.income)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-rose-500/10 flex items-center justify-center">
-                    <TrendingDown className="h-5 w-5 text-rose-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Expenses</p>
-                    <p className="text-xs text-muted-foreground">{txCounts.expense} transactions</p>
-                  </div>
+                <div className="h-48 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} layout="vertical" barCategoryGap="20%">
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} className="stroke-muted" />
+                      <XAxis type="number" className="text-xs" tickFormatter={(v) => formatMoney(v).replace(/\.00$/, "")} />
+                      <YAxis type="category" dataKey="name" className="text-xs" width={70} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--card))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "8px",
+                        }}
+                        formatter={(value) => formatMoney(typeof value === "number" ? value : 0)}
+                      />
+                      <Bar dataKey="value" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
-                <span className="text-lg font-bold text-rose-600">
-                  {formatMoney(monthTotals.expense)}
-                </span>
-              </div>
-            </div>
-            <div className="h-48 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} layout="vertical" barCategoryGap="20%">
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} className="stroke-muted" />
-                  <XAxis type="number" className="text-xs" tickFormatter={(v) => formatMoney(v).replace(/\.00$/, "")} />
-                  <YAxis type="category" dataKey="name" className="text-xs" width={70} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                    formatter={(value) => formatMoney(typeof value === "number" ? value : 0)}
-                  />
-                  <Bar dataKey="value" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
         {/* Expense Categories */}
-        <Card>
+        <Card className="shadow-sm">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div>
@@ -449,12 +648,33 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent>
-            {expenseByCategory.length > 0 ? (
+            {isLoading ? (
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="space-y-4">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <Skeleton className="h-3 w-3 rounded-full" />
+                      <div className="flex-1">
+                        <div className="flex justify-between mb-1">
+                          <Skeleton className="h-4 w-24" />
+                          <Skeleton className="h-4 w-8" />
+                        </div>
+                        <Skeleton className="h-1.5 w-full rounded-full" />
+                      </div>
+                      <Skeleton className="h-4 w-16" />
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-center justify-center">
+                  <Skeleton className="h-40 w-40 rounded-full" />
+                </div>
+              </div>
+            ) : expenseByCategory.length > 0 ? (
               <div className="grid gap-4 lg:grid-cols-2">
                 <div className="space-y-2">
                   {expenseByCategory.map((cat, idx) => {
-                    const pct = monthTotals.expense > 0 
-                      ? Math.round((cat.value / monthTotals.expense) * 100) 
+                    const pct = monthTotals.expense > 0
+                      ? Math.round((cat.value / monthTotals.expense) * 100)
                       : 0;
                     return (
                       <div key={cat.categoryId} className="flex items-center gap-3">
@@ -470,7 +690,7 @@ export default function DashboardPage() {
                           <div className="h-1.5 w-full rounded-full bg-muted mt-1 overflow-hidden">
                             <div
                               className="h-full rounded-full"
-                              style={{ 
+                              style={{
                                 width: `${pct}%`,
                                 backgroundColor: pieColors[idx % pieColors.length]
                               }}
@@ -549,7 +769,34 @@ export default function DashboardPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {budgetStatus.overallLimit ? (
+          {isLoading ? (
+            <div className="space-y-4">
+              <div className="p-4 rounded-lg border-2 border-dashed space-y-3">
+                <div className="flex justify-between">
+                  <div className="space-y-1">
+                    <Skeleton className="h-5 w-32" />
+                    <Skeleton className="h-3 w-40" />
+                  </div>
+                  <div className="space-y-1 text-right">
+                    <Skeleton className="h-6 w-32 ml-auto" />
+                    <Skeleton className="h-3 w-24 ml-auto" />
+                  </div>
+                </div>
+                <Skeleton className="h-3 w-full rounded-full" />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="p-3 rounded-lg border space-y-2">
+                    <div className="flex justify-between">
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-3 w-8" />
+                    </div>
+                    <Skeleton className="h-2 w-full rounded-full" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : budgetStatus.overallLimit ? (
             <div className="space-y-4">
               {/* Overall Budget */}
               <div className="p-4 rounded-lg border-2 border-dashed">
@@ -566,7 +813,7 @@ export default function DashboardPage() {
                       </span>
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {budgetStatus.overallLimit - budgetStatus.totalSpent > 0 
+                      {budgetStatus.overallLimit - budgetStatus.totalSpent > 0
                         ? `${formatMoney(budgetStatus.overallLimit - budgetStatus.totalSpent, budgetStatus.overallCurrency)} remaining`
                         : "Budget exceeded"}
                     </p>
@@ -574,13 +821,12 @@ export default function DashboardPage() {
                 </div>
                 <div className="h-3 w-full rounded-full bg-muted overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all ${
-                      budgetStatus.totalSpent > budgetStatus.overallLimit
-                        ? "bg-destructive"
-                        : budgetStatus.totalSpent > budgetStatus.overallLimit * 0.8
-                          ? "bg-amber-500"
-                          : "bg-primary"
-                    }`}
+                    className={`h-full rounded-full transition-all ${budgetStatus.totalSpent > budgetStatus.overallLimit
+                      ? "bg-destructive"
+                      : budgetStatus.totalSpent > budgetStatus.overallLimit * 0.8
+                        ? "bg-amber-500"
+                        : "bg-primary"
+                      }`}
                     style={{
                       width: `${Math.min(100, Math.round((budgetStatus.totalSpent / budgetStatus.overallLimit) * 100))}%`,
                     }}
@@ -609,9 +855,8 @@ export default function DashboardPage() {
                         </div>
                         <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
                           <div
-                            className={`h-full rounded-full transition-all ${
-                              over ? "bg-destructive" : warning ? "bg-amber-500" : "bg-primary"
-                            }`}
+                            className={`h-full rounded-full transition-all ${over ? "bg-destructive" : warning ? "bg-amber-500" : "bg-primary"
+                              }`}
                             style={{ width: `${pct}%` }}
                           />
                         </div>

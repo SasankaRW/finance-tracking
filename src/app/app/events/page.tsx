@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { MapPin, Plus, Trash2 } from "lucide-react";
+import { MapPin, Plus, Trash2, Calendar, TrendingUp, PiggyBank, Archive } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { useEvents, useTransactions } from "@/lib/finance/hooks";
 import { createEvent, deleteEvent } from "@/lib/finance/event-mutations";
@@ -81,11 +81,11 @@ export default function EventsPage() {
         budgetMin: values.budgetMin,
         budgetMax: values.budgetMax,
       });
-      toast.success("Trip created");
+      toast.success("Event created");
       setOpen(false);
       form.reset({ name: "", currency: values.currency, budgetMin: 0, budgetMax: 0 });
     } catch (e) {
-      toast.error("Failed to create trip", {
+      toast.error("Failed to create event", {
         description: e instanceof Error ? e.message : undefined,
       });
     }
@@ -95,9 +95,9 @@ export default function EventsPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Trips</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Events</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Track trip budgets separately while still deducting from real accounts
+            Track event budgets separately while still deducting from real accounts
           </p>
         </div>
 
@@ -105,14 +105,14 @@ export default function EventsPage() {
           <DialogTrigger asChild>
             <Button>
               <Plus className="h-4 w-4 mr-2" />
-              New Trip
+              New Event
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>Create Trip</DialogTitle>
+              <DialogTitle>Create Event</DialogTitle>
               <DialogDescription>
-                Set a budget range and then tag expenses to this trip
+                Set a budget range and then tag expenses to this event
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={submitCreate}>
@@ -191,11 +191,95 @@ export default function EventsPage() {
         </Dialog>
       </div>
 
+      {/* Summary Stats */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Total Events
+              </CardTitle>
+              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                <Calendar className="h-4 w-4 text-primary" />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{events.length}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {events.filter((e: any) => e.status !== "archived").length} active
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Total Budget
+              </CardTitle>
+              <div className="h-8 w-8 rounded-full bg-blue-500/10 flex items-center justify-center">
+                <PiggyBank className="h-4 w-4 text-blue-600" />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {formatMoney(
+                events.reduce((sum: number, e: any) => sum + (e.budgetMax ?? 0), 0)
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">across all events</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Total Spent
+              </CardTitle>
+              <div className="h-8 w-8 rounded-full bg-rose-500/10 flex items-center justify-center">
+                <TrendingUp className="h-4 w-4 text-rose-600" />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-rose-600">
+              {formatMoney(
+                Array.from(spentByEvent.values()).reduce((sum, val) => sum + val, 0)
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">from event transactions</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Archived
+              </CardTitle>
+              <div className="h-8 w-8 rounded-full bg-amber-500/10 flex items-center justify-center">
+                <Archive className="h-4 w-4 text-amber-600" />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {events.filter((e: any) => e.status === "archived").length}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">completed events</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Events Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {eventsLoading ? (
           <Card>
             <CardContent className="py-10 text-sm text-muted-foreground text-center">
-              Loading trips…
+              Loading events…
             </CardContent>
           </Card>
         ) : events.length ? (
@@ -214,7 +298,7 @@ export default function EventsPage() {
             const over = max > 0 && spent > max;
 
             return (
-              <Card key={e.id} className="relative overflow-hidden">
+              <Card key={e.id} className="card-hover relative overflow-hidden transition-smooth">
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -240,14 +324,14 @@ export default function EventsPage() {
                         if (!confirm("Delete this trip?")) return;
                         try {
                           await deleteEvent(user.uid, e.id);
-                          toast.success("Trip deleted");
+                          toast.success("Event deleted");
                         } catch (err) {
                           toast.error("Failed to delete", {
                             description: err instanceof Error ? err.message : undefined,
                           });
                         }
                       }}
-                      aria-label="Delete trip"
+                      aria-label="Delete event"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -275,13 +359,13 @@ export default function EventsPage() {
 
                   <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
                     <div
-                      className={`h-full rounded-full transition-all ${over ? "bg-destructive" : "bg-primary"}`}
+                      className={`progress-animated h-full rounded-full ${over ? "bg-destructive" : "bg-primary"}`}
                       style={{ width: `${pct}%` }}
                     />
                   </div>
 
                   <Button asChild variant="outline" className="w-full">
-                    <Link href={`/app/events/view?id=${e.id}`}>Open Trip</Link>
+                    <Link href={`/app/events/view?id=${e.id}`}>View Details</Link>
                   </Button>
                 </CardContent>
               </Card>
@@ -290,15 +374,15 @@ export default function EventsPage() {
         ) : (
           <Card className="md:col-span-2 lg:col-span-3">
             <CardContent className="py-12 text-center">
-              <div className="text-sm font-medium">No trips yet</div>
+              <div className="text-sm font-medium">No events yet</div>
               <div className="text-sm text-muted-foreground mt-1">
-                Create a trip and tag expenses to keep them grouped under one budget.
+                Create an event and tag expenses to keep them grouped under one budget.
               </div>
             </CardContent>
           </Card>
         )}
       </div>
-    </div>
+    </div >
   );
 }
 

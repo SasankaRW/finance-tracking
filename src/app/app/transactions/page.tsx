@@ -4,7 +4,7 @@ import * as React from "react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { format } from "date-fns";
+import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays, subMonths } from "date-fns";
 import { toast } from "sonner";
 import {
   Download,
@@ -22,6 +22,7 @@ import {
   Plus,
   Tag,
   Settings2,
+  CalendarIcon,
 } from "lucide-react";
 import { Timestamp } from "firebase/firestore";
 import { useAuth } from "@/lib/auth/auth-provider";
@@ -80,6 +81,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { TransactionTrendChart } from "@/components/transaction-trend-chart";
 
 const kindSchema = z.enum(["expense", "income", "transfer"]);
 
@@ -118,6 +120,47 @@ export default function TransactionsPage() {
   const { events } = useEvents();
   const { data: fxUsd } = useFxRates("USD", [HOME_CURRENCY]);
   const usdToLkr = fxUsd?.rates?.[HOME_CURRENCY] ?? null;
+
+  // Date range presets
+  type DateRangePreset = "today" | "week" | "month" | "30days" | "90days" | "custom";
+
+  const [dateRangePreset, setDateRangePreset] = React.useState<DateRangePreset>("month");
+  const [customDateRange, setCustomDateRange] = React.useState<{ start: Date; end: Date }>({
+    start: startOfMonth(new Date()),
+    end: endOfMonth(new Date()),
+  });
+  const [showCustomDatePicker, setShowCustomDatePicker] = React.useState(false);
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [debouncedSearch, setDebouncedSearch] = React.useState("");
+
+  // Debounce search
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Calculate date range based on preset
+  const dateRange = React.useMemo(() => {
+    const now = new Date();
+    switch (dateRangePreset) {
+      case "today":
+        return { start: startOfDay(now), end: endOfDay(now) };
+      case "week":
+        return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }) };
+      case "month":
+        return { start: startOfMonth(now), end: endOfMonth(now) };
+      case "30days":
+        return { start: subDays(now, 30), end: now };
+      case "90days":
+        return { start: subDays(now, 90), end: now };
+      case "custom":
+        return customDateRange;
+      default:
+        return { start: startOfMonth(now), end: endOfMonth(now) };
+    }
+  }, [dateRangePreset, customDateRange]);
 
   const [filters, setFilters] = React.useState<{
     accountId?: string;
@@ -231,6 +274,35 @@ export default function TransactionsPage() {
     }
   };
 
+  // Apply client-side filtering for date range and search
+  const filteredTransactions = React.useMemo(() => {
+    let filtered = transactions as any[];
+
+    // Apply date range filter
+    filtered = filtered.filter((t: any) => {
+      if (!t.occurredAt) return false;
+      const txnDate = t.occurredAt instanceof Timestamp ? t.occurredAt.toDate() : new Date(t.occurredAt);
+      return txnDate >= dateRange.start && txnDate <= dateRange.end;
+    });
+
+    // Apply search filter
+    if (debouncedSearch.trim()) {
+      const search = debouncedSearch.toLowerCase();
+      filtered = filtered.filter((t: any) => {
+        const note = (t.note || "").toLowerCase();
+        const categoryName = t.categoryId
+          ? (allCategories.find((c: any) => c.id === t.categoryId)?.name || "").toLowerCase()
+          : "";
+        const accountName = t.accountId
+          ? (accounts.find((a: any) => a.id === t.accountId)?.name || "").toLowerCase()
+          : "";
+        return note.includes(search) || categoryName.includes(search) || accountName.includes(search);
+      });
+    }
+
+    return filtered;
+  }, [transactions, dateRange, debouncedSearch, allCategories, accounts]);
+
   const summaryStats = React.useMemo(() => {
     let totalIncome = 0;
     let totalExpense = 0;
@@ -252,7 +324,7 @@ export default function TransactionsPage() {
       return 0;
     };
 
-    for (const t of transactions as any[]) {
+    for (const t of filteredTransactions as any[]) {
       const amt = t.amount ?? 0;
       const cur = t.currency ?? HOME_CURRENCY;
       if (t.kind === "income") {
@@ -274,13 +346,13 @@ export default function TransactionsPage() {
       incomeCount,
       expenseCount,
       transferCount,
-      total: transactions.length,
+      total: filteredTransactions.length,
       missingUsdRate,
       unsupportedCurrency,
     };
-  }, [transactions, usdToLkr]);
+  }, [filteredTransactions, usdToLkr]);
 
-  const hasFilters = filters.accountId || filters.categoryId || filters.eventId || filters.noEvent;
+  const hasFilters = filters.accountId || filters.categoryId || filters.eventId || filters.noEvent || debouncedSearch.trim() || dateRangePreset !== "month";
 
   return (
     <div className="space-y-6">
@@ -301,7 +373,7 @@ export default function TransactionsPage() {
               const accountById = new Map(accounts.map((a: any) => [a.id, a.name]));
               const categoryById = new Map(allCategories.map((c: any) => [c.id, c.name]));
 
-              const rows = (transactions as any[]).map((t) => {
+              const rows = (filteredTransactions as any[]).map((t) => {
                 const occurredAt = t.occurredAt instanceof Timestamp ? t.occurredAt.toDate().toISOString() : "";
                 return {
                   id: t.id,
@@ -323,7 +395,7 @@ export default function TransactionsPage() {
               downloadTextFile(`cashly-transactions-${new Date().toISOString().slice(0, 10)}.csv`, csv);
               toast.success("CSV exported");
             }}
-            disabled={loading || !(transactions as any[]).length}
+            disabled={loading || !(filteredTransactions as any[]).length}
           >
             <Download className="h-4 w-4 mr-1" />
             Export
@@ -416,6 +488,136 @@ export default function TransactionsPage() {
             </p>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Trend Chart */}
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle>Transaction Trends</CardTitle>
+              <CardDescription>
+                Income vs expenses over time
+              </CardDescription>
+            </div>
+
+            {/* Date Range Filters */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                variant={dateRangePreset === "today" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setDateRangePreset("today")}
+                className="h-8"
+              >
+                Today
+              </Button>
+              <Button
+                variant={dateRangePreset === "week" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setDateRangePreset("week")}
+                className="h-8"
+              >
+                Week
+              </Button>
+              <Button
+                variant={dateRangePreset === "month" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setDateRangePreset("month")}
+                className="h-8"
+              >
+                Month
+              </Button>
+              <Button
+                variant={dateRangePreset === "30days" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setDateRangePreset("30days")}
+                className="hidden sm:flex h-8"
+              >
+                30 Days
+              </Button>
+              <Button
+                variant={dateRangePreset === "90days" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setDateRangePreset("90days")}
+                className="hidden sm:flex h-8"
+              >
+                90 Days
+              </Button>
+              <Popover open={showCustomDatePicker} onOpenChange={setShowCustomDatePicker}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={dateRangePreset === "custom" ? "default" : "outline"}
+                    size="sm"
+                    className="h-8 gap-1"
+                  >
+                    <CalendarIcon className="h-3.5 w-3.5" />
+                    {dateRangePreset === "custom" ? "Custom" : "Custom"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-4" align="end">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-xs">Start Date</Label>
+                      <Calendar
+                        mode="single"
+                        selected={customDateRange.start}
+                        onSelect={(date) => {
+                          if (date) {
+                            setCustomDateRange((prev) => ({ ...prev, start: date }));
+                            setDateRangePreset("custom");
+                          }
+                        }}
+                        initialFocus
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">End Date</Label>
+                      <Calendar
+                        mode="single"
+                        selected={customDateRange.end}
+                        onSelect={(date) => {
+                          if (date) {
+                            setCustomDateRange((prev) => ({ ...prev, end: date }));
+                            setDateRangePreset("custom");
+                          }
+                        }}
+                        initialFocus
+                      />
+                    </div>
+                    <Button
+                      size="sm"
+                      className="w-full"
+                      onClick={() => setShowCustomDatePicker(false)}
+                    >
+                      Apply
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <TransactionTrendChart
+            transactions={filteredTransactions.map((t: any) => ({
+              date: t.occurredAt instanceof Timestamp ? t.occurredAt.toDate() : new Date(t.occurredAt),
+              amount: t.amount ?? 0,
+              kind: t.kind,
+              currency: t.currency,
+            }))}
+            dateRange={dateRange}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Search Bar */}
+      <div className="flex gap-3">
+        <Input
+          placeholder="Search transactions..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="max-w-md"
+        />
       </div>
 
       {/* Transactions Table */}
@@ -651,14 +853,165 @@ export default function TransactionsPage() {
           </div>
         </CardContent>
 
-        <div className="border-t">
+        {/* Mobile Card View */}
+        <div className="md:hidden">
+          {loading ? (
+            <div className="p-6 text-center text-muted-foreground">
+              Loading transactions…
+            </div>
+          ) : filteredTransactions.length ? (
+            <div className="divide-y">
+              {(filteredTransactions as any[]).map((t) => {
+                const occurredAt = t.occurredAt instanceof Timestamp ? t.occurredAt.toDate() : new Date();
+                const accountName = t.accountId ? accounts.find((a: any) => a.id === t.accountId)?.name : null;
+                const categoryName = t.categoryId
+                  ? allCategories.find((c: any) => c.id === t.categoryId)?.name
+                  : null;
+                const eventName = t.eventId ? eventById.get(t.eventId) ?? null : null;
+                const fromAccountName = t.fromAccountId
+                  ? accounts.find((a: any) => a.id === t.fromAccountId)?.name
+                  : null;
+                const toAccountName = t.toAccountId
+                  ? accounts.find((a: any) => a.id === t.toAccountId)?.name
+                  : null;
+
+                return (
+                  <div key={t.id} className="p-4 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-start justify-between gap-3">
+                      {/* Left: Icon, Details, Meta */}
+                      <div className="flex gap-3 flex-1 min-w-0">
+                        <div className={`h-10 w-10 shrink-0 rounded-xl flex items-center justify-center ${t.kind === "income"
+                            ? "bg-emerald-500/10"
+                            : t.kind === "expense"
+                              ? "bg-rose-500/10"
+                              : "bg-blue-500/10"
+                          }`}>
+                          {getTransactionIcon(t.kind)}
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              {t.note ? (
+                                <div className="font-semibold truncate">{t.note}</div>
+                              ) : (
+                                <div className="font-semibold capitalize text-muted-foreground">{t.kind}</div>
+                              )}
+                              <div className="text-xs text-muted-foreground mt-0.5">
+                                {t.kind === "transfer" ? (
+                                  <span>{fromAccountName} → {toAccountName}</span>
+                                ) : (
+                                  <span>
+                                    {accountName}
+                                    {categoryName && <span> · {categoryName}</span>}
+                                    {eventName && <span> · {eventName}</span>}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-xs text-muted-foreground/70 mt-1">
+                                {format(occurredAt, "MMM d, yyyy")}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right: Amount & Actions */}
+                      <div className="flex items-start gap-2 shrink-0">
+                        <div className="text-right">
+                          <div className={`font-bold tabular-nums text-base ${t.kind === "income"
+                              ? "text-emerald-600"
+                              : t.kind === "expense"
+                                ? "text-rose-600"
+                                : ""
+                            }`}>
+                            {t.kind === "expense" ? "-" : t.kind === "income" ? "+" : ""}
+                            {formatMoney(t.amount ?? 0)}
+                          </div>
+                        </div>
+
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setEdit(t);
+                                form.reset({
+                                  kind: t.kind,
+                                  amount: t.amount ?? 0,
+                                  occurredAt,
+                                  note: t.note ?? "",
+                                  accountId: t.accountId,
+                                  categoryId: t.categoryId,
+                                  eventId: t.eventId,
+                                  fromAccountId: t.fromAccountId,
+                                  toAccountId: t.toAccountId,
+                                });
+                              }}
+                            >
+                              <Pencil className="h-4 w-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={async () => {
+                                if (!user) return;
+                                if (!confirm("Delete this transaction?")) return;
+                                try {
+                                  await deleteTransaction(user.uid, t.id, t.updatedAt);
+                                  toast.success("Transaction deleted");
+                                } catch (e) {
+                                  toast.error("Failed to delete", {
+                                    description: e instanceof Error ? e.message : undefined,
+                                  });
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="py-16 px-4">
+              <div className="flex flex-col items-center gap-3 max-w-sm mx-auto text-center">
+                <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
+                  <Receipt className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="font-medium">No transactions found</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {hasFilters ? "Try clearing your filters" : "Add your first transaction"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Desktop Table View */}
+        <div className="border-t hidden md:block">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/50 hover:bg-muted/50">
                 <TableHead className="pl-6 w-[120px]">Date</TableHead>
                 <TableHead className="w-[100px]">Type</TableHead>
                 <TableHead>Details</TableHead>
-                <TableHead className="text-right w-[140px]">Amount</TableHead>
+                <TableHead className="text-right w-[160px] pr-4">Amount</TableHead>
                 <TableHead className="w-[60px] pr-6" />
               </TableRow>
             </TableHeader>
@@ -669,8 +1022,8 @@ export default function TransactionsPage() {
                     Loading transactions…
                   </TableCell>
                 </TableRow>
-              ) : transactions.length ? (
-                (transactions as any[]).map((t) => {
+              ) : filteredTransactions.length ? (
+                (filteredTransactions as any[]).map((t) => {
                   const occurredAt = t.occurredAt instanceof Timestamp ? t.occurredAt.toDate() : new Date();
 
                   const accountName = t.accountId ? accounts.find((a: any) => a.id === t.accountId)?.name : null;
@@ -694,10 +1047,10 @@ export default function TransactionsPage() {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${t.kind === "income"
-                              ? "bg-emerald-500/10"
-                              : t.kind === "expense"
-                                ? "bg-rose-500/10"
-                                : "bg-blue-500/10"
+                            ? "bg-emerald-500/10"
+                            : t.kind === "expense"
+                              ? "bg-rose-500/10"
+                              : "bg-blue-500/10"
                             }`}>
                             {getTransactionIcon(t.kind)}
                           </div>
@@ -725,10 +1078,10 @@ export default function TransactionsPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <span className={`font-semibold tabular-nums ${t.kind === "income"
-                            ? "text-emerald-600"
-                            : t.kind === "expense"
-                              ? "text-rose-600"
-                              : ""
+                          ? "text-emerald-600"
+                          : t.kind === "expense"
+                            ? "text-rose-600"
+                            : ""
                           }`}>
                           {t.kind === "expense" ? "-" : t.kind === "income" ? "+" : ""}
                           {formatMoney(t.amount ?? 0)}

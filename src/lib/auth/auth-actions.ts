@@ -6,6 +6,7 @@ import {
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
+  sendPasswordResetEmail,
 } from "firebase/auth";
 import { getFirebaseAuth } from "@/lib/firebase/client";
 import { clearSession, createSession } from "@/lib/auth/session-client";
@@ -30,14 +31,24 @@ export async function signInWithEmail(email: string, password: string) {
 }
 
 export async function signInWithGoogle() {
+  try {
+    const auth = getFirebaseAuth();
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+    const cred = await signInWithPopup(auth, provider);
+    const idToken = await cred.user.getIdToken();
+    await createSession(idToken);
+    await ensureDefaultCategoriesSeeded(cred.user.uid);
+    return cred.user;
+  } catch (error) {
+    console.error("Error signing in with Google:", error);
+    throw error;
+  }
+}
+
+export async function resetPassword(email: string) {
   const auth = getFirebaseAuth();
-  const provider = new GoogleAuthProvider();
-  provider.setCustomParameters({ prompt: "select_account" });
-  const cred = await signInWithPopup(auth, provider);
-  const idToken = await cred.user.getIdToken();
-  await createSession(idToken);
-  await ensureDefaultCategoriesSeeded(cred.user.uid);
-  return cred.user;
+  await sendPasswordResetEmail(auth, email);
 }
 
 export async function signOutEverywhere() {
