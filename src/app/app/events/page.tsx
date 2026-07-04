@@ -14,7 +14,6 @@ import { createEvent, deleteEvent } from "@/lib/finance/event-mutations";
 import { formatMoney } from "@/lib/format";
 import { COMMON_CURRENCIES, DEFAULT_CURRENCY } from "@/shared/currency";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogBody,
@@ -92,11 +91,11 @@ export default function EventsPage() {
   });
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Events</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <h1 className="font-display text-xl font-bold tracking-tight sm:text-2xl">Events</h1>
+          <p className="mt-1 hidden text-sm text-muted-foreground sm:block">
             Track event budgets separately while still deducting from real accounts
           </p>
         </div>
@@ -192,96 +191,58 @@ export default function EventsPage() {
       </div>
 
       {/* Summary Stats */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Events
-              </CardTitle>
-              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                <Calendar className="h-4 w-4 text-primary" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{events.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {events.filter((e: any) => e.status !== "archived").length} active
-            </p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-2 divide-x divide-y divide-border/60 overflow-hidden rounded-[2rem] bg-card shadow-sm sm:grid-cols-4 sm:divide-y-0">
+        <div className="p-3 sm:p-4">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
+            <Calendar className="h-3.5 w-3.5 text-primary" />
+            Events
+          </div>
+          <p className="mt-2 font-display text-lg font-bold tabular-nums sm:text-2xl">{events.length}</p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            {events.filter((e: any) => e.status !== "archived").length} active
+          </p>
+        </div>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Budget
-              </CardTitle>
-              <div className="h-8 w-8 rounded-full bg-blue-500/10 flex items-center justify-center">
-                <PiggyBank className="h-4 w-4 text-blue-600" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {formatMoney(
-                events.reduce((sum: number, e: any) => sum + (e.budgetMax ?? 0), 0)
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">across all events</p>
-          </CardContent>
-        </Card>
+        <div className="p-3 sm:p-4">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
+            <PiggyBank className="h-3.5 w-3.5 text-blue-600" />
+            Budget
+          </div>
+          <p className="mt-2 truncate font-display text-lg font-bold tabular-nums sm:text-2xl">
+            {formatMoney(events.reduce((sum: number, e: any) => sum + (e.budgetMax ?? 0), 0))}
+          </p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">across all events</p>
+        </div>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Spent
-              </CardTitle>
-              <div className="h-8 w-8 rounded-full bg-rose-500/10 flex items-center justify-center">
-                <TrendingUp className="h-4 w-4 text-rose-600" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-rose-600">
-              {formatMoney(
-                Array.from(spentByEvent.values()).reduce((sum, val) => sum + val, 0)
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">from event transactions</p>
-          </CardContent>
-        </Card>
+        <div className="p-3 sm:p-4">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
+            <TrendingUp className="h-3.5 w-3.5 text-rose-600" />
+            Spent
+          </div>
+          <p className="mt-2 truncate font-display text-lg font-bold tabular-nums text-rose-600 sm:text-2xl">
+            {formatMoney(Array.from(spentByEvent.values()).reduce((sum, val) => sum + val, 0))}
+          </p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">from event transactions</p>
+        </div>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Archived
-              </CardTitle>
-              <div className="h-8 w-8 rounded-full bg-amber-500/10 flex items-center justify-center">
-                <Archive className="h-4 w-4 text-amber-600" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {events.filter((e: any) => e.status === "archived").length}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">completed events</p>
-          </CardContent>
-        </Card>
+        <div className="p-3 sm:p-4">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
+            <Archive className="h-3.5 w-3.5 text-amber-600" />
+            Archived
+          </div>
+          <p className="mt-2 font-display text-lg font-bold tabular-nums sm:text-2xl">
+            {events.filter((e: any) => e.status === "archived").length}
+          </p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">completed events</p>
+        </div>
       </div>
 
       {/* Events Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
         {eventsLoading ? (
-          <Card>
-            <CardContent className="py-10 text-sm text-muted-foreground text-center">
-              Loading events…
-            </CardContent>
-          </Card>
+          <div className="rounded-[2rem] bg-card p-8 text-center text-sm text-muted-foreground shadow-sm md:col-span-2 lg:col-span-3">
+            Loading events…
+          </div>
         ) : events.length ? (
           (events as any[]).map((e) => {
             const spent = spentByEvent.get(e.id) ?? 0;
@@ -298,91 +259,88 @@ export default function EventsPage() {
             const over = max > 0 && spent > max;
 
             return (
-              <Card key={e.id} className="card-hover relative overflow-hidden transition-smooth">
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <CardTitle className="truncate">{e.name}</CardTitle>
-                      <CardDescription className="mt-1 flex items-center gap-2">
-                        <MapPin className="h-3.5 w-3.5" />
-                        <span className="truncate">
-                          {startAt && endAt
-                            ? `${format(startAt, "MMM d")} – ${format(endAt, "MMM d, yyyy")}`
-                            : e.status === "archived"
-                              ? "Archived"
-                              : "Active"}
-                        </span>
-                      </CardDescription>
-                    </div>
-
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-9 w-9 text-muted-foreground hover:text-destructive"
-                      onClick={async () => {
-                        if (!user) return;
-                        if (!confirm("Delete this trip?")) return;
-                        try {
-                          await deleteEvent(user.uid, e.id);
-                          toast.success("Event deleted");
-                        } catch (err) {
-                          toast.error("Failed to delete", {
-                            description: err instanceof Error ? err.message : undefined,
-                          });
-                        }
-                      }}
-                      aria-label="Delete event"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardHeader>
-
-                <CardContent className="space-y-3">
-                  <div className="flex items-end justify-between gap-3">
-                    <div>
-                      <div className="text-xs text-muted-foreground">Spent</div>
-                      <div className="text-lg font-bold tabular-nums">
-                        {formatMoney(spent, currency)}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-xs text-muted-foreground">Budget range</div>
-                      <div className="text-sm font-medium tabular-nums">
-                        {formatMoney(min, currency)} – {formatMoney(max, currency)}
-                      </div>
-                      <div className={`text-xs mt-1 ${over ? "text-destructive" : "text-muted-foreground"}`}>
-                        {over ? "Over budget" : `${formatMoney(Math.max(0, remaining), currency)} remaining`}
-                      </div>
+              <div
+                key={e.id}
+                className="motion-expressive rounded-[2rem] bg-card p-4 shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-display truncate text-base font-bold">{e.name}</p>
+                    <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <MapPin className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">
+                        {startAt && endAt
+                          ? `${format(startAt, "MMM d")} – ${format(endAt, "MMM d, yyyy")}`
+                          : e.status === "archived"
+                            ? "Archived"
+                            : "Active"}
+                      </span>
                     </div>
                   </div>
 
-                  <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-                    <div
-                      className={`progress-animated h-full rounded-full ${over ? "bg-destructive" : "bg-primary"}`}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
+                  <button
+                    type="button"
+                    aria-label="Delete event"
+                    className="motion-expressive press-expressive flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    onClick={async () => {
+                      if (!user) return;
+                      if (!confirm("Delete this trip?")) return;
+                      try {
+                        await deleteEvent(user.uid, e.id);
+                        toast.success("Event deleted");
+                      } catch (err) {
+                        toast.error("Failed to delete", {
+                          description: err instanceof Error ? err.message : undefined,
+                        });
+                      }
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
 
-                  <Button asChild variant="outline" className="w-full">
-                    <Link href={`/app/events/view?id=${e.id}`}>View Details</Link>
-                  </Button>
-                </CardContent>
-              </Card>
+                <div className="mt-4 flex items-end justify-between gap-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Spent</p>
+                    <p className="font-display text-xl font-bold tabular-nums">{formatMoney(spent, currency)}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground">Budget range</p>
+                    <p className="text-sm font-medium tabular-nums">
+                      {formatMoney(min, currency)} – {formatMoney(max, currency)}
+                    </p>
+                    <p className={`mt-0.5 text-xs ${over ? "text-destructive" : "text-muted-foreground"}`}>
+                      {over ? "Over budget" : `${formatMoney(Math.max(0, remaining), currency)} remaining`}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={`h-full rounded-full transition-all ${over ? "bg-destructive" : "bg-primary"}`}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+
+                <Link
+                  href={`/app/events/view?id=${e.id}`}
+                  className="motion-expressive press-expressive mt-4 flex h-10 w-full items-center justify-center rounded-full bg-secondary text-sm font-semibold text-secondary-foreground"
+                >
+                  View Details
+                </Link>
+              </div>
             );
           })
         ) : (
-          <Card className="md:col-span-2 lg:col-span-3">
-            <CardContent className="py-12 text-center">
-              <div className="text-sm font-medium">No events yet</div>
-              <div className="text-sm text-muted-foreground mt-1">
-                Create an event and tag expenses to keep them grouped under one budget.
-              </div>
-            </CardContent>
-          </Card>
+          <div className="rounded-[2rem] border border-dashed p-8 text-center md:col-span-2 lg:col-span-3">
+            <p className="text-sm font-medium">No events yet</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Create an event and tag expenses to keep them grouped under one budget.
+            </p>
+          </div>
         )}
       </div>
-    </div >
+    </div>
   );
 }
 

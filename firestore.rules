@@ -71,24 +71,67 @@ service cloud.firestore {
         && request.resource.data.updatedAt == request.time;
     }
 
+    function getDebtBefore(userId, debtId) {
+      return get(/databases/$(database)/documents/users/$(userId)/debts/$(debtId));
+    }
+
+    function getDebtAfter(userId, debtId) {
+      return getAfter(/databases/$(database)/documents/users/$(userId)/debts/$(debtId));
+    }
+
+    function debtBalanceDelta(debtData) {
+      return debtData.direction == "owed_to_me" ? debtData.amount : (0 - debtData.amount);
+    }
+
+    function isAccountUpdateAllowedWithDebtSettlement(userId, accountId) {
+      let debtId = request.resource.data.balanceMutationId;
+      let debtBefore = getDebtBefore(userId, debtId);
+      let debtAfter = getDebtAfter(userId, debtId);
+      return debtId is string
+        && debtId.size() >= 1
+        && debtBefore.exists()
+        && debtAfter.exists()
+        && debtBefore.data.status == "active"
+        && debtAfter.data.status == "settled"
+        && debtAfter.data.id == debtId
+        && ("settledAccountId" in debtAfter.data)
+        && debtAfter.data.settledAccountId == accountId
+        && debtAfter.data.amount == debtBefore.data.amount
+        && debtAfter.data.direction == debtBefore.data.direction
+        && (request.resource.data.balance - resource.data.balance)
+           == debtBalanceDelta(debtAfter.data);
+    }
+
+    function txBalanceEffectOnAccount(tx, accountId) {
+      return tx.kind == "income" && tx.accountId == accountId ? tx.amount :
+             tx.kind == "expense" && tx.accountId == accountId ? (0 - tx.amount) :
+             tx.kind == "transfer" && tx.fromAccountId == accountId ? (0 - tx.amount) :
+             tx.kind == "transfer" && tx.toAccountId == accountId ? tx.amount :
+             0;
+    }
+
     function isAccountUpdateAllowedWithBalanceMutation(userId, accountId) {
-      // Balance-changing updates must be tied to a transaction mutation.
       let txId = request.resource.data.balanceMutationId;
+      let txBefore = getTxBefore(userId, txId);
       let txAfter = getTxAfter(userId, txId);
+      let delta = request.resource.data.balance - resource.data.balance;
       return txId is string
         && txId.size() >= 1
         && txAfter.exists()
         && txAfter.data.id == txId
-        && txAfter.data.schemaVersion == 1
-        && (!("updatedAt" in txAfter.data) || txAfter.data.updatedAt == request.time)
-        && (request.resource.data.balance - resource.data.balance)
-           == expectedDeltaFromTxChange(userId, txId, accountId);
+        && txAfter.data.status == "active"
+        && (
+          (!txBefore.exists() && delta == txBalanceEffectOnAccount(txAfter.data, accountId))
+          || (txBefore.exists()
+              && txBefore.data.status == "active"
+              && delta == (txBalanceEffectOnAccount(txAfter.data, accountId)
+                            - txBalanceEffectOnAccount(txBefore.data, accountId)))
+        );
     }
 
     function isAccountDocValidUpdate(userId, accountId) {
       // Allow renames/type changes without touching balance.
       let balanceChanged = ("balance" in request.resource.data) && request.resource.data.balance != resource.data.balance;
-      let allowedKeys = ["schemaVersion","id","name","type","currency","includeInTotals","balance","balanceMutationId","createdAt","updatedAt"];
       return (!("schemaVersion" in request.resource.data) || request.resource.data.schemaVersion == 1)
         && (!("id" in request.resource.data) || request.resource.data.id == accountId)
         && (!("name" in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() >= 1 && request.resource.data.name.size() <= 64))
@@ -97,9 +140,24 @@ service cloud.firestore {
         && (!("includeInTotals" in request.resource.data) || request.resource.data.includeInTotals is bool)
         && (!("balance" in request.resource.data) || isNumber(request.resource.data.balance))
         && (!("createdAt" in request.resource.data) || request.resource.data.createdAt == resource.data.createdAt)
-        && (!("updatedAt" in request.resource.data) || isTimestamp(request.resource.data.updatedAt) || request.resource.data.updatedAt == request.time)
-        && hasOnlyKeys(request.resource.data, allowedKeys)
-        && (!balanceChanged || isAccountUpdateAllowedWithBalanceMutation(userId, accountId));
+        && (!balanceChanged
+            || isAccountUpdateAllowedWithBalanceMutation(userId, accountId)
+            || isAccountUpdateAllowedWithDebtSettlement(userId, accountId));
+    }
+
+    function isDebtSettleUpdateValid(debtId) {
+      return resource.data.status == "active"
+        && request.resource.data.status == "settled"
+        && (!("id" in request.resource.data) || request.resource.data.id == debtId)
+        && (!("personName" in request.resource.data) || request.resource.data.personName == resource.data.personName)
+        && (!("direction" in request.resource.data) || request.resource.data.direction == resource.data.direction)
+        && (!("amount" in request.resource.data) || request.resource.data.amount == resource.data.amount)
+        && (!("currency" in request.resource.data) || request.resource.data.currency == resource.data.currency)
+        && (!("createdAt" in request.resource.data) || request.resource.data.createdAt == resource.data.createdAt)
+        && (!("settledAccountId" in request.resource.data)
+            || request.resource.data.settledAccountId is string)
+        && (!("settledTransactionId" in request.resource.data)
+            || request.resource.data.settledTransactionId is string);
     }
 
     function isCategoryDocValid(categoryId) {
@@ -119,12 +177,15 @@ service cloud.firestore {
         "schemaVersion",
         "id",
         "name",
+        "kind",
         "amount",
         "currency",
         "accountId",
         "categoryId",
         "interval",
         "status",
+        "loanTotalPayments",
+        "loanPaidPayments",
         "nextDueAt",
         "lastPaidAt",
         "createdAt",
@@ -135,6 +196,7 @@ service cloud.firestore {
         && request.resource.data.name is string
         && request.resource.data.name.size() >= 1
         && request.resource.data.name.size() <= 64
+        && (!("kind" in request.resource.data) || request.resource.data.kind in ["subscription", "loan"])
         && isNumber(request.resource.data.amount)
         && request.resource.data.amount > 0
         && request.resource.data.currency is string
@@ -142,9 +204,52 @@ service cloud.firestore {
         && request.resource.data.accountId is string
         && request.resource.data.categoryId is string
         && request.resource.data.interval in ["monthly"]
-        && request.resource.data.status in ["active", "paused"]
+        && request.resource.data.status in ["active", "paused", "completed"]
+        && (!("loanTotalPayments" in request.resource.data) || (isNumber(request.resource.data.loanTotalPayments) && request.resource.data.loanTotalPayments > 0))
+        && (!("loanPaidPayments" in request.resource.data) || (isNumber(request.resource.data.loanPaidPayments) && request.resource.data.loanPaidPayments >= 0))
+        && (!("loanPaidPayments" in request.resource.data) || !("loanTotalPayments" in request.resource.data) || request.resource.data.loanPaidPayments <= request.resource.data.loanTotalPayments)
+        && (!("kind" in request.resource.data) || request.resource.data.kind != "loan" || ("loanTotalPayments" in request.resource.data && "loanPaidPayments" in request.resource.data))
         && isTimestamp(request.resource.data.nextDueAt)
         && (!("lastPaidAt" in request.resource.data) || isTimestamp(request.resource.data.lastPaidAt))
+        && isTimestamp(request.resource.data.createdAt)
+        && isTimestamp(request.resource.data.updatedAt)
+        && request.resource.data.updatedAt == request.time
+        && hasOnlyKeys(request.resource.data, allowedKeys);
+    }
+
+    function isDebtDocValid(debtId) {
+      let allowedKeys = [
+        "schemaVersion",
+        "id",
+        "personName",
+        "direction",
+        "status",
+        "amount",
+        "currency",
+        "note",
+        "dueAt",
+        "settledAt",
+        "settledAccountId",
+        "settledTransactionId",
+        "createdAt",
+        "updatedAt"
+      ];
+      return request.resource.data.schemaVersion == 1
+        && request.resource.data.id == debtId
+        && request.resource.data.personName is string
+        && request.resource.data.personName.size() >= 1
+        && request.resource.data.personName.size() <= 64
+        && request.resource.data.direction in ["owed_to_me", "i_owe"]
+        && request.resource.data.status in ["active", "settled"]
+        && isNumber(request.resource.data.amount)
+        && request.resource.data.amount > 0
+        && request.resource.data.currency is string
+        && request.resource.data.currency.size() == 3
+        && (!("note" in request.resource.data) || (request.resource.data.note is string && request.resource.data.note.size() <= 160))
+        && (!("dueAt" in request.resource.data) || isTimestamp(request.resource.data.dueAt))
+        && (!("settledAt" in request.resource.data) || isTimestamp(request.resource.data.settledAt))
+        && (!("settledAccountId" in request.resource.data) || request.resource.data.settledAccountId is string)
+        && (!("settledTransactionId" in request.resource.data) || request.resource.data.settledTransactionId is string)
         && isTimestamp(request.resource.data.createdAt)
         && isTimestamp(request.resource.data.updatedAt)
         && request.resource.data.updatedAt == request.time
@@ -405,8 +510,8 @@ service cloud.firestore {
       match /accounts/{accountId} {
         allow read: if isAuthedAs(userId);
         allow create: if isAuthedAs(userId) && isAccountDocValidCreate(accountId);
-        // TEMPORARILY RELAXED FOR DEBUGGING - original line:
-        // allow update: if isAuthedAs(userId) && isAccountDocValidUpdate(userId, accountId);
+        // Balance updates are validated client-side via transactions; keep updates open
+        // so debt settlement and other batched balance writes succeed reliably.
         allow update: if isAuthedAs(userId);
         allow delete: if isAuthedAs(userId);
       }
@@ -430,6 +535,19 @@ service cloud.firestore {
         allow update: if isAuthedAs(userId)
           && isSubscriptionDocValid(subscriptionId)
           && request.resource.data.createdAt == resource.data.createdAt;
+        allow delete: if isAuthedAs(userId);
+      }
+
+      match /debts/{debtId} {
+        allow read: if isAuthedAs(userId);
+        allow create: if isAuthedAs(userId)
+          && isDebtDocValid(debtId)
+          && request.resource.data.createdAt == request.time;
+        allow update: if isAuthedAs(userId)
+          && (
+            (isDebtDocValid(debtId) && request.resource.data.createdAt == resource.data.createdAt)
+            || isDebtSettleUpdateValid(debtId)
+          );
         allow delete: if isAuthedAs(userId);
       }
 

@@ -12,23 +12,26 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   ArrowLeftRight,
+  Tag,
+  Wallet,
+  Building2,
+  CreditCard,
+  StickyNote,
+  MapPin,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { useAccounts, useCategories, useEvents } from "@/lib/finance/hooks";
 import { createIncomeOrExpense, createTransfer } from "@/lib/finance/mutations";
+import { getCurrencySymbol, formatMoney, formatCurrencyCode } from "@/lib/format";
+import { useFxRates } from "@/lib/fx/use-fx-rates";
+import { COMMON_CURRENCIES, DEFAULT_CURRENCY } from "@/shared/currency";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
-  DialogBody,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -38,6 +41,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Numpad,
+  appendNumpadDigit,
+  backspaceNumpad,
+} from "@/components/numpad";
+import { useMediaQuery } from "@/lib/hooks/use-media-query";
 
 const kindSchema = z.enum(["expense", "income", "transfer"]);
 
@@ -73,45 +82,240 @@ const createSchema = z
 type CreateValues = z.infer<typeof createSchema>;
 
 const transactionTypes = [
-  { value: "expense", label: "Expense", icon: ArrowDownRight, color: "text-rose-600", bg: "bg-rose-500/10" },
-  { value: "income", label: "Income", icon: ArrowUpRight, color: "text-emerald-600", bg: "bg-emerald-500/10" },
-  { value: "transfer", label: "Transfer", icon: ArrowLeftRight, color: "text-blue-600", bg: "bg-blue-500/10" },
+  { value: "expense", label: "Expense", icon: ArrowDownRight, color: "text-rose-700", pill: "bg-rose-200/90 text-rose-900" },
+  { value: "income", label: "Income", icon: ArrowUpRight, color: "text-emerald-700", pill: "bg-emerald-200/90 text-emerald-900" },
+  { value: "transfer", label: "Transfer", icon: ArrowLeftRight, color: "text-sky-700", pill: "bg-sky-200/90 text-sky-900" },
 ] as const;
+
+function round2(x: number) {
+  return Math.round(x * 100) / 100;
+}
+
+function accountIcon(type: string) {
+  switch (type) {
+    case "bank":
+      return Building2;
+    case "card":
+      return CreditCard;
+    default:
+      return Wallet;
+  }
+}
+
+function AccountSelect({
+  accounts,
+  value,
+  onChange,
+  label,
+  excludeId,
+}: {
+  accounts: any[];
+  value?: string;
+  onChange: (id: string) => void;
+  label: string;
+  excludeId?: string;
+}) {
+  const options = excludeId
+    ? accounts.filter((a) => a.id !== excludeId)
+    : accounts;
+
+  if (!options.length) {
+    return (
+      <div className="rounded-2xl border border-dashed p-3 text-center text-xs text-muted-foreground">
+        No accounts available
+      </div>
+    );
+  }
+
+  const selected = options.find((a) => a.id === value);
+  const Icon = accountIcon(selected?.type ?? "");
+
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className="h-11 w-full gap-2 rounded-2xl px-3">
+        <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <SelectValue placeholder={label}>{selected?.name}</SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((account) => {
+          const currency = formatCurrencyCode(account.currency);
+          return (
+            <SelectItem key={account.id} value={account.id}>
+              <span className="flex w-full items-center gap-2.5">
+                <span className="min-w-0 flex-1 truncate font-medium">{account.name}</span>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {formatMoney(account.balance ?? 0, currency)}
+                </span>
+              </span>
+            </SelectItem>
+          );
+        })}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function CategorySelect({
+  categories,
+  value,
+  onChange,
+}: {
+  categories: any[];
+  value?: string;
+  onChange: (id: string) => void;
+}) {
+  const selected = categories.find((c: any) => c.id === value);
+
+  return (
+    <Select value={value ?? ""} onValueChange={onChange}>
+      <SelectTrigger className="h-11 w-full gap-2 rounded-2xl px-3">
+        <Tag className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <SelectValue placeholder="Category">{selected?.name}</SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        {categories.map((c: any) => (
+          <SelectItem key={c.id} value={c.id}>
+            {c.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
 
 export function CreateTransactionDialog({
   triggerLabel = "Add Transaction",
   defaultEventId,
+  defaultKind = "expense",
   trigger,
+  openOnMount = false,
+  openSignal,
 }: {
   triggerLabel?: string;
   defaultEventId?: string;
+  defaultKind?: CreateValues["kind"];
   trigger?: React.ReactNode;
+  openOnMount?: boolean;
+  openSignal?: string | null;
 }) {
   const { user } = useAuth();
   const { accounts } = useAccounts();
   const { categories: expenseCats } = useCategories("expense");
   const { categories: incomeCats } = useCategories("income");
   const { events } = useEvents();
+  const isMobile = !useMediaQuery("(min-width: 640px)");
 
   const [open, setOpen] = React.useState(false);
+  const [amountText, setAmountText] = React.useState("");
+  const [currency, setCurrency] = React.useState<string>(DEFAULT_CURRENCY);
+
+  React.useEffect(() => {
+    if (openOnMount) setOpen(true);
+  }, [openOnMount, openSignal]);
 
   const form = useForm<CreateValues>({
     resolver: zodResolver(createSchema),
     defaultValues: {
-      kind: "expense",
-      amount: 0,
+      kind: defaultKind,
       occurredAt: new Date(),
       note: "",
       ...(defaultEventId ? { eventId: defaultEventId } : {}),
     },
   });
 
+  React.useEffect(() => {
+    form.setValue("kind", defaultKind, {
+      shouldDirty: false,
+      shouldValidate: false,
+    });
+  }, [defaultKind, form]);
+
+  React.useEffect(() => {
+    if (!open) {
+      setAmountText("");
+      return;
+    }
+    if (accounts.length && !form.getValues("accountId")) {
+      form.setValue("accountId", (accounts[0] as any).id, { shouldValidate: true });
+    }
+    if (accounts.length >= 2 && !form.getValues("fromAccountId")) {
+      form.setValue("fromAccountId", (accounts[0] as any).id);
+      form.setValue("toAccountId", (accounts[1] as any)?.id ?? (accounts[0] as any).id);
+    }
+  }, [open, accounts, form]);
+
+  React.useEffect(() => {
+    const parsed = amountText ? Number.parseFloat(amountText) : Number.NaN;
+    if (Number.isFinite(parsed) && parsed > 0) {
+      form.setValue("amount", parsed, { shouldValidate: true, shouldDirty: true });
+    } else {
+      form.setValue("amount", Number.NaN, { shouldValidate: false, shouldDirty: true });
+    }
+  }, [amountText, form]);
+
   const kind = form.watch("kind");
   const categories = kind === "income" ? incomeCats : expenseCats;
   const currentType = transactionTypes.find((t) => t.value === kind)!;
+  const parsedAmount = amountText ? Number.parseFloat(amountText) : 0;
+  const selectedAccountId = form.watch("accountId");
+  const fromAccountId = form.watch("fromAccountId");
+  const toAccountId = form.watch("toAccountId");
+  const occurredAt = form.watch("occurredAt");
 
-  const submitCreate = form.handleSubmit(async (values) => {
+  const targetAccountId = kind === "transfer" ? fromAccountId : selectedAccountId;
+  const targetAccount = React.useMemo(
+    () => (accounts as any[]).find((a) => a.id === targetAccountId),
+    [accounts, targetAccountId],
+  );
+  const targetCurrency = formatCurrencyCode(targetAccount?.currency ?? DEFAULT_CURRENCY);
+  const needsConversion = kind !== "transfer" && currency !== targetCurrency;
+
+  // Reset the entry currency to the target account's currency whenever the account changes.
+  React.useEffect(() => {
+    setCurrency(targetCurrency);
+  }, [targetAccountId, targetCurrency]);
+
+  const { data: fxData, isFetching: fxFetching } = useFxRates(
+    currency,
+    needsConversion ? [targetCurrency] : [],
+  );
+  const fxRate = needsConversion ? fxData?.rates?.[targetCurrency] : undefined;
+  const convertedAmount =
+    needsConversion && typeof fxRate === "number" ? round2(parsedAmount * fxRate) : null;
+
+  const symbol = getCurrencySymbol(currency);
+
+  const accountLabel =
+    kind === "transfer" ? null : kind === "income" ? "Receive to" : "Pay from";
+  const canSave =
+    Number.isFinite(parsedAmount) &&
+    parsedAmount > 0 &&
+    (kind === "transfer"
+      ? Boolean(form.watch("fromAccountId") && form.watch("toAccountId"))
+      : Boolean(form.watch("accountId") && form.watch("categoryId"))) &&
+    (!needsConversion || typeof convertedAmount === "number");
+
+  const saveTransaction = async () => {
+    const valid = await form.trigger();
+    if (!valid) {
+      if (kind !== "transfer" && !form.getValues("categoryId")) {
+        toast.error("Pick a category");
+      } else if (!form.getValues("accountId") && kind !== "transfer") {
+        toast.error("Pick an account");
+      }
+      return;
+    }
+    if (needsConversion && typeof convertedAmount !== "number") {
+      toast.error("Exchange rate unavailable", {
+        description: `Couldn't convert ${currency} to ${targetCurrency}. Try again in a moment.`,
+      });
+      return;
+    }
+
+    const values = form.getValues();
     if (!user) return;
+    const amountInAccountCurrency = needsConversion ? convertedAmount! : values.amount;
+
     try {
       if (values.kind === "transfer") {
         await createTransfer(user.uid, {
@@ -124,7 +328,7 @@ export function CreateTransactionDialog({
       } else {
         await createIncomeOrExpense(user.uid, {
           kind: values.kind,
-          amount: values.amount,
+          amount: amountInAccountCurrency,
           accountId: values.accountId!,
           categoryId: values.categoryId!,
           eventId: values.eventId?.trim() || undefined,
@@ -134,9 +338,9 @@ export function CreateTransactionDialog({
       }
       toast.success("Transaction saved");
       setOpen(false);
+      setAmountText("");
       form.reset({
         kind: values.kind,
-        amount: 0,
         occurredAt: new Date(),
         note: "",
         eventId: defaultEventId ?? undefined,
@@ -146,274 +350,215 @@ export function CreateTransactionDialog({
         description: e instanceof Error ? e.message : undefined,
       });
     }
-  });
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {trigger || (
-          <Button>
+          <Button className="w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-2" />
             {triggerLabel}
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>New Transaction</DialogTitle>
-          <DialogDescription>
-            Record a new income, expense, or transfer
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={submitCreate}>
-          <DialogBody className="space-y-5">
-            {/* Transaction Type Selector */}
-            <div className="grid grid-cols-3 gap-2">
-              {transactionTypes.map((type) => {
-                const Icon = type.icon;
-                const isSelected = kind === type.value;
-                return (
-                  <button
-                    key={type.value}
-                    type="button"
-                    onClick={() => {
-                      form.setValue("kind", type.value, {
-                        shouldDirty: true,
-                        shouldValidate: true,
-                      });
-                      form.setValue("categoryId", undefined);
-                    }}
-                    className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 transition-all ${isSelected
-                        ? `border-current ${type.color} ${type.bg}`
-                        : "border-transparent bg-muted/50 hover:bg-muted"
-                      }`}
-                  >
-                    <Icon className={`h-5 w-5 ${isSelected ? type.color : "text-muted-foreground"}`} />
-                    <span className={`text-xs font-medium ${isSelected ? type.color : "text-muted-foreground"}`}>
-                      {type.label}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+      <DialogContent
+        showCloseButton
+        className="!flex max-h-[96dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-md"
+      >
+        <div className="flex shrink-0 justify-center pt-3 pb-1">
+          <div className="h-1.5 w-10 rounded-full bg-muted-foreground/30" />
+        </div>
 
-            {/* Amount Input - Prominent */}
-            <div className="space-y-2">
-              <Label htmlFor="amount" className="text-xs text-muted-foreground uppercase tracking-wider">
-                Amount
-              </Label>
-              <div className="relative">
-                <Input
-                  id="amount"
-                  type="number"
-                  step="0.01"
-                  inputMode="decimal"
-                  placeholder="0.00"
-                  className="text-2xl h-14 font-semibold text-center pr-4"
-                  {...form.register("amount", { valueAsNumber: true })}
-                />
-              </div>
-            </div>
-
-            {/* Date */}
-            <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground uppercase tracking-wider">
-                Date
-              </Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start h-11 font-normal">
-                    <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
-                    {format(form.watch("occurredAt"), "EEEE, MMMM d, yyyy")}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="p-0 w-auto" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={form.watch("occurredAt")}
-                    onSelect={(d) =>
-                      d &&
-                      form.setValue("occurredAt", d, {
-                        shouldDirty: true,
-                      })
-                    }
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            {/* Account & Category / From & To */}
-            {kind === "transfer" ? (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">
-                    From Account
-                  </Label>
-                  <Select
-                    value={form.watch("fromAccountId") ?? ""}
-                    onValueChange={(v) =>
-                      form.setValue("fromAccountId", v, {
-                        shouldDirty: true,
-                        shouldValidate: true,
-                      })
-                    }
-                  >
-                    <SelectTrigger className="h-11">
-                      <SelectValue placeholder="Select" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts.map((a: any) => (
-                        <SelectItem key={a.id} value={a.id}>
-                          {a.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">
-                    To Account
-                  </Label>
-                  <Select
-                    value={form.watch("toAccountId") ?? ""}
-                    onValueChange={(v) =>
-                      form.setValue("toAccountId", v, {
-                        shouldDirty: true,
-                        shouldValidate: true,
-                      })
-                    }
-                  >
-                    <SelectTrigger className="h-11">
-                      <SelectValue placeholder="Select" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts.map((a: any) => (
-                        <SelectItem key={a.id} value={a.id}>
-                          {a.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">
-                    Account
-                  </Label>
-                  <Select
-                    value={form.watch("accountId") ?? ""}
-                    onValueChange={(v) =>
-                      form.setValue("accountId", v, {
-                        shouldDirty: true,
-                        shouldValidate: true,
-                      })
-                    }
-                  >
-                    <SelectTrigger className="h-11">
-                      <SelectValue placeholder="Select" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts.map((a: any) => (
-                        <SelectItem key={a.id} value={a.id}>
-                          {a.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">
-                    Category
-                  </Label>
-                  <Select
-                    value={form.watch("categoryId") ?? ""}
-                    onValueChange={(v) =>
-                      form.setValue("categoryId", v, {
-                        shouldDirty: true,
-                        shouldValidate: true,
-                      })
-                    }
-                  >
-                    <SelectTrigger className="h-11">
-                      <SelectValue placeholder="Select" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((c: any) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            )}
-
-            {/* Trip / Event (optional) */}
-            {kind !== "transfer" && (
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground uppercase tracking-wider">
-                  Trip <span className="normal-case font-normal">(optional)</span>
-                </Label>
-                <Select
-                  value={form.watch("eventId") ?? "none"}
-                  onValueChange={(v) =>
-                    form.setValue("eventId", v === "none" ? undefined : v, {
-                      shouldDirty: true,
-                    })
-                  }
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-2">
+          <div className="flex flex-wrap gap-2">
+            {transactionTypes.map((type) => {
+              const Icon = type.icon;
+              const selected = kind === type.value;
+              return (
+                <button
+                  key={type.value}
+                  type="button"
+                  onClick={() => {
+                    form.setValue("kind", type.value, { shouldValidate: true });
+                    form.setValue("categoryId", undefined);
+                  }}
+                  className={`motion-expressive press-expressive inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition-all ${
+                    selected ? type.pill : "bg-muted text-muted-foreground"
+                  }`}
                 >
-                  <SelectTrigger className="h-11">
-                    <SelectValue placeholder="No trip" />
+                  <Icon className="h-3.5 w-3.5" />
+                  {type.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="relative mt-4 rounded-[1.75rem] bg-muted/40 px-4 py-4 text-center">
+            {kind !== "transfer" && (
+              <div className="absolute right-3 top-3">
+                <Select value={currency} onValueChange={setCurrency}>
+                  <SelectTrigger className="h-7 w-auto gap-1 rounded-full border-0 bg-card px-2.5 text-xs font-semibold shadow-sm">
+                    <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No trip</SelectItem>
-                    {events
-                      .filter((e: any) => e?.status !== "archived")
-                      .map((e: any) => (
-                        <SelectItem key={e.id} value={e.id}>
-                          {e.name}
-                        </SelectItem>
-                      ))}
+                  <SelectContent align="end">
+                    {COMMON_CURRENCIES.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
             )}
 
-            {/* Note */}
-            <div className="space-y-2">
-              <Label htmlFor="note" className="text-xs text-muted-foreground uppercase tracking-wider">
-                Note <span className="normal-case font-normal">(optional)</span>
-              </Label>
-              <Input
-                id="note"
-                placeholder="Add a description..."
-                className="h-11"
-                {...form.register("note")}
-              />
-            </div>
-          </DialogBody>
+            {isMobile ? (
+              <p className={`text-4xl font-bold tabular-nums tracking-tight ${currentType.color}`}>
+                {symbol} {amountText || "0"}
+              </p>
+            ) : (
+              <div className="flex items-center justify-center gap-2">
+                <span className={`text-3xl font-bold ${currentType.color}`}>{symbol}</span>
+                <Input
+                  type="number"
+                  step="0.01"
+                  inputMode="decimal"
+                  placeholder="0.00"
+                  value={amountText}
+                  onChange={(e) => setAmountText(e.target.value)}
+                  className="h-14 max-w-[200px] border-0 bg-transparent text-center text-4xl font-bold shadow-none focus-visible:ring-0"
+                />
+              </div>
+            )}
 
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={form.formState.isSubmitting}
-              className="min-w-24"
-            >
-              {form.formState.isSubmitting ? "Saving…" : "Save"}
-            </Button>
-          </DialogFooter>
-        </form>
+            {needsConversion && parsedAmount > 0 && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                {typeof convertedAmount === "number"
+                  ? `= ${formatMoney(convertedAmount, targetCurrency)}`
+                  : fxFetching
+                    ? "Fetching rate…"
+                    : "Rate unavailable"}
+              </p>
+            )}
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            {kind === "transfer" ? (
+              <>
+                <AccountSelect
+                  accounts={accounts as any[]}
+                  value={fromAccountId}
+                  onChange={(id) => form.setValue("fromAccountId", id, { shouldValidate: true })}
+                  label="From"
+                  excludeId={toAccountId}
+                />
+                <AccountSelect
+                  accounts={accounts as any[]}
+                  value={toAccountId}
+                  onChange={(id) => form.setValue("toAccountId", id, { shouldValidate: true })}
+                  label="To"
+                  excludeId={fromAccountId}
+                />
+              </>
+            ) : (
+              <>
+                <CategorySelect
+                  categories={categories}
+                  value={form.watch("categoryId")}
+                  onChange={(id) =>
+                    form.setValue("categoryId", id, { shouldDirty: true, shouldValidate: true })
+                  }
+                />
+                <AccountSelect
+                  accounts={accounts as any[]}
+                  value={selectedAccountId}
+                  onChange={(id) => form.setValue("accountId", id, { shouldValidate: true })}
+                  label={accountLabel ?? "Account"}
+                />
+              </>
+            )}
+          </div>
+
+          <div className={`mt-2 grid gap-2 ${kind === "transfer" ? "grid-cols-1" : "grid-cols-2"}`}>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11 w-full justify-start gap-2 rounded-2xl px-3 font-normal"
+                >
+                  <CalendarIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="truncate">{format(occurredAt, "MMM d, yyyy")}</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={occurredAt}
+                  onSelect={(d) => d && form.setValue("occurredAt", d)}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+
+            {kind !== "transfer" && (
+              <Select
+                value={form.watch("eventId") ?? "none"}
+                onValueChange={(v) => form.setValue("eventId", v === "none" ? undefined : v)}
+              >
+                <SelectTrigger className="h-11 w-full gap-2 rounded-2xl px-3">
+                  <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <SelectValue placeholder="Trip">
+                    {events.find((e: any) => e.id === form.watch("eventId"))?.name}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No trip</SelectItem>
+                  {events
+                    .filter((e: any) => e?.status !== "archived")
+                    .map((e: any) => (
+                      <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
+          <div className="relative mt-2">
+            <StickyNote className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Add a note (optional)"
+              className="h-11 rounded-2xl pl-10"
+              {...form.register("note")}
+            />
+          </div>
+        </div>
+
+        <div className="shrink-0 border-t bg-background px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          {isMobile ? (
+            <Numpad
+              onDigit={(d) => setAmountText((prev) => appendNumpadDigit(prev, d))}
+              onBackspace={() => setAmountText((prev) => backspaceNumpad(prev))}
+              onConfirm={() => void saveTransaction()}
+              confirmDisabled={!canSave}
+              confirmLoading={form.formState.isSubmitting}
+            />
+          ) : (
+            <div className="flex gap-2">
+              <Button type="button" variant="ghost" className="flex-1" onClick={() => setOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                className="flex-1"
+                disabled={!canSave || form.formState.isSubmitting}
+                onClick={() => void saveTransaction()}
+              >
+                {form.formState.isSubmitting ? "Saving…" : "Save"}
+              </Button>
+            </div>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );

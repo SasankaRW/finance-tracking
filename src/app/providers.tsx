@@ -5,6 +5,7 @@ import { ThemeProvider } from "next-themes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/lib/auth/auth-provider";
+import { ThemeColorProvider } from "@/lib/theme/theme-color-provider";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -20,12 +21,14 @@ const queryClient = new QueryClient({
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          {children}
-          <Toaster richColors closeButton />
-        </AuthProvider>
-      </QueryClientProvider>
+      <ThemeColorProvider>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            {children}
+            <Toaster richColors closeButton />
+          </AuthProvider>
+        </QueryClientProvider>
+      </ThemeColorProvider>
     </ThemeProvider>
   );
 }

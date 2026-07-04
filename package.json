@@ -14,12 +14,13 @@
     "electron:pack": "npm run clean:next && npm run build && npm run electron:prepare && electron-builder --dir",
     "electron:dist": "npm run clean:next && npm run build && npm run electron:prepare && electron-builder",
     "mobile:sync": "npx cap sync android",
-    "mobile:build": "npm run build && npx cap sync android",
+    "mobile:build": "cross-env MOBILE_BUILD=1 npm run build && npx cap sync android",
     "mobile:open": "npx cap open android",
-    "mobile:apk": "npm run mobile:build && cd android && ./gradlew assembleDebug"
+    "mobile:apk": "npm run mobile:build && cd android && gradlew.bat assembleDebug"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.0",
+    "@capacitor/app": "^8.1.0",
     "@capacitor/cli": "^8.0.0",
     "@capacitor/core": "^8.0.0",
     "@hookform/resolvers": "^5.2.2",
@@ -55,6 +56,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
     "electron": "^33.4.0",
     "electron-builder": "^25.1.8",
     "eslint": "^8.57.1",

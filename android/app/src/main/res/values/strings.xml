@@ -4,4 +4,9 @@
     <string name="title_activity_main">Cashly</string>
     <string name="package_name">com.cashly.app</string>
     <string name="custom_url_scheme">com.cashly.app</string>
+    <string name="add_transaction_widget_name">Cashly Quick Add</string>
+    <string name="add_transaction_widget_description">Quickly open the transaction form from your home screen.</string>
+    <string name="add_transaction_widget_title">Quick add</string>
+    <string name="add_transaction_widget_subtitle">Track a transaction</string>
+    <string name="add_transaction_widget_button">Add expense</string>
 </resources>

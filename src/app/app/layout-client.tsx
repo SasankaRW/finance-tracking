@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/auth-provider";
+import { AppLockGate } from "@/components/app-lock-gate";
+import { WidgetSessionSync } from "@/components/widget-session-sync";
 import { AppShell } from "@/app/app/shell";
+
+const PENDING_ROUTE_KEY = "cashly:pending-route";
 
 export function AppLayoutClient({
   children,
@@ -12,12 +16,36 @@ export function AppLayoutClient({
 }) {
   const router = useRouter();
   const { user, loading } = useAuth();
+  const [widgetSyncReady, setWidgetSyncReady] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
       router.replace("/login");
     }
   }, [user, loading, router]);
+
+  useEffect(() => {
+    if (loading || !user || typeof window === "undefined") return;
+
+    const pendingRoute = sessionStorage.getItem(PENDING_ROUTE_KEY);
+    if (!pendingRoute?.startsWith("/app")) return;
+
+    sessionStorage.removeItem(PENDING_ROUTE_KEY);
+    const currentRoute = `${window.location.pathname}${window.location.search}`;
+    if (currentRoute !== pendingRoute) {
+      router.replace(pendingRoute);
+    }
+  }, [user, loading, router]);
+
+  useEffect(() => {
+    if (loading || !user) {
+      setWidgetSyncReady(false);
+      return;
+    }
+
+    const timer = window.setTimeout(() => setWidgetSyncReady(true), 2_500);
+    return () => window.clearTimeout(timer);
+  }, [user, loading]);
 
   if (loading) {
     return (
@@ -31,7 +59,12 @@ export function AppLayoutClient({
     return null;
   }
 
-  return <AppShell>{children}</AppShell>;
+  return (
+    <AppLockGate user={user}>
+      {widgetSyncReady && <WidgetSessionSync user={user} />}
+      <AppShell>{children}</AppShell>
+    </AppLockGate>
+  );
 }
 
 

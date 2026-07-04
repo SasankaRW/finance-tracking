@@ -2,6 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <application
+        android:name=".MainApplication"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -24,6 +25,13 @@
 
         </activity>
 
+        <activity
+            android:name=".QuickAddTransactionActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:label="@string/add_transaction_widget_title"
+            android:theme="@style/AppTheme.WidgetQuickAdd" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -33,6 +41,19 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
+
+        <receiver
+            android:name=".AddTransactionWidgetProvider"
+            android:exported="true"
+            android:label="@string/add_transaction_widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/add_transaction_widget_info" />
+        </receiver>
     </application>
 
     <!-- Permissions -->

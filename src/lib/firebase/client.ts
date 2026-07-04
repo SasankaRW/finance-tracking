@@ -36,13 +36,14 @@ export function getFirebaseAuth() {
 
 export function getFirebaseDb() {
   if (_db) return _db;
-  // Use memory cache in development to avoid cache issues after rule changes
-  // Switch back to persistentLocalCache for production
   const isDev = process.env.NODE_ENV === 'development';
   const isBrowser = typeof window !== 'undefined';
+  const isNativeApp =
+    isBrowser &&
+    Boolean((window as any).Capacitor?.isNativePlatform?.() ?? (window as any).Capacitor);
 
   _db = initializeFirestore(getFirebaseApp(), {
-    localCache: (isDev || !isBrowser)
+    localCache: (isDev || !isBrowser || isNativeApp)
       ? memoryLocalCache()
       : persistentLocalCache({
         tabManager: persistentMultipleTabManager(),

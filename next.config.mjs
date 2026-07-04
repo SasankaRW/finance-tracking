@@ -1,7 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // output: "export",  // Only enable this when building for Android
-  // output: "standalone", // Previous setting for Electron
+  output: process.env.MOBILE_BUILD === "1" ? "export" : "standalone",
   typescript: {
     ignoreBuildErrors: true,
   },

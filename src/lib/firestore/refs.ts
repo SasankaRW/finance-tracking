@@ -49,6 +49,22 @@ export function subscriptionDoc(uid: string, subscriptionId: string) {
   return doc(getFirebaseDb(), "users", uid, "subscriptions", subscriptionId);
 }
 
+export function debtsCol(uid: string) {
+  return collection(getFirebaseDb(), "users", uid, "debts");
+}
+
+export function debtDoc(uid: string, debtId: string) {
+  return doc(getFirebaseDb(), "users", uid, "debts", debtId);
+}
+
+export function salaryProfilesCol(uid: string) {
+  return collection(getFirebaseDb(), "users", uid, "salaryProfiles");
+}
+
+export function salaryProfileDoc(uid: string, salaryProfileId: string) {
+  return doc(getFirebaseDb(), "users", uid, "salaryProfiles", salaryProfileId);
+}
+
 export function eventsCol(uid: string) {
   return collection(getFirebaseDb(), "users", uid, "events");
 }

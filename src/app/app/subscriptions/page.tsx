@@ -18,6 +18,7 @@ import {
   CalendarIcon,
   AlertTriangle,
   Clock,
+  HandCoins,
 } from "lucide-react";
 import { Timestamp } from "firebase/firestore";
 import { useAuth } from "@/lib/auth/auth-provider";
@@ -67,6 +68,7 @@ import {
 } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DebtPillsPanel } from "@/app/app/subscriptions/debt-pills-panel";
 import {
   Table,
   TableBody,
@@ -76,22 +78,57 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-const createSchema = z.object({
+const monthlyBillSchema = z.object({
   name: z.string().min(1).max(64),
+  kind: z.enum(["subscription", "loan"]),
   amount: z.number().positive().finite(),
   currency: z.string().min(3).max(3),
   accountId: z.string().min(1),
   categoryId: z.string().min(1),
   nextDueAt: z.date(),
   interval: z.literal("monthly"),
+  loanTotalPayments: z.number().int().positive().optional(),
+  loanPaidPayments: z.number().int().min(0).optional(),
 });
+
+function validateLoanProgress(values: z.infer<typeof monthlyBillSchema>, ctx: z.RefinementCtx) {
+  if (values.kind !== "loan") return;
+
+  if (!values.loanTotalPayments) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["loanTotalPayments"],
+      message: "Loan needs total months",
+    });
+  }
+
+  if ((values.loanPaidPayments ?? 0) > (values.loanTotalPayments ?? 0)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["loanPaidPayments"],
+      message: "Paid months cannot be greater than total months",
+    });
+  }
+}
+
+const createSchema = monthlyBillSchema.superRefine(validateLoanProgress);
 type CreateValues = z.infer<typeof createSchema>;
 
-const updateSchema = createSchema.extend({
+const updateSchema = monthlyBillSchema.extend({
   subscriptionId: z.string().min(1),
-  status: z.enum(["active", "paused"]),
-});
+  status: z.enum(["active", "paused", "completed"]),
+}).superRefine(validateLoanProgress);
 type UpdateValues = z.infer<typeof updateSchema>;
+
+function getLoanProgress(item: any) {
+  const total = typeof item.loanTotalPayments === "number" ? item.loanTotalPayments : 0;
+  const paid = typeof item.loanPaidPayments === "number" ? item.loanPaidPayments : 0;
+  const safePaid = Math.min(Math.max(paid, 0), total);
+  const remaining = Math.max(total - safePaid, 0);
+  const percent = total > 0 ? Math.round((safePaid / total) * 100) : 0;
+
+  return { total, paid: safePaid, remaining, percent };
+}
 
 function getDueDateInfo(date: Date) {
   if (isPast(date) && !isToday(date)) {
@@ -111,7 +148,7 @@ function getDueDateInfo(date: Date) {
   return { label: format(date, "MMM d"), variant: "outline" as const, icon: CalendarIcon };
 }
 
-export default function SubscriptionsPage() {
+export default function SubscriptionsPage({ embedded = false }: { embedded?: boolean }) {
   const { user } = useAuth();
   const { accounts } = useAccounts();
   const { categories: expenseCats } = useCategories("expense");
@@ -124,12 +161,15 @@ export default function SubscriptionsPage() {
     resolver: zodResolver(createSchema),
     defaultValues: {
       name: "",
+      kind: "subscription",
       amount: 0,
       currency: COMMON_CURRENCIES[0],
       accountId: "",
       categoryId: "",
       nextDueAt: new Date(),
       interval: "monthly",
+      loanTotalPayments: 12,
+      loanPaidPayments: 0,
     },
   });
 
@@ -138,11 +178,15 @@ export default function SubscriptionsPage() {
     defaultValues: {
       subscriptionId: "",
       name: "",
+      kind: "subscription",
       amount: 0,
       currency: COMMON_CURRENCIES[0],
       accountId: "",
       categoryId: "",
       nextDueAt: new Date(),
+      interval: "monthly",
+      loanTotalPayments: 12,
+      loanPaidPayments: 0,
       status: "active",
     },
   });
@@ -155,12 +199,15 @@ export default function SubscriptionsPage() {
       setCreateOpen(false);
       createForm.reset({
         name: "",
+        kind: "subscription",
         amount: 0,
         currency: COMMON_CURRENCIES[0],
         accountId: "",
         categoryId: "",
         nextDueAt: new Date(),
         interval: "monthly",
+        loanTotalPayments: 12,
+        loanPaidPayments: 0,
       });
     } catch (e) {
       toast.error("Failed to create subscription", {
@@ -191,9 +238,10 @@ export default function SubscriptionsPage() {
     [expenseCats],
   );
 
-  const { active, paused, totalMonthly, dueThisWeek } = React.useMemo(() => {
+  const { active, paused, loans, totalMonthly, dueThisWeek } = React.useMemo(() => {
     let activeCount = 0;
     let pausedCount = 0;
+    let loanCount = 0;
     let monthly = 0;
     let dueCount = 0;
     const now = new Date();
@@ -201,6 +249,7 @@ export default function SubscriptionsPage() {
     for (const s of subscriptions as any[]) {
       if (s.status === "active") {
         activeCount++;
+        if (s.kind === "loan") loanCount++;
         monthly += s.amount ?? 0;
         const nextDue = s.nextDueAt instanceof Timestamp ? s.nextDueAt.toDate() : new Date();
         const days = differenceInDays(nextDue, now);
@@ -209,7 +258,7 @@ export default function SubscriptionsPage() {
         pausedCount++;
       }
     }
-    return { active: activeCount, paused: pausedCount, totalMonthly: monthly, dueThisWeek: dueCount };
+    return { active: activeCount, paused: pausedCount, loans: loanCount, totalMonthly: monthly, dueThisWeek: dueCount };
   }, [subscriptions]);
 
   const createAccountCurrency = React.useMemo(() => {
@@ -242,40 +291,73 @@ export default function SubscriptionsPage() {
     }
   }, [editAccountCurrency, editForm]);
 
+  const createKind = createForm.watch("kind");
+  const editKind = editForm.watch("kind");
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Subscriptions</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Track recurring expenses and never miss a payment
-          </p>
-        </div>
+    <div className="space-y-4 sm:space-y-6">
+      <div className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${embedded ? "items-stretch sm:items-center" : ""}`}>
+        {!embedded && (
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Bills & Loans</h1>
+              <Badge variant="secondary" className="font-mono text-[11px]">
+                Monthly
+              </Badge>
+            </div>
+            <p className="hidden text-sm text-muted-foreground sm:block">
+              Track subscriptions, monthly loan payments, and borrowed money
+            </p>
+          </div>
+        )}
 
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="h-11 w-full sm:w-auto">
               <Plus className="h-4 w-4 mr-2" />
-              Add Subscription
+              Add Monthly Bill
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>New Subscription</DialogTitle>
+              <DialogTitle>New Monthly Bill</DialogTitle>
               <DialogDescription>
-                Add a recurring expense to track
+                Add a subscription or monthly loan payment to track
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={submitCreate}>
               <DialogBody className="space-y-5">
+                {/* Type */}
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                    Type
+                  </Label>
+                  <Select
+                    value={createForm.watch("kind")}
+                    onValueChange={(v) =>
+                      createForm.setValue("kind", v as CreateValues["kind"], {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      })
+                    }
+                  >
+                    <SelectTrigger className="h-11">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="subscription">Subscription</SelectItem>
+                      <SelectItem value="loan">Loan payment</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {/* Name */}
                 <div className="space-y-2">
                   <Label className="text-xs text-muted-foreground uppercase tracking-wider">
-                    Service Name
+                    Name
                   </Label>
                   <Input
-                    placeholder="e.g., Netflix, Spotify, Gym"
+                    placeholder="e.g., Netflix, Car loan, Home loan"
                     className="h-11"
                     {...createForm.register("name")}
                   />
@@ -285,7 +367,7 @@ export default function SubscriptionsPage() {
                 <div className="grid grid-cols-3 gap-3">
                   <div className="col-span-2 space-y-2">
                     <Label className="text-xs text-muted-foreground uppercase tracking-wider">
-                      Amount
+                      {createKind === "loan" ? "Monthly Payment" : "Amount"}
                     </Label>
                     <Input
                       type="number"
@@ -326,6 +408,37 @@ export default function SubscriptionsPage() {
                   <p className="text-xs text-muted-foreground -mt-3">
                     Will be converted to {createAccountCurrency} when marked as paid
                   </p>
+                )}
+
+                {createKind === "loan" && (
+                  <div className="grid grid-cols-2 gap-3 rounded-3xl border bg-muted/30 p-3">
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                        Total Months
+                      </Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        step={1}
+                        inputMode="numeric"
+                        className="h-11"
+                        {...createForm.register("loanTotalPayments", { valueAsNumber: true })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                        Already Paid
+                      </Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        step={1}
+                        inputMode="numeric"
+                        className="h-11"
+                        {...createForm.register("loanPaidPayments", { valueAsNumber: true })}
+                      />
+                    </div>
+                  </div>
                 )}
 
                 {/* Account & Category */}
@@ -426,87 +539,272 @@ export default function SubscriptionsPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-2 border-primary/20">
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Monthly Total
-              </CardTitle>
-              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                <Repeat className="h-4 w-4 text-primary" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatMoney(totalMonthly)}</div>
-            <p className="text-xs text-muted-foreground mt-1">from active subscriptions</p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-2 divide-x divide-y divide-border/60 overflow-hidden rounded-[2rem] bg-card shadow-sm sm:grid-cols-4 sm:divide-y-0">
+        <div className="p-3 sm:p-4">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
+            <Repeat className="h-3.5 w-3.5 text-primary" />
+            Monthly Total
+          </div>
+          <p className="mt-2 truncate font-display text-lg font-bold tabular-nums sm:text-2xl">
+            {formatMoney(totalMonthly)}
+          </p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">from active monthly bills</p>
+        </div>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Active
-              </CardTitle>
-              <div className="h-8 w-8 rounded-full bg-emerald-500/10 flex items-center justify-center">
-                <Play className="h-4 w-4 text-emerald-600" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{active}</div>
-            <p className="text-xs text-muted-foreground mt-1">running subscriptions</p>
-          </CardContent>
-        </Card>
+        <div className="p-3 sm:p-4">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
+            <Play className="h-3.5 w-3.5 text-emerald-600" />
+            Active
+          </div>
+          <p className="mt-2 font-display text-lg font-bold tabular-nums sm:text-2xl">{active}</p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">active monthly bills</p>
+        </div>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Paused
-              </CardTitle>
-              <div className="h-8 w-8 rounded-full bg-amber-500/10 flex items-center justify-center">
-                <Pause className="h-4 w-4 text-amber-600" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{paused}</div>
-            <p className="text-xs text-muted-foreground mt-1">on hold</p>
-          </CardContent>
-        </Card>
+        <div className="p-3 sm:p-4">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
+            <HandCoins className="h-3.5 w-3.5 text-amber-600" />
+            Monthly Loans
+          </div>
+          <p className="mt-2 font-display text-lg font-bold tabular-nums sm:text-2xl">{loans}</p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">{paused} paused</p>
+        </div>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Due This Week
-              </CardTitle>
-              <div className="h-8 w-8 rounded-full bg-blue-500/10 flex items-center justify-center">
-                <Clock className="h-4 w-4 text-blue-600" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{dueThisWeek}</div>
-            <p className="text-xs text-muted-foreground mt-1">payments upcoming</p>
-          </CardContent>
-        </Card>
+        <div className="p-3 sm:p-4">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
+            <Clock className="h-3.5 w-3.5 text-sky-600" />
+            Due This Week
+          </div>
+          <p className="mt-2 font-display text-lg font-bold tabular-nums sm:text-2xl">{dueThisWeek}</p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">payments upcoming</p>
+        </div>
       </div>
 
-      {/* Subscriptions Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>All Subscriptions</CardTitle>
-          <CardDescription>Manage your recurring payments</CardDescription>
+      {/* Monthly Bills Table */}
+      <Card className="surface-tonal shadow-sm">
+        <CardHeader className="p-4 pb-2 sm:p-6 sm:pb-2">
+          <CardTitle className="text-base">Monthly Bills</CardTitle>
+          <CardDescription>Manage subscriptions and loan payments</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
+          <div className="grid gap-3 p-4 md:hidden">
+            {loading ? (
+              <div className="rounded-3xl border p-6 text-center text-sm text-muted-foreground">
+                Loading monthly bills...
+              </div>
+            ) : error ? (
+              <div className="rounded-3xl border border-destructive/30 bg-destructive/5 p-6 text-center text-sm text-destructive">
+                Failed to load monthly bills{error?.message ? `: ${error.message}` : ""}
+              </div>
+            ) : subscriptions.length ? (
+              (subscriptions as any[]).map((s) => {
+                const nextDue = s.nextDueAt instanceof Timestamp ? s.nextDueAt.toDate() : new Date();
+                const acct = accountById.get(s.accountId);
+                const cat = categoryById.get(s.categoryId);
+                const cur = formatCurrencyCode(s.currency ?? acct?.currency);
+                const dueInfo = s.status === "active" ? getDueDateInfo(nextDue) : null;
+                const isPaused = s.status === "paused";
+                const isLoan = s.kind === "loan";
+                const isCompleted = s.status === "completed";
+                const loanProgress = isLoan ? getLoanProgress(s) : null;
+
+                return (
+                  <Card key={s.id} className={`surface-container-high py-0 shadow-sm ${isPaused ? "opacity-70" : ""}`}>
+                    <CardContent className="space-y-4 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 items-start gap-3">
+                          <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
+                            isPaused ? "bg-muted" : "bg-primary/10"
+                          }`}>
+                            {isLoan ? (
+                              <HandCoins className={`h-5 w-5 ${isPaused ? "text-muted-foreground" : "text-primary"}`} />
+                            ) : (
+                              <Repeat className={`h-5 w-5 ${isPaused ? "text-muted-foreground" : "text-primary"}`} />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold">{s.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {isLoan ? "Loan payment" : "Subscription"} · {acct?.name ?? "-"} · {cat?.name ?? "-"}
+                            </p>
+                          </div>
+                        </div>
+
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon-sm" className="-mr-2 -mt-1">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {!isCompleted && (
+                              <DropdownMenuItem
+                                onClick={async () => {
+                                  if (!user) return;
+                                  try {
+                                    await recordSubscriptionPayment(user.uid, s.id);
+                                    toast.success(
+                                      isLoan && loanProgress?.remaining === 1
+                                        ? "Loan completed"
+                                        : "Payment recorded",
+                                    );
+                                  } catch (e) {
+                                    toast.error("Failed to record payment", {
+                                      description: e instanceof Error ? e.message : undefined,
+                                    });
+                                  }
+                                }}
+                              >
+                                <CheckCircle2 className="h-4 w-4 mr-2" />
+                                Mark paid
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setEdit(s);
+                                editForm.reset({
+                                  subscriptionId: s.id,
+                                  name: s.name ?? "",
+                                  kind: s.kind === "loan" ? "loan" : "subscription",
+                                  amount: s.amount ?? 0,
+                                  currency: formatCurrencyCode(s.currency ?? acct?.currency),
+                                  accountId: s.accountId ?? "",
+                                  categoryId: s.categoryId ?? "",
+                                  nextDueAt: nextDue,
+                                  interval: "monthly",
+                                  loanTotalPayments: s.loanTotalPayments ?? 12,
+                                  loanPaidPayments: s.loanPaidPayments ?? 0,
+                                  status:
+                                    s.status === "completed"
+                                      ? "completed"
+                                      : s.status === "paused"
+                                        ? "paused"
+                                        : "active",
+                                });
+                              }}
+                            >
+                              <Pencil className="h-4 w-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            {!isCompleted && (
+                              <DropdownMenuItem
+                                onClick={async () => {
+                                  if (!user) return;
+                                  const nextStatus = s.status === "active" ? "paused" : "active";
+                                  try {
+                                    await setSubscriptionStatus(user.uid, s.id, nextStatus);
+                                    toast.success(
+                                      nextStatus === "paused" ? "Monthly bill paused" : "Monthly bill resumed",
+                                    );
+                                  } catch (e) {
+                                    toast.error("Failed to update status", {
+                                      description: e instanceof Error ? e.message : undefined,
+                                    });
+                                  }
+                                }}
+                              >
+                                {s.status === "active" ? (
+                                  <>
+                                    <Pause className="h-4 w-4 mr-2" />
+                                    Pause
+                                  </>
+                                ) : (
+                                  <>
+                                    <Play className="h-4 w-4 mr-2" />
+                                    Resume
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={async () => {
+                                if (!user) return;
+                                if (!confirm("Delete this monthly bill?")) return;
+                                try {
+                                  await deleteSubscription(user.uid, s.id);
+                                  toast.success("Monthly bill deleted");
+                                } catch (e) {
+                                  toast.error("Failed to delete monthly bill", {
+                                    description: e instanceof Error ? e.message : undefined,
+                                  });
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant={s.status === "active" ? "default" : "secondary"} className="capitalize">
+                          {s.status}
+                        </Badge>
+                        {dueInfo && (
+                          <Badge variant={dueInfo.variant} className="gap-1">
+                            <dueInfo.icon className="h-3 w-3" />
+                            {dueInfo.label}
+                          </Badge>
+                        )}
+                      </div>
+
+                      {loanProgress && loanProgress.total > 0 && (
+                        <div className="space-y-1">
+                          <div className="h-2.5 overflow-hidden rounded-full bg-muted">
+                            <div
+                              className="h-full rounded-full bg-primary transition-all"
+                              style={{ width: `${loanProgress.percent}%` }}
+                            />
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {loanProgress.paid}/{loanProgress.total} paid · {loanProgress.remaining} month{loanProgress.remaining !== 1 ? "s" : ""} left
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="flex items-end justify-between gap-3">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Monthly amount</p>
+                          <p className="text-lg font-bold tabular-nums">
+                            {formatMoney(s.amount ?? 0, cur)}
+                          </p>
+                        </div>
+                        {loanProgress && loanProgress.total > 0 && (
+                          <div className="text-right">
+                            <p className="text-xs text-muted-foreground">Remaining</p>
+                            <p className="font-semibold tabular-nums">
+                              {formatMoney((s.amount ?? 0) * loanProgress.remaining, cur)}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })
+            ) : (
+              <div className="rounded-3xl border border-dashed p-8 text-center">
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                  <Repeat className="h-6 w-6 text-muted-foreground" />
+                </div>
+                <p className="font-medium">No monthly bills yet</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Add your first subscription or loan payment.
+                </p>
+                <Button variant="outline" size="sm" className="mt-4" onClick={() => setCreateOpen(true)}>
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Monthly Bill
+                </Button>
+              </div>
+            )}
+          </div>
+
+          <div className="hidden md:block">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/50 hover:bg-muted/50">
-                <TableHead className="pl-6">Subscription</TableHead>
+                <TableHead className="pl-6">Bill</TableHead>
                 <TableHead className="w-[100px]">Status</TableHead>
                 <TableHead className="w-[120px]">Due Date</TableHead>
                 <TableHead className="text-right w-[140px]">Amount</TableHead>
@@ -517,13 +815,13 @@ export default function SubscriptionsPage() {
               {loading ? (
                 <TableRow>
                   <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
-                    Loading subscriptions…
+                    Loading monthly bills…
                   </TableCell>
                 </TableRow>
               ) : error ? (
                 <TableRow>
                   <TableCell colSpan={5} className="h-32 text-center text-destructive">
-                    Failed to load subscriptions{error?.message ? `: ${error.message}` : ""}
+                    Failed to load monthly bills{error?.message ? `: ${error.message}` : ""}
                   </TableCell>
                 </TableRow>
               ) : subscriptions.length ? (
@@ -534,6 +832,9 @@ export default function SubscriptionsPage() {
                   const cur = formatCurrencyCode(s.currency ?? acct?.currency);
                   const dueInfo = s.status === "active" ? getDueDateInfo(nextDue) : null;
                   const isPaused = s.status === "paused";
+                  const isLoan = s.kind === "loan";
+                  const isCompleted = s.status === "completed";
+                  const loanProgress = isLoan ? getLoanProgress(s) : null;
 
                   return (
                     <TableRow key={s.id} className={`group ${isPaused ? "opacity-60" : ""}`}>
@@ -542,18 +843,38 @@ export default function SubscriptionsPage() {
                           <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
                             isPaused ? "bg-muted" : "bg-primary/10"
                           }`}>
-                            <Repeat className={`h-4 w-4 ${isPaused ? "text-muted-foreground" : "text-primary"}`} />
+                            {isLoan ? (
+                              <HandCoins className={`h-4 w-4 ${isPaused ? "text-muted-foreground" : "text-primary"}`} />
+                            ) : (
+                              <Repeat className={`h-4 w-4 ${isPaused ? "text-muted-foreground" : "text-primary"}`} />
+                            )}
                           </div>
                           <div>
                             <div className="font-medium">{s.name}</div>
                             <div className="text-xs text-muted-foreground">
-                              {acct?.name ?? "—"} · {cat?.name ?? "—"}
+                              {isLoan ? "Loan payment" : "Subscription"} · {acct?.name ?? "—"} · {cat?.name ?? "—"}
                             </div>
+                            {loanProgress && loanProgress.total > 0 && (
+                              <div className="mt-2 max-w-[260px] space-y-1">
+                                <div className="h-2 overflow-hidden rounded-full bg-muted">
+                                  <div
+                                    className="h-full rounded-full bg-primary transition-all"
+                                    style={{ width: `${loanProgress.percent}%` }}
+                                  />
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {loanProgress.paid}/{loanProgress.total} paid · {loanProgress.remaining} month{loanProgress.remaining !== 1 ? "s" : ""} left
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={s.status === "active" ? "default" : "secondary"} className="capitalize">
+                        <Badge
+                          variant={s.status === "active" ? "default" : "secondary"}
+                          className="capitalize"
+                        >
                           {s.status}
                         </Badge>
                       </TableCell>
@@ -572,6 +893,11 @@ export default function SubscriptionsPage() {
                           {formatMoney(s.amount ?? 0, cur)}
                         </span>
                         <span className="text-xs text-muted-foreground block">/month</span>
+                        {loanProgress && loanProgress.total > 0 && (
+                          <span className="text-xs text-muted-foreground block">
+                            {formatMoney((s.amount ?? 0) * loanProgress.remaining, cur)} left
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell className="text-right pr-6">
                         <DropdownMenu>
@@ -585,68 +911,85 @@ export default function SubscriptionsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={async () => {
-                                if (!user) return;
-                                try {
-                                  await recordSubscriptionPayment(user.uid, s.id);
-                                  toast.success("Payment recorded");
-                                } catch (e) {
-                                  toast.error("Failed to record payment", {
-                                    description: e instanceof Error ? e.message : undefined,
-                                  });
-                                }
-                              }}
-                            >
-                              <CheckCircle2 className="h-4 w-4 mr-2" />
-                              Mark paid
-                            </DropdownMenuItem>
+                            {!isCompleted && (
+                              <DropdownMenuItem
+                                onClick={async () => {
+                                  if (!user) return;
+                                  try {
+                                    await recordSubscriptionPayment(user.uid, s.id);
+                                    toast.success(
+                                      isLoan && loanProgress?.remaining === 1
+                                        ? "Loan completed"
+                                        : "Payment recorded",
+                                    );
+                                  } catch (e) {
+                                    toast.error("Failed to record payment", {
+                                      description: e instanceof Error ? e.message : undefined,
+                                    });
+                                  }
+                                }}
+                              >
+                                <CheckCircle2 className="h-4 w-4 mr-2" />
+                                Mark paid
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem
                               onClick={() => {
                                 setEdit(s);
                                 editForm.reset({
                                   subscriptionId: s.id,
                                   name: s.name ?? "",
+                                  kind: s.kind === "loan" ? "loan" : "subscription",
                                   amount: s.amount ?? 0,
                                   currency: formatCurrencyCode(s.currency ?? acct?.currency),
                                   accountId: s.accountId ?? "",
                                   categoryId: s.categoryId ?? "",
                                   nextDueAt: nextDue,
-                                  status: s.status === "paused" ? "paused" : "active",
+                                  interval: "monthly",
+                                  loanTotalPayments: s.loanTotalPayments ?? 12,
+                                  loanPaidPayments: s.loanPaidPayments ?? 0,
+                                  status:
+                                    s.status === "completed"
+                                      ? "completed"
+                                      : s.status === "paused"
+                                        ? "paused"
+                                        : "active",
                                 });
                               }}
                             >
                               <Pencil className="h-4 w-4 mr-2" />
                               Edit
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={async () => {
-                                if (!user) return;
-                                const nextStatus = s.status === "active" ? "paused" : "active";
-                                try {
-                                  await setSubscriptionStatus(user.uid, s.id, nextStatus);
-                                  toast.success(
-                                    nextStatus === "paused" ? "Subscription paused" : "Subscription resumed",
-                                  );
-                                } catch (e) {
-                                  toast.error("Failed to update status", {
-                                    description: e instanceof Error ? e.message : undefined,
-                                  });
-                                }
-                              }}
-                            >
-                              {s.status === "active" ? (
-                                <>
-                                  <Pause className="h-4 w-4 mr-2" />
-                                  Pause
-                                </>
-                              ) : (
-                                <>
-                                  <Play className="h-4 w-4 mr-2" />
-                                  Resume
-                                </>
-                              )}
-                            </DropdownMenuItem>
+                            {!isCompleted && (
+                              <DropdownMenuItem
+                                onClick={async () => {
+                                  if (!user) return;
+                                  const nextStatus = s.status === "active" ? "paused" : "active";
+                                  try {
+                                    await setSubscriptionStatus(user.uid, s.id, nextStatus);
+                                    toast.success(
+                                      nextStatus === "paused" ? "Monthly bill paused" : "Monthly bill resumed",
+                                    );
+                                  } catch (e) {
+                                    toast.error("Failed to update status", {
+                                      description: e instanceof Error ? e.message : undefined,
+                                    });
+                                  }
+                                }}
+                              >
+                                {s.status === "active" ? (
+                                  <>
+                                    <Pause className="h-4 w-4 mr-2" />
+                                    Pause
+                                  </>
+                                ) : (
+                                  <>
+                                    <Play className="h-4 w-4 mr-2" />
+                                    Resume
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive"
                               onClick={async () => {
@@ -679,14 +1022,14 @@ export default function SubscriptionsPage() {
                         <Repeat className="h-6 w-6 text-muted-foreground" />
                       </div>
                       <div>
-                        <p className="font-medium">No subscriptions yet</p>
+                        <p className="font-medium">No monthly bills yet</p>
                         <p className="text-sm text-muted-foreground">
-                          Add your first subscription to track recurring expenses
+                          Add your first subscription or loan payment
                         </p>
                       </div>
                       <Button variant="outline" size="sm" onClick={() => setCreateOpen(true)}>
                         <Plus className="h-4 w-4 mr-1" />
-                        Add Subscription
+                        Add Monthly Bill
                       </Button>
                     </div>
                   </TableCell>
@@ -694,24 +1037,51 @@ export default function SubscriptionsPage() {
               )}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
+
+      <DebtPillsPanel />
 
       {/* Edit Dialog */}
       <Dialog open={Boolean(edit)} onOpenChange={(v) => (!v ? setEdit(null) : v)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Edit Subscription</DialogTitle>
+            <DialogTitle>Edit Monthly Bill</DialogTitle>
             <DialogDescription>
-              Update subscription details
+              Update subscription or loan payment details
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={submitEdit}>
             <DialogBody className="space-y-5">
+              {/* Type */}
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                  Type
+                </Label>
+                <Select
+                  value={editForm.watch("kind")}
+                  onValueChange={(v) =>
+                    editForm.setValue("kind", v as UpdateValues["kind"], {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    })
+                  }
+                >
+                  <SelectTrigger className="h-11">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="subscription">Subscription</SelectItem>
+                    <SelectItem value="loan">Loan payment</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* Name */}
               <div className="space-y-2">
                 <Label className="text-xs text-muted-foreground uppercase tracking-wider">
-                  Service Name
+                  Name
                 </Label>
                 <Input className="h-11" {...editForm.register("name")} />
               </div>
@@ -720,7 +1090,7 @@ export default function SubscriptionsPage() {
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-2">
                   <Label className="text-xs text-muted-foreground uppercase tracking-wider">
-                    Amount
+                    {editKind === "loan" ? "Monthly Payment" : "Amount"}
                   </Label>
                   <Input
                     type="number"
@@ -774,6 +1144,9 @@ export default function SubscriptionsPage() {
                     <SelectContent>
                       <SelectItem value="active">Active</SelectItem>
                       <SelectItem value="paused">Paused</SelectItem>
+                      {editKind === "loan" && (
+                        <SelectItem value="completed">Completed</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -782,6 +1155,37 @@ export default function SubscriptionsPage() {
                 <p className="text-xs text-muted-foreground -mt-3">
                   Will be converted to {editAccountCurrency} when marked as paid
                 </p>
+              )}
+
+              {editKind === "loan" && (
+                <div className="grid grid-cols-2 gap-3 rounded-3xl border bg-muted/30 p-3">
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                      Total Months
+                    </Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      step={1}
+                      inputMode="numeric"
+                      className="h-11"
+                      {...editForm.register("loanTotalPayments", { valueAsNumber: true })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                      Paid Months
+                    </Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step={1}
+                      inputMode="numeric"
+                      className="h-11"
+                      {...editForm.register("loanPaidPayments", { valueAsNumber: true })}
+                    />
+                  </div>
+                </div>
               )}
 
               {/* Account & Category */}

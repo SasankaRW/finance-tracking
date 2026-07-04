@@ -15,7 +15,9 @@ import {
   accountsCol,
   budgetsCol,
   categoriesCol,
+  debtsCol,
   eventsCol,
+  salaryProfilesCol,
   subscriptionsCol,
   transactionsCol,
 } from "@/lib/firestore/refs";
@@ -165,6 +167,30 @@ export function useSubscriptions() {
   const map = React.useCallback((snap: QuerySnapshot) => docs(snap), []);
   const state = useRealtimeQuery(q, map);
   return { ...state, subscriptions: state.data ?? [] };
+}
+
+export function useDebts() {
+  const { user } = useAuth();
+  const q = React.useMemo(() => {
+    if (!user) return null;
+    return query(debtsCol(user.uid), orderBy("createdAt", "desc"));
+  }, [user]);
+
+  const map = React.useCallback((snap: QuerySnapshot) => docs(snap), []);
+  const state = useRealtimeQuery(q, map);
+  return { ...state, debts: state.data ?? [] };
+}
+
+export function useSalaryProfiles() {
+  const { user } = useAuth();
+  const q = React.useMemo(() => {
+    if (!user) return null;
+    return query(salaryProfilesCol(user.uid), orderBy("nextPaydayAt", "asc"));
+  }, [user]);
+
+  const map = React.useCallback((snap: QuerySnapshot) => docs(snap), []);
+  const state = useRealtimeQuery(q, map);
+  return { ...state, salaryProfiles: state.data ?? [] };
 }
 
 

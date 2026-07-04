@@ -14,5 +14,14 @@ export default function Home() {
     }
   }, [user, loading, router]);
 
-  return null;
+  return (
+    <div className="min-h-dvh bg-background flex items-center justify-center px-6">
+      <div className="text-center">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-3xl bg-primary text-primary-foreground shadow-sm">
+          <span className="text-lg font-bold">C</span>
+        </div>
+        <p className="text-sm text-muted-foreground">Opening Cashly...</p>
+      </div>
+    </div>
+  );
 }

@@ -91,7 +91,7 @@ function monthToDate(month: string) {
   return new Date(parseInt(year), parseInt(monthNum) - 1, 1);
 }
 
-export default function BudgetsPage() {
+export default function BudgetsPage({ embedded = false }: { embedded?: boolean }) {
   const { user } = useAuth();
   const [mode, setMode] = React.useState<SummaryMode>("monthly");
   const [month, setMonth] = React.useState(currentMonth());
@@ -286,19 +286,25 @@ export default function BudgetsPage() {
   });
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Budgets</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Track your spending and manage budget limits
-          </p>
-        </div>
+    <div className="space-y-4 sm:space-y-6">
+      <div className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${embedded ? "items-stretch sm:items-center" : ""}`}>
+        {!embedded && (
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Budgets</h1>
+              <Badge variant="secondary" className="font-mono text-[11px]">
+                {monthName}
+              </Badge>
+            </div>
+            <p className="hidden text-sm text-muted-foreground sm:block">
+              Track your spending and manage budget limits
+            </p>
+          </div>
+        )}
 
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="h-11 w-full sm:w-auto">
               <Plus className="h-4 w-4 mr-2" />
               Add Budget
             </Button>
@@ -410,9 +416,11 @@ export default function BudgetsPage() {
       </div>
 
       {/* Period Selector Tabs */}
-      <Tabs value={mode} onValueChange={(v) => setMode(v as SummaryMode)}>
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <TabsList>
+      <Tabs value={mode} onValueChange={(v) => setMode(v as SummaryMode)} className="space-y-4 sm:space-y-6">
+        <Card className="surface-tonal py-3 shadow-sm sm:py-4">
+          <CardContent className="space-y-3 px-3 sm:px-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <TabsList className="grid w-full grid-cols-4 sm:w-fit">
             <TabsTrigger value="all">All Time</TabsTrigger>
             <TabsTrigger value="yearly">Yearly</TabsTrigger>
             <TabsTrigger value="monthly">Monthly</TabsTrigger>
@@ -421,7 +429,7 @@ export default function BudgetsPage() {
 
           {/* Period Navigation */}
           {mode !== "all" && (
-            <div className="flex items-center gap-2">
+            <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2 sm:flex">
               <Button
                 variant="outline"
                 size="icon"
@@ -433,7 +441,7 @@ export default function BudgetsPage() {
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <Badge variant="secondary" className="font-mono px-3 py-1.5 text-sm">
+              <Badge variant="secondary" className="justify-center px-3 py-1.5 font-mono text-sm">
                 {period.label}
               </Badge>
               <Button
@@ -450,101 +458,67 @@ export default function BudgetsPage() {
             </div>
           )}
         </div>
+          </CardContent>
+        </Card>
 
         {/* Summary Cards */}
-        <TabsContent value={mode} className="mt-6">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {/* Income */}
-            <Card>
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Income
-                  </CardTitle>
-                  <div className="h-8 w-8 rounded-full bg-emerald-500/10 flex items-center justify-center">
-                    <TrendingUp className="h-4 w-4 text-emerald-600" />
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-emerald-600">
-                  {summary.missingUsdRate || summary.unsupportedCurrency
-                    ? "—"
-                    : `+${formatMoney(summary.incomeLkr, HOME_CURRENCY)}`}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {summary.incomeCount} transaction{summary.incomeCount !== 1 ? "s" : ""}
-                </p>
-              </CardContent>
-            </Card>
+        <TabsContent value={mode} className="mt-0">
+          <div className="grid grid-cols-2 divide-x divide-y divide-border/60 overflow-hidden rounded-[2rem] bg-card shadow-sm sm:grid-cols-4 sm:divide-y-0">
+            <div className="p-3 sm:p-4">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
+                <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
+                Income
+              </div>
+              <p className="mt-2 truncate font-display text-lg font-bold tabular-nums text-emerald-600 sm:text-2xl">
+                {summary.missingUsdRate || summary.unsupportedCurrency
+                  ? "-"
+                  : `+${formatMoney(summary.incomeLkr, HOME_CURRENCY)}`}
+              </p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                {summary.incomeCount} transaction{summary.incomeCount !== 1 ? "s" : ""}
+              </p>
+            </div>
 
-            {/* Expenses */}
-            <Card>
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Expenses
-                  </CardTitle>
-                  <div className="h-8 w-8 rounded-full bg-rose-500/10 flex items-center justify-center">
-                    <TrendingDown className="h-4 w-4 text-rose-600" />
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-rose-600">
-                  {summary.missingUsdRate || summary.unsupportedCurrency
-                    ? "—"
-                    : `-${formatMoney(summary.expenseLkr, HOME_CURRENCY)}`}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {summary.expenseCount} transaction{summary.expenseCount !== 1 ? "s" : ""}
-                </p>
-              </CardContent>
-            </Card>
+            <div className="p-3 sm:p-4">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
+                <TrendingDown className="h-3.5 w-3.5 text-rose-600" />
+                Expenses
+              </div>
+              <p className="mt-2 truncate font-display text-lg font-bold tabular-nums text-rose-600 sm:text-2xl">
+                {summary.missingUsdRate || summary.unsupportedCurrency
+                  ? "-"
+                  : `-${formatMoney(summary.expenseLkr, HOME_CURRENCY)}`}
+              </p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                {summary.expenseCount} transaction{summary.expenseCount !== 1 ? "s" : ""}
+              </p>
+            </div>
 
-            {/* Net */}
-            <Card className="border-2 border-primary/20">
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Net Change
-                  </CardTitle>
-                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                    <PiggyBank className="h-4 w-4 text-primary" />
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className={`text-2xl font-bold ${summary.netLkr >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
-                  {summary.missingUsdRate || summary.unsupportedCurrency
-                    ? "—"
-                    : `${summary.netLkr >= 0 ? "+" : ""}${formatMoney(summary.netLkr, HOME_CURRENCY)}`}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {summary.netLkr >= 0 ? "Saved this period" : "Overspent this period"}
-                </p>
-              </CardContent>
-            </Card>
+            <div className="p-3 sm:p-4">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
+                <PiggyBank className="h-3.5 w-3.5 text-primary" />
+                Net
+              </div>
+              <p className={`mt-2 truncate font-display text-lg font-bold tabular-nums sm:text-2xl ${summary.netLkr >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                {summary.missingUsdRate || summary.unsupportedCurrency
+                  ? "-"
+                  : `${summary.netLkr >= 0 ? "+" : ""}${formatMoney(summary.netLkr, HOME_CURRENCY)}`}
+              </p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                {summary.netLkr >= 0 ? "Saved this period" : "Overspent this period"}
+              </p>
+            </div>
 
-            {/* Budgets Summary */}
-            <Card>
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Budgets
-                  </CardTitle>
-                  <div className="h-8 w-8 rounded-full bg-blue-500/10 flex items-center justify-center">
-                    <Target className="h-4 w-4 text-blue-600" />
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{budgetRows.length}</div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {mode === "monthly" ? `active for ${monthName}` : "view monthly tab"}
-                </p>
-              </CardContent>
-            </Card>
+            <div className="p-3 sm:p-4">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
+                <Target className="h-3.5 w-3.5 text-sky-600" />
+                Budgets
+              </div>
+              <p className="mt-2 font-display text-lg font-bold tabular-nums sm:text-2xl">{budgetRows.length}</p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                {mode === "monthly" ? `active for ${monthName}` : "view monthly tab"}
+              </p>
+            </div>
           </div>
 
           {(summary.missingUsdRate || summary.unsupportedCurrency) && (
@@ -559,21 +533,130 @@ export default function BudgetsPage() {
 
       {/* Budgets Table - Only in Monthly View */}
       {mode === "monthly" && (
-        <Card>
-          <CardHeader>
+        <Card className="surface-tonal shadow-sm">
+          <CardHeader className="p-4 pb-2 sm:p-6 sm:pb-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10">
                   <Target className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <CardTitle>Monthly Budgets</CardTitle>
+                  <CardTitle className="text-base">Monthly Budgets</CardTitle>
                   <CardDescription>Spending limits for {monthName}</CardDescription>
                 </div>
               </div>
             </div>
           </CardHeader>
           <CardContent className="p-0">
+            <div className="grid gap-3 p-4 md:hidden">
+              {loading ? (
+                <div className="rounded-3xl border p-6 text-center text-sm text-muted-foreground">
+                  Loading budgets...
+                </div>
+              ) : error ? (
+                <div className="rounded-3xl border border-destructive/30 bg-destructive/5 p-6 text-center text-sm text-destructive">
+                  Failed to load budgets{error?.message ? `: ${error.message}` : ""}
+                </div>
+              ) : budgetRows.length ? (
+                budgetRows.map((b) => {
+                  const over = b.remaining < 0;
+                  const warning = b.percent >= 80 && !over;
+                  const tone = over ? "text-destructive" : warning ? "text-amber-600" : "text-primary";
+
+                  return (
+                    <Card key={b.id} className="surface-container-high py-0 shadow-sm">
+                      <CardContent className="space-y-4 p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl ${
+                                over ? "bg-destructive/10" : warning ? "bg-amber-500/10" : "bg-primary/10"
+                              }`}>
+                                <Target className={`h-4 w-4 ${tone}`} />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="truncate font-semibold">{b.scopeName}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  Limit {formatMoney(b.limitAmount, b.currency)}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                          <Badge variant={over ? "destructive" : warning ? "secondary" : "outline"}>
+                            {b.percent}%
+                          </Badge>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-3 text-sm">
+                            <span className="text-muted-foreground">Spent</span>
+                            <span className="font-semibold tabular-nums">
+                              {b.missingUsdRate || b.unsupportedCurrency
+                                ? "-"
+                                : formatMoney(b.spentInBudgetCurrency, b.currency)}
+                            </span>
+                          </div>
+                          <div className="h-2.5 overflow-hidden rounded-full bg-muted">
+                            <div
+                              className={`h-full rounded-full transition-all ${
+                                over ? "bg-destructive" : warning ? "bg-amber-500" : "bg-primary"
+                              }`}
+                              style={{ width: `${b.percent}%` }}
+                            />
+                          </div>
+                          <div className="flex items-center justify-between gap-3 text-sm">
+                            <span className="text-muted-foreground">Remaining</span>
+                            <span className={`font-semibold tabular-nums ${over ? "text-destructive" : ""}`}>
+                              {b.missingUsdRate || b.unsupportedCurrency
+                                ? "-"
+                                : formatMoney(b.remaining, b.currency)}
+                            </span>
+                          </div>
+                        </div>
+
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="w-full text-destructive hover:text-destructive"
+                          onClick={async () => {
+                            if (!user) return;
+                            if (!confirm("Delete this budget?")) return;
+                            try {
+                              await deleteBudget(user.uid, b.id);
+                              toast.success("Budget deleted");
+                            } catch (e) {
+                              toast.error("Failed to delete budget", {
+                                description: e instanceof Error ? e.message : undefined,
+                              });
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete Budget
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  );
+                })
+              ) : (
+                <div className="rounded-3xl border border-dashed p-8 text-center">
+                  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                    <Target className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <p className="font-medium">No budgets for {monthName}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Set a budget to track your spending.
+                  </p>
+                  <Button variant="outline" size="sm" className="mt-4" onClick={() => setOpen(true)}>
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Budget
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            <div className="hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50 hover:bg-muted/50">
@@ -711,6 +794,7 @@ export default function BudgetsPage() {
                 )}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       )}

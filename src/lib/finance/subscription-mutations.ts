@@ -1,4 +1,4 @@
-import { Timestamp, runTransaction, serverTimestamp } from "firebase/firestore";
+import { Timestamp, deleteField, runTransaction, serverTimestamp } from "firebase/firestore";
 import { addMonths } from "date-fns";
 import { z } from "zod";
 import { getFirebaseDb } from "@/lib/firebase/client";
@@ -37,12 +37,33 @@ function round2(x: number) {
 
 const createSubscriptionInputSchema = z.object({
   name: z.string().min(1).max(64),
+  kind: z.enum(["subscription", "loan"]).default("subscription"),
   amount: z.number().positive().finite(),
   currency: z.string().min(3).max(3).default(DEFAULT_CURRENCY),
   accountId: z.string().min(1),
   categoryId: z.string().min(1),
   nextDueAt: z.date(),
   interval: z.enum(["monthly"]).default("monthly"),
+  loanTotalPayments: z.number().int().positive().optional(),
+  loanPaidPayments: z.number().int().min(0).optional(),
+}).superRefine((values, ctx) => {
+  if (values.kind !== "loan") return;
+
+  if (!values.loanTotalPayments) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["loanTotalPayments"],
+      message: "Loan needs total months",
+    });
+  }
+
+  if ((values.loanPaidPayments ?? 0) > (values.loanTotalPayments ?? 0)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["loanPaidPayments"],
+      message: "Paid months cannot be greater than total months",
+    });
+  }
 });
 
 export async function createSubscription(
@@ -55,20 +76,29 @@ export async function createSubscription(
   const ref = subscriptionDoc(uid, id);
 
   await runTransaction(db, async (tx) => {
-    tx.set(ref, {
+    const payload = {
       schemaVersion: 1,
       id,
       name: values.name,
+      kind: values.kind,
       amount: values.amount,
       currency: values.currency.toUpperCase(),
       accountId: values.accountId,
       categoryId: values.categoryId,
       interval: values.interval,
       status: "active",
+      ...(values.kind === "loan"
+        ? {
+            loanTotalPayments: values.loanTotalPayments,
+            loanPaidPayments: values.loanPaidPayments ?? 0,
+          }
+        : {}),
       nextDueAt: Timestamp.fromDate(values.nextDueAt),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    });
+    };
+
+    tx.set(ref, payload);
   });
 
   return id;
@@ -77,13 +107,34 @@ export async function createSubscription(
 const updateSubscriptionInputSchema = z.object({
   subscriptionId: z.string().min(1),
   name: z.string().min(1).max(64),
+  kind: z.enum(["subscription", "loan"]).default("subscription"),
   amount: z.number().positive().finite(),
   currency: z.string().min(3).max(3).default(DEFAULT_CURRENCY),
   accountId: z.string().min(1),
   categoryId: z.string().min(1),
   nextDueAt: z.date(),
   interval: z.enum(["monthly"]).default("monthly"),
-  status: z.enum(["active", "paused"]).default("active"),
+  status: z.enum(["active", "paused", "completed"]).default("active"),
+  loanTotalPayments: z.number().int().positive().optional(),
+  loanPaidPayments: z.number().int().min(0).optional(),
+}).superRefine((values, ctx) => {
+  if (values.kind !== "loan") return;
+
+  if (!values.loanTotalPayments) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["loanTotalPayments"],
+      message: "Loan needs total months",
+    });
+  }
+
+  if ((values.loanPaidPayments ?? 0) > (values.loanTotalPayments ?? 0)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["loanPaidPayments"],
+      message: "Paid months cannot be greater than total months",
+    });
+  }
 });
 
 export async function updateSubscription(
@@ -97,17 +148,24 @@ export async function updateSubscription(
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists()) throw new Error("Subscription not found");
-    tx.update(ref, {
+    const payload = {
       name: values.name,
+      kind: values.kind,
       amount: values.amount,
       currency: values.currency.toUpperCase(),
       accountId: values.accountId,
       categoryId: values.categoryId,
       interval: values.interval,
       status: values.status,
+      loanTotalPayments:
+        values.kind === "loan" ? values.loanTotalPayments : deleteField(),
+      loanPaidPayments:
+        values.kind === "loan" ? values.loanPaidPayments ?? 0 : deleteField(),
       nextDueAt: Timestamp.fromDate(values.nextDueAt),
       updatedAt: serverTimestamp(),
-    });
+    };
+
+    tx.update(ref, payload);
   });
 }
 
@@ -181,8 +239,9 @@ export async function recordSubscriptionPayment(
       currency: accountCurrency,
       accountId,
       categoryId,
+      subscriptionId,
       occurredAt,
-      note: `Subscription: ${s.name ?? "Payment"}`,
+      note: `${s.kind === "loan" ? "Loan payment" : "Subscription"}: ${s.name ?? "Payment"}`,
       ...(fxRate
         ? {
             fxOriginalAmount: amount,
@@ -203,10 +262,24 @@ export async function recordSubscriptionPayment(
     const currentNextDue =
       s.nextDueAt instanceof Timestamp ? s.nextDueAt.toDate() : new Date();
     const nextDueAt = Timestamp.fromDate(addMonths(currentNextDue, 1));
+    const isLoan = s.kind === "loan";
+    const loanTotalPayments =
+      typeof s.loanTotalPayments === "number" ? s.loanTotalPayments : null;
+    const loanPaidPayments =
+      typeof s.loanPaidPayments === "number" ? s.loanPaidPayments : 0;
+    const nextLoanPaidPayments = isLoan ? loanPaidPayments + 1 : null;
+    const loanCompleted =
+      isLoan && loanTotalPayments != null && nextLoanPaidPayments! >= loanTotalPayments;
 
     trx.update(sRef, {
       lastPaidAt: serverTimestamp(),
       nextDueAt,
+      ...(isLoan
+        ? {
+            loanPaidPayments: nextLoanPaidPayments,
+            status: loanCompleted ? "completed" : "active",
+          }
+        : {}),
       updatedAt: serverTimestamp(),
     });
   });

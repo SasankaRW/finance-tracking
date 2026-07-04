@@ -10,7 +10,7 @@ import {
     format as formatDate
 } from "date-fns";
 import { Timestamp } from "firebase/firestore";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, formatCurrencyCode } from "@/lib/format";
 import { HOME_CURRENCY } from "@/shared/currency";
 
 interface Transaction {
@@ -18,6 +18,26 @@ interface Transaction {
     amount: number;
     kind: "income" | "expense" | "transfer";
     currency?: string;
+    subscriptionId?: string;
+    accountId?: string;
+}
+
+interface RecurringCommitment {
+    status: string;
+    interval: string;
+    amount: number;
+    currency?: string;
+    accountId?: string;
+}
+
+interface AccrualStats {
+    /** Smoothed "true" daily burn rate: variable spend so far + recurring bills spread evenly, whether paid yet or not. */
+    accrualDailyAverage: number;
+    /** Projected total spend for the full month on an accrual basis (variable spend extrapolated + full recurring commitments). */
+    accrualMonthlyProjected: number;
+    recurringMonthlyTotal: number;
+    variableExpenseSoFar: number;
+    hasUnsupportedCurrency: boolean;
 }
 
 interface TrendData {
@@ -143,6 +163,76 @@ export function useQuickStats(transactions: Transaction[], currentBalance: numbe
 
         return stats;
     }, [transactions, currentBalance]);
+}
+
+/**
+ * Accrual-basis daily/monthly averages.
+ *
+ * Cash-basis averages (see `useQuickStats`) undercount spending early in the month
+ * because recurring bills (rent, subscriptions, loans) only show up once actually paid,
+ * then spike the average on whatever day they're paid. This spreads active monthly
+ * recurring commitments evenly across the month regardless of payment date, and combines
+ * that with the variable (non-recurring) spend rate so the numbers stay smooth all month.
+ *
+ * Transactions created from a recorded subscription/loan payment carry `subscriptionId`
+ * and are excluded from the variable bucket to avoid double-counting that bill.
+ *
+ * When `visibleAccountIds` is provided, transactions/subscriptions tied to accounts
+ * excluded from totals (hidden accounts) are left out of both buckets, matching how
+ * the balance total already treats hidden accounts.
+ */
+export function useAccrualStats(
+    transactions: Transaction[],
+    subscriptions: RecurringCommitment[],
+    usdToLkr: number | null,
+    visibleAccountIds?: Set<string> | null,
+): AccrualStats {
+    return React.useMemo(() => {
+        const now = new Date();
+        const monthStart = startOfMonth(now);
+        const monthEnd = endOfMonth(now);
+        const daysInMonth = differenceInDays(monthEnd, monthStart) + 1;
+        const daysElapsed = differenceInDays(now, monthStart) + 1;
+        const isVisible = (accountId?: string) =>
+            !visibleAccountIds || (!!accountId && visibleAccountIds.has(accountId));
+
+        let hasUnsupportedCurrency = false;
+        const toHomeCurrency = (amount: number, currency?: string) => {
+            const cur = formatCurrencyCode(currency ?? HOME_CURRENCY);
+            if (cur === HOME_CURRENCY) return amount;
+            if (cur === "USD" && typeof usdToLkr === "number") return amount * usdToLkr;
+            hasUnsupportedCurrency = true;
+            return 0;
+        };
+
+        let variableExpenseSoFar = 0;
+        for (const txn of transactions) {
+            if (txn.kind !== "expense" || txn.subscriptionId) continue;
+            if (!isVisible(txn.accountId)) continue;
+            const date = txn.occurredAt instanceof Timestamp ? txn.occurredAt.toDate() : new Date(txn.occurredAt);
+            if (date < monthStart || date > now) continue;
+            variableExpenseSoFar += toHomeCurrency(txn.amount || 0, txn.currency);
+        }
+
+        let recurringMonthlyTotal = 0;
+        for (const sub of subscriptions) {
+            if (sub.status !== "active" || sub.interval !== "monthly") continue;
+            if (!isVisible(sub.accountId)) continue;
+            recurringMonthlyTotal += toHomeCurrency(sub.amount || 0, sub.currency);
+        }
+
+        const variableDailyRate = daysElapsed > 0 ? variableExpenseSoFar / daysElapsed : 0;
+        const accrualDailyAverage = variableDailyRate + (daysInMonth > 0 ? recurringMonthlyTotal / daysInMonth : 0);
+        const accrualMonthlyProjected = variableDailyRate * daysInMonth + recurringMonthlyTotal;
+
+        return {
+            accrualDailyAverage,
+            accrualMonthlyProjected,
+            recurringMonthlyTotal,
+            variableExpenseSoFar,
+            hasUnsupportedCurrency,
+        };
+    }, [transactions, subscriptions, usdToLkr, visibleAccountIds]);
 }
 
 export function useSparklineData(transactions: Transaction[], days: number = 30) {

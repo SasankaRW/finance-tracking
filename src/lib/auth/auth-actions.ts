@@ -11,6 +11,7 @@ import {
 import { getFirebaseAuth } from "@/lib/firebase/client";
 import { clearSession, createSession } from "@/lib/auth/session-client";
 import { ensureDefaultCategoriesSeeded } from "@/lib/finance/seed";
+import { clearWidgetSession } from "@/lib/widget-session";
 
 export async function signUpWithEmail(email: string, password: string) {
   const auth = getFirebaseAuth();
@@ -53,6 +54,7 @@ export async function resetPassword(email: string) {
 
 export async function signOutEverywhere() {
   const auth = getFirebaseAuth();
+  await clearWidgetSession();
   await clearSession();
   await signOut(auth);
 }

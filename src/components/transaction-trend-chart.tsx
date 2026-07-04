@@ -1,20 +1,28 @@
 "use client";
 
 import * as React from "react";
-import { format, startOfDay, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, startOfWeek, startOfMonth } from "date-fns";
 import {
-  AreaChart,
-  Area,
+  format,
+  startOfDay,
+  eachDayOfInterval,
+  eachWeekOfInterval,
+  eachMonthOfInterval,
+  startOfWeek,
+  startOfMonth,
+} from "date-fns";
+import {
+  Bar,
+  BarChart,
   XAxis,
   YAxis,
-  CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
-  Line,
-  ComposedChart,
+  ReferenceLine,
+  LabelList,
 } from "recharts";
 import { formatMoney } from "@/lib/format";
-import { TrendingUp, TrendingDown, DollarSign } from "lucide-react";
+import { TrendingUp, TrendingDown, Scale } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { ChartContainer } from "@/components/chart-container";
 
 interface TransactionData {
   date: Date;
@@ -27,6 +35,7 @@ interface TransactionTrendChartProps {
   transactions: TransactionData[];
   dateRange: { start: Date; end: Date };
   className?: string;
+  showSummary?: boolean;
 }
 
 type AggregationPeriod = "daily" | "weekly" | "monthly";
@@ -37,11 +46,70 @@ interface ChartDataPoint {
   income: number;
   expense: number;
   net: number;
+  onTarget: boolean;
+}
+
+interface ChartTheme {
+  income: string;
+  expense: string;
+  muted: string;
+  border: string;
+  card: string;
+  foreground: string;
+  primary: string;
+}
+
+function readChartTheme(): ChartTheme {
+  if (typeof window === "undefined") {
+    return {
+      income: "oklch(0.68 0.14 165)",
+      expense: "oklch(0.62 0.18 25)",
+      muted: "oklch(0.48 0.025 220)",
+      border: "oklch(0.88 0.015 220)",
+      card: "oklch(0.995 0.006 220)",
+      foreground: "oklch(0.2 0.02 220)",
+      primary: "oklch(0.45 0.1 200)",
+    };
+  }
+  const style = getComputedStyle(document.documentElement);
+  const read = (name: string, fallback: string) =>
+    style.getPropertyValue(name).trim() || fallback;
+  return {
+    income: read("--chart-1", "oklch(0.68 0.14 165)"),
+    expense: read("--chart-2", "oklch(0.62 0.18 25)"),
+    muted: read("--muted-foreground", "oklch(0.48 0.025 220)"),
+    border: read("--border", "oklch(0.88 0.015 220)"),
+    card: read("--card", "oklch(0.995 0.006 220)"),
+    foreground: read("--foreground", "oklch(0.2 0.02 220)"),
+    primary: read("--primary", "oklch(0.45 0.1 200)"),
+  };
+}
+
+function useChartTheme(): ChartTheme {
+  const [theme, setTheme] = React.useState<ChartTheme>(readChartTheme);
+
+  React.useEffect(() => {
+    const refresh = () => setTheme(readChartTheme());
+    refresh();
+
+    const observer = new MutationObserver(refresh);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class", "style"],
+    });
+
+    window.addEventListener("resize", refresh);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", refresh);
+    };
+  }, []);
+
+  return theme;
 }
 
 function getAggregationPeriod(start: Date, end: Date): AggregationPeriod {
   const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-
   if (days <= 31) return "daily";
   if (days <= 90) return "weekly";
   return "monthly";
@@ -51,8 +119,8 @@ function aggregateTransactions(
   transactions: TransactionData[],
   start: Date,
   end: Date,
-  period: AggregationPeriod
-): ChartDataPoint[] {
+  period: AggregationPeriod,
+): Omit<ChartDataPoint, "onTarget">[] {
   let intervals: Date[];
 
   switch (period) {
@@ -69,18 +137,14 @@ function aggregateTransactions(
 
   const dataMap = new Map<string, { income: number; expense: number }>();
 
-  // Initialize all intervals with zero
   intervals.forEach((date) => {
-    const key = period === "daily"
-      ? format(date, "yyyy-MM-dd")
-      : period === "weekly"
-        ? format(date, "yyyy-MM-dd")
-        : format(date, "yyyy-MM");
-
+    const key =
+      period === "monthly"
+        ? format(date, "yyyy-MM")
+        : format(date, "yyyy-MM-dd");
     dataMap.set(key, { income: 0, expense: 0 });
   });
 
-  // Aggregate transactions
   transactions.forEach((txn) => {
     let key: string;
     const txnDate = startOfDay(txn.date);
@@ -99,15 +163,11 @@ function aggregateTransactions(
 
     const existing = dataMap.get(key);
     if (existing) {
-      if (txn.kind === "income") {
-        existing.income += txn.amount;
-      } else if (txn.kind === "expense") {
-        existing.expense += txn.amount;
-      }
+      if (txn.kind === "income") existing.income += txn.amount;
+      else if (txn.kind === "expense") existing.expense += txn.amount;
     }
   });
 
-  // Convert to array with net calculation
   return Array.from(dataMap.entries()).map(([dateStr, values]) => ({
     date: dateStr,
     dateObj: new Date(dateStr),
@@ -120,10 +180,12 @@ function aggregateTransactions(
 function formatXAxis(dateStr: string, period: AggregationPeriod, isMobile: boolean): string {
   const date = new Date(dateStr);
 
+  if (period === "daily") {
+    return format(date, isMobile ? "EEEEE" : "EEE");
+  }
+
   if (isMobile) {
     switch (period) {
-      case "daily":
-        return format(date, "d");
       case "weekly":
         return format(date, "d");
       case "monthly":
@@ -132,8 +194,6 @@ function formatXAxis(dateStr: string, period: AggregationPeriod, isMobile: boole
   }
 
   switch (period) {
-    case "daily":
-      return format(date, "MMM d");
     case "weekly":
       return format(date, "MMM d");
     case "monthly":
@@ -141,237 +201,355 @@ function formatXAxis(dateStr: string, period: AggregationPeriod, isMobile: boole
   }
 }
 
+function formatTooltipDate(dateStr: string, period: AggregationPeriod): string {
+  const date = new Date(dateStr);
+  switch (period) {
+    case "monthly":
+      return format(date, "MMMM yyyy");
+    case "weekly":
+      return `Week of ${format(date, "MMM d, yyyy")}`;
+    default:
+      return format(date, "EEEE, MMM d");
+  }
+}
+
+function formatYAxis(value: number): string {
+  if (value >= 1000) return `${Math.round(value / 1000)}k`;
+  if (value === 0) return "0";
+  return value.toString();
+}
+
+function GoalBadge(props: {
+  x?: number;
+  y?: number;
+  width?: number;
+  payload?: ChartDataPoint;
+  accent: string;
+  surface: string;
+}) {
+  const { x = 0, y = 0, width = 0, payload, accent, surface } = props;
+  if (!payload?.onTarget) return null;
+
+  const cx = x + width / 2;
+  const cy = y - 14;
+
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r={12} fill={accent} opacity={0.18} />
+      <circle cx={cx} cy={cy} r={10} fill={surface} stroke={accent} strokeWidth={1.5} />
+      <path
+        d={`M ${cx - 4} ${cy} l 2.8 2.8 5.6 -5.8`}
+        fill="none"
+        stroke={accent}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </g>
+  );
+}
+
 export function TransactionTrendChart({
   transactions,
   dateRange,
   className = "",
+  showSummary = true,
 }: TransactionTrendChartProps) {
+  const theme = useChartTheme();
   const [isMobile, setIsMobile] = React.useState(false);
 
   React.useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
     checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
   const period = getAggregationPeriod(dateRange.start, dateRange.end);
-  const chartData = aggregateTransactions(transactions, dateRange.start, dateRange.end, period);
+  const rawChartData = aggregateTransactions(
+    transactions,
+    dateRange.start,
+    dateRange.end,
+    period,
+  );
 
-  // Calculate summary stats
-  const totalIncome = chartData.reduce((sum, d) => sum + d.income, 0);
-  const totalExpense = chartData.reduce((sum, d) => sum + d.expense, 0);
+  const totalIncome = rawChartData.reduce((sum, d) => sum + d.income, 0);
+  const totalExpense = rawChartData.reduce((sum, d) => sum + d.expense, 0);
   const netChange = totalIncome - totalExpense;
-  const avgIncome = chartData.length > 0 ? totalIncome / chartData.length : 0;
-  const avgExpense = chartData.length > 0 ? totalExpense / chartData.length : 0;
+  const avgIncome = rawChartData.length > 0 ? totalIncome / rawChartData.length : 0;
+  const avgExpense = rawChartData.length > 0 ? totalExpense / rawChartData.length : 0;
+  const hasActivity = totalIncome > 0 || totalExpense > 0;
 
-  const chartHeight = isMobile ? 220 : 280;
-  const margins = isMobile
-    ? { top: 5, right: 5, left: 0, bottom: 0 }
-    : { top: 10, right: 10, left: 0, bottom: 0 };
+  const chartData: ChartDataPoint[] = rawChartData.map((point) => ({
+    ...point,
+    onTarget: point.expense > 0 && point.expense <= avgExpense,
+  }));
+
+  const chartHeight = isMobile ? 200 : 280;
+  const barSize = isMobile ? 10 : 16;
+  const margins = {
+    top: 28,
+    right: isMobile ? 36 : 44,
+    left: 4,
+    bottom: 4,
+  };
 
   return (
-    <div className={`space-y-4 animate-fade-in ${className}`}>
-      {/* Summary Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-        {/* Total Income */}
-        <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border border-emerald-500/20">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="h-6 w-6 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-              <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
+    <div className={cn("space-y-3 sm:space-y-4", className)}>
+      {showSummary && (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
+          <div className="rounded-2xl border bg-card p-3 shadow-sm">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] font-medium text-muted-foreground sm:text-xs">
+                Total income
+              </span>
+              <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-emerald-500/10">
+                <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
+              </div>
             </div>
-            <span className="text-xs font-medium text-muted-foreground">Total Income</span>
+            <p className="mt-2 truncate text-base font-bold tabular-nums text-emerald-600 sm:text-lg">
+              +{formatMoney(totalIncome)}
+            </p>
+            <p className="mt-1 text-[10px] text-muted-foreground sm:text-xs">
+              Avg {formatMoney(avgIncome)}/period
+            </p>
           </div>
-          <p className="text-lg font-bold text-emerald-600 tabular-nums">
-            +{formatMoney(totalIncome)}
-          </p>
-          <p className="text-[10px] text-muted-foreground mt-0.5">
-            Avg {formatMoney(avgIncome)}/period
-          </p>
-        </div>
 
-        {/* Total Expense */}
-        <div className="p-3 rounded-xl bg-gradient-to-br from-rose-500/10 to-rose-500/5 border border-rose-500/20">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="h-6 w-6 rounded-lg bg-rose-500/10 flex items-center justify-center">
-              <TrendingDown className="h-3.5 w-3.5 text-rose-600" />
+          <div className="rounded-2xl border bg-card p-3 shadow-sm">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] font-medium text-muted-foreground sm:text-xs">
+                Total expense
+              </span>
+              <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-rose-500/10">
+                <TrendingDown className="h-3.5 w-3.5 text-rose-600" />
+              </div>
             </div>
-            <span className="text-xs font-medium text-muted-foreground">Total Expense</span>
+            <p className="mt-2 truncate text-base font-bold tabular-nums text-rose-600 sm:text-lg">
+              -{formatMoney(totalExpense)}
+            </p>
+            <p className="mt-1 text-[10px] text-muted-foreground sm:text-xs">
+              Avg {formatMoney(avgExpense)}/period
+            </p>
           </div>
-          <p className="text-lg font-bold text-rose-600 tabular-nums">
-            -{formatMoney(totalExpense)}
-          </p>
-          <p className="text-[10px] text-muted-foreground mt-0.5">
-            Avg {formatMoney(avgExpense)}/period
-          </p>
-        </div>
 
-        {/* Net Change */}
-        <div className={`p-3 rounded-xl bg-gradient-to-br col-span-2 lg:col-span-1 ${netChange >= 0
-          ? 'from-emerald-500/10 to-emerald-500/5 border-emerald-500/20'
-          : 'from-rose-500/10 to-rose-500/5 border-rose-500/20'
-          } border`}>
-          <div className="flex items-center gap-2 mb-1">
-            <div className={`h-6 w-6 rounded-lg flex items-center justify-center ${netChange >= 0 ? 'bg-emerald-500/10' : 'bg-rose-500/10'
-              }`}>
-              <DollarSign className={`h-3.5 w-3.5 ${netChange >= 0 ? 'text-emerald-600' : 'text-rose-600'}`} />
-            </div>
-            <span className="text-xs font-medium text-muted-foreground">Net Change</span>
-          </div>
-          <p className={`text-lg font-bold tabular-nums ${netChange >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-            {netChange >= 0 ? '+' : ''}{formatMoney(netChange)}
-          </p>
-          <p className="text-[10px] text-muted-foreground mt-0.5">
-            {netChange >= 0 ? 'Net savings' : 'Net deficit'} this period
-          </p>
-        </div>
-      </div>
-
-      {/* Chart */}
-      <div className="relative">
-        <ResponsiveContainer width="100%" height={chartHeight}>
-          <ComposedChart
-            data={chartData}
-            margin={margins}
+          <div
+            className={cn(
+              "col-span-2 rounded-2xl border bg-card p-3 shadow-sm sm:col-span-1",
+              netChange >= 0 ? "border-emerald-500/20" : "border-rose-500/20",
+            )}
           >
-            <defs>
-              {/* Income gradient */}
-              <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="hsl(168, 76%, 42%)" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="hsl(168, 76%, 42%)" stopOpacity={0} />
-              </linearGradient>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] font-medium text-muted-foreground sm:text-xs">
+                Net change
+              </span>
+              <div
+                className={cn(
+                  "flex h-7 w-7 items-center justify-center rounded-xl",
+                  netChange >= 0 ? "bg-emerald-500/10" : "bg-rose-500/10",
+                )}
+              >
+                <Scale
+                  className={cn(
+                    "h-3.5 w-3.5",
+                    netChange >= 0 ? "text-emerald-600" : "text-rose-600",
+                  )}
+                />
+              </div>
+            </div>
+            <p
+              className={cn(
+                "mt-2 truncate text-base font-bold tabular-nums sm:text-lg",
+                netChange >= 0 ? "text-emerald-600" : "text-rose-600",
+              )}
+            >
+              {netChange >= 0 ? "+" : ""}
+              {formatMoney(netChange)}
+            </p>
+            <p className="mt-1 text-[10px] text-muted-foreground sm:text-xs">
+              {netChange >= 0 ? "Net savings" : "Net deficit"} this period
+            </p>
+          </div>
+        </div>
+      )}
 
-              {/* Expense gradient */}
-              <linearGradient id="expenseGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="hsl(0, 84%, 60%)" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="hsl(0, 84%, 60%)" stopOpacity={0} />
-              </linearGradient>
-            </defs>
+      <div className="rounded-2xl border bg-muted/20 p-3 sm:rounded-3xl sm:p-5">
+        {!hasActivity ? (
+          <div className="flex h-[200px] flex-col items-center justify-center gap-2 text-center sm:h-[280px]">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10">
+              <TrendingUp className="h-5 w-5 text-primary" />
+            </div>
+            <p className="text-sm font-medium">No trend data yet</p>
+            <p className="max-w-xs text-xs text-muted-foreground">
+              Add income or expense transactions in this range to see the chart.
+            </p>
+          </div>
+        ) : (
+          <ChartContainer height={chartHeight}>
+            <BarChart
+              data={chartData}
+              margin={margins}
+              barCategoryGap={isMobile ? "18%" : "24%"}
+              barGap={4}
+            >
+              <XAxis
+                dataKey="date"
+                tickFormatter={(value) => formatXAxis(value, period, isMobile)}
+                fontSize={isMobile ? 11 : 12}
+                tickLine={false}
+                axisLine={false}
+                interval={isMobile ? "preserveEnd" : 0}
+                tick={{ fill: theme.muted }}
+                dy={8}
+              />
 
-            <CartesianGrid
-              strokeDasharray="3 3"
-              stroke="hsl(var(--border))"
-              opacity={0.15}
-              vertical={false}
-            />
+              <YAxis
+                orientation="right"
+                fontSize={isMobile ? 10 : 11}
+                tickLine={false}
+                axisLine={false}
+                width={isMobile ? 32 : 40}
+                domain={[0, "auto"]}
+                tickFormatter={formatYAxis}
+                tick={{ fill: theme.muted }}
+              />
 
-            <XAxis
-              dataKey="date"
-              tickFormatter={(value) => formatXAxis(value, period, isMobile)}
-              stroke="hsl(var(--muted-foreground))"
-              fontSize={isMobile ? 9 : 11}
-              tickLine={false}
-              axisLine={false}
-              interval={isMobile ? "preserveEnd" : "preserveStartEnd"}
-              tick={{ fill: "#ffffff" }}
-              dy={5}
-            />
+              {avgExpense > 0 && (
+                <ReferenceLine
+                  y={avgExpense}
+                  stroke={theme.expense}
+                  strokeWidth={2}
+                  strokeOpacity={0.45}
+                />
+              )}
 
-            <YAxis
-              stroke="hsl(var(--muted-foreground))"
-              fontSize={isMobile ? 9 : 11}
-              tickLine={false}
-              axisLine={false}
-              width={isMobile ? 32 : 45}
-              domain={[0, 'auto']}
-              tickFormatter={(value) => {
-                if (value >= 1000) return `${Math.round(value / 1000)}k`;
-                if (value === 0) return '0';
-                return value.toString();
-              }}
-              tick={{ fill: "#ffffff" }}
-            />
-
-            <Tooltip
-              content={({ active, payload }) => {
-                if (!active || !payload || !payload.length) return null;
-
-                const data = payload[0].payload;
-                return (
-                  <div className="rounded-xl border bg-background/95 backdrop-blur-md p-3 shadow-2xl">
-                    <p className="mb-2 text-xs font-semibold">
-                      {formatXAxis(data.date, period, false)}
-                    </p>
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-2">
-                          <div className="h-2 w-2 rounded-full bg-emerald-500" />
-                          <span className="text-xs text-muted-foreground">Income</span>
-                        </div>
-                        <span className="text-xs font-bold text-emerald-600 tabular-nums">
-                          +{formatMoney(data.income)}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-2">
-                          <div className="h-2 w-2 rounded-full bg-rose-500" />
-                          <span className="text-xs text-muted-foreground">Expense</span>
-                        </div>
-                        <span className="text-xs font-bold text-rose-600 tabular-nums">
-                          -{formatMoney(data.expense)}
-                        </span>
-                      </div>
-
-                      <div className="pt-1.5 mt-1.5 border-t">
+              <Tooltip
+                cursor={{ fill: theme.muted, opacity: 0.08 }}
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const data = payload[0].payload as ChartDataPoint;
+                  return (
+                    <div
+                      className="min-w-38 rounded-2xl border p-3 shadow-lg"
+                      style={{
+                        backgroundColor: theme.card,
+                        borderColor: theme.border,
+                        color: theme.foreground,
+                      }}
+                    >
+                      <p className="mb-2 text-xs font-semibold">
+                        {formatTooltipDate(data.date, period)}
+                      </p>
+                      <div className="space-y-2">
                         <div className="flex items-center justify-between gap-4">
-                          <span className="text-xs font-medium">Net</span>
-                          <span className={`text-xs font-bold tabular-nums ${data.net >= 0 ? "text-emerald-600" : "text-rose-600"
-                            }`}>
-                            {data.net >= 0 ? "+" : ""}{formatMoney(data.net)}
+                          <span className="text-xs text-muted-foreground">Income</span>
+                          <span
+                            className="text-xs font-bold tabular-nums"
+                            style={{ color: theme.income }}
+                          >
+                            +{formatMoney(data.income)}
                           </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-4">
+                          <span className="text-xs text-muted-foreground">Expense</span>
+                          <span
+                            className="text-xs font-bold tabular-nums"
+                            style={{ color: theme.expense }}
+                          >
+                            -{formatMoney(data.expense)}
+                          </span>
+                        </div>
+                        <div
+                          className="mt-1 border-t pt-2"
+                          style={{ borderColor: theme.border }}
+                        >
+                          <div className="flex items-center justify-between gap-4">
+                            <span className="text-xs font-medium">Net</span>
+                            <span
+                              className="text-xs font-bold tabular-nums"
+                              style={{
+                                color: data.net >= 0 ? theme.income : theme.expense,
+                              }}
+                            >
+                              {data.net >= 0 ? "+" : ""}
+                              {formatMoney(data.net)}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                );
-              }}
-              cursor={{
-                stroke: "hsl(var(--muted-foreground))",
-                strokeWidth: 1,
-                strokeDasharray: "5 5",
-                opacity: 0.3
-              }}
-            />
+                  );
+                }}
+              />
 
-            {/* Expense Area */}
-            <Area
-              type="monotone"
-              dataKey="expense"
-              stroke="hsl(0, 84%, 60%)"
-              strokeWidth={2}
-              fill="url(#expenseGradient)"
-              animationDuration={1000}
-              animationBegin={0}
-            />
+              <Bar
+                dataKey="income"
+                fill={theme.income}
+                barSize={barSize}
+                radius={[999, 999, 999, 999]}
+                animationDuration={650}
+                animationEasing="ease-out"
+              />
 
-            {/* Income Area */}
-            <Area
-              type="monotone"
-              dataKey="income"
-              stroke="hsl(168, 76%, 42%)"
-              strokeWidth={2}
-              fill="url(#incomeGradient)"
-              animationDuration={1000}
-              animationBegin={200}
-            />
-          </ComposedChart>
-        </ResponsiveContainer>
+              <Bar
+                dataKey="expense"
+                fill={theme.expense}
+                barSize={barSize}
+                radius={[999, 999, 999, 999]}
+                animationDuration={650}
+                animationEasing="ease-out"
+                animationBegin={80}
+              >
+                <LabelList
+                  dataKey="expense"
+                  content={(rawProps) => {
+                    const props = rawProps as {
+                      x?: number;
+                      y?: number;
+                      width?: number;
+                      payload?: ChartDataPoint;
+                    };
+                    return (
+                      <GoalBadge
+                        x={typeof props.x === "number" ? props.x : undefined}
+                        y={typeof props.y === "number" ? props.y : undefined}
+                        width={typeof props.width === "number" ? props.width : undefined}
+                        payload={props.payload}
+                        accent={theme.income}
+                        surface={theme.card}
+                      />
+                    );
+                  }}
+                />
+              </Bar>
+            </BarChart>
+          </ChartContainer>
+        )}
 
-        {/* Legend */}
-        <div className="flex items-center justify-center gap-4 mt-3 text-xs">
-          <div className="flex items-center gap-1.5">
-            <div className="h-2 w-2 rounded-full bg-emerald-500" />
-            <span className="text-muted-foreground">Income</span>
+        {hasActivity && (
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-[11px]">
+            <div className="expressive-pill flex items-center gap-1.5 px-3 py-1 font-medium">
+              <span
+                className="h-2.5 w-5 rounded-full"
+                style={{ backgroundColor: theme.expense }}
+              />
+              Spending
+            </div>
+            <div className="expressive-pill flex items-center gap-1.5 px-3 py-1 font-medium">
+              <span
+                className="h-2.5 w-5 rounded-full"
+                style={{ backgroundColor: theme.income }}
+              />
+              Income
+            </div>
+            <div className="expressive-pill flex items-center gap-1.5 px-3 py-1 font-medium">
+              <span
+                className="h-0.5 w-5 rounded-full"
+                style={{ backgroundColor: theme.expense }}
+              />
+              Avg spend
+            </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <div className="h-2 w-2 rounded-full bg-rose-500" />
-            <span className="text-muted-foreground">Expense</span>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

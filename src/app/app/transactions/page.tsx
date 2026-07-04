@@ -1,10 +1,11 @@
 "use client";
 
 import * as React from "react";
+import { useSearchParams } from "next/navigation";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays, subMonths } from "date-fns";
+import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subDays, subMonths } from "date-fns";
 import { toast } from "sonner";
 import {
   Download,
@@ -23,6 +24,7 @@ import {
   Tag,
   Settings2,
   CalendarIcon,
+  Search,
 } from "lucide-react";
 import { Timestamp } from "firebase/firestore";
 import { useAuth } from "@/lib/auth/auth-provider";
@@ -113,6 +115,7 @@ const createSchema = z
 type CreateValues = z.infer<typeof createSchema>;
 
 export default function TransactionsPage() {
+  const searchParams = useSearchParams();
   const { user } = useAuth();
   const { accounts } = useAccounts();
   const { categories: expenseCats } = useCategories("expense");
@@ -122,14 +125,27 @@ export default function TransactionsPage() {
   const usdToLkr = fxUsd?.rates?.[HOME_CURRENCY] ?? null;
 
   // Date range presets
-  type DateRangePreset = "today" | "week" | "month" | "30days" | "90days" | "custom";
+  type DateRangePreset = "today" | "week" | "month" | "30days" | "90days" | "year" | "custom";
 
   const [dateRangePreset, setDateRangePreset] = React.useState<DateRangePreset>("month");
   const [customDateRange, setCustomDateRange] = React.useState<{ start: Date; end: Date }>({
     start: startOfMonth(new Date()),
     end: endOfMonth(new Date()),
   });
+  const shouldOpenQuickAdd =
+    searchParams.get("quickAdd") === "transaction" || searchParams.get("add") === "transaction";
+  const quickAddSignal = searchParams.get("quickAddAt") ?? searchParams.toString();
+  const quickAddKindParam = searchParams.get("kind");
+  const quickAddKind =
+    quickAddKindParam === "income" || quickAddKindParam === "transfer"
+      ? quickAddKindParam
+      : "expense";
   const [showCustomDatePicker, setShowCustomDatePicker] = React.useState(false);
+  const handleCustomRangeSelect = (range: { from?: Date; to?: Date } | undefined) => {
+    if (!range?.from) return;
+    setCustomDateRange({ start: range.from, end: range.to ?? range.from });
+    setDateRangePreset("custom");
+  };
   const [searchQuery, setSearchQuery] = React.useState("");
   const [debouncedSearch, setDebouncedSearch] = React.useState("");
 
@@ -155,6 +171,8 @@ export default function TransactionsPage() {
         return { start: subDays(now, 30), end: now };
       case "90days":
         return { start: subDays(now, 90), end: now };
+      case "year":
+        return { start: startOfYear(now), end: endOfYear(now) };
       case "custom":
         return customDateRange;
       default:
@@ -355,17 +373,17 @@ export default function TransactionsPage() {
   const hasFilters = filters.accountId || filters.categoryId || filters.eventId || filters.noEvent || debouncedSearch.trim() || dateRangePreset !== "month";
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Transactions</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <h1 className="font-display text-xl font-bold tracking-tight sm:text-2xl">Transactions</h1>
+          <p className="mt-1 hidden text-sm text-muted-foreground sm:block">
             Track and manage your financial activity
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="grid grid-cols-[auto_1fr] items-center gap-2 sm:flex">
           <Button
             variant="outline"
             size="sm"
@@ -396,113 +414,133 @@ export default function TransactionsPage() {
               toast.success("CSV exported");
             }}
             disabled={loading || !(filteredTransactions as any[]).length}
+            className="h-10 rounded-xl px-3"
           >
             <Download className="h-4 w-4 mr-1" />
-            Export
+            <span className="hidden sm:inline">Export</span>
           </Button>
 
-          <CreateTransactionDialog />
+          <CreateTransactionDialog
+            openOnMount={shouldOpenQuickAdd}
+            openSignal={quickAddSignal}
+            defaultKind={quickAddKind}
+          />
         </div>
       </div>
 
+      <div className="scrollbar-hide -mx-3 flex gap-2 overflow-x-auto px-3 sm:hidden">
+        {([
+          ["today", "Today"],
+          ["week", "Week"],
+          ["month", "Month"],
+          ["30days", "30D"],
+          ["year", "Year"],
+        ] as const).map(([preset, label]) => (
+          <Button
+            key={preset}
+            variant={dateRangePreset === preset ? "default" : "outline"}
+            size="sm"
+            onClick={() => setDateRangePreset(preset)}
+            className="h-9 shrink-0 rounded-full px-4"
+          >
+            {label}
+          </Button>
+        ))}
+        <Popover open={showCustomDatePicker} onOpenChange={setShowCustomDatePicker}>
+          <PopoverTrigger asChild>
+            <Button
+              variant={dateRangePreset === "custom" ? "default" : "outline"}
+              size="sm"
+              className="h-9 shrink-0 rounded-full px-4"
+            >
+              <CalendarIcon className="mr-1 h-3.5 w-3.5" />
+              Custom
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-4" align="start">
+            <div className="space-y-3">
+              <Label className="text-xs">Select a date range</Label>
+              <Calendar
+                mode="range"
+                selected={{ from: customDateRange.start, to: customDateRange.end }}
+                onSelect={handleCustomRangeSelect}
+                initialFocus
+              />
+              <p className="text-center text-xs text-muted-foreground">
+                {format(customDateRange.start, "MMM d, yyyy")} – {format(customDateRange.end, "MMM d, yyyy")}
+              </p>
+              <Button size="sm" className="w-full" onClick={() => setShowCustomDatePicker(false)}>
+                Apply
+              </Button>
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
+
       {/* Summary Stats */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Income
-              </CardTitle>
-              <div className="h-8 w-8 rounded-full bg-emerald-500/10 flex items-center justify-center">
-                <TrendingUp className="h-4 w-4 text-emerald-600" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-emerald-600">
-              +{formatMoney(summaryStats.totalIncome)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {summaryStats.incomeCount} transaction{summaryStats.incomeCount !== 1 ? "s" : ""}
-            </p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-2 divide-x divide-y divide-border/60 overflow-hidden rounded-[2rem] bg-card shadow-sm sm:grid-cols-4 sm:divide-y-0">
+        <div className="p-3 sm:p-4">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
+            <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
+            Income
+          </div>
+          <p className="mt-2 truncate font-display text-lg font-bold tabular-nums text-emerald-600 sm:text-2xl">
+            +{formatMoney(summaryStats.totalIncome)}
+          </p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            {summaryStats.incomeCount} transaction{summaryStats.incomeCount !== 1 ? "s" : ""}
+          </p>
+        </div>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Expenses
-              </CardTitle>
-              <div className="h-8 w-8 rounded-full bg-rose-500/10 flex items-center justify-center">
-                <TrendingDown className="h-4 w-4 text-rose-600" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-rose-600">
-              -{formatMoney(summaryStats.totalExpense)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {summaryStats.expenseCount} transaction{summaryStats.expenseCount !== 1 ? "s" : ""}
-            </p>
-          </CardContent>
-        </Card>
+        <div className="p-3 sm:p-4">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
+            <TrendingDown className="h-3.5 w-3.5 text-rose-600" />
+            Expenses
+          </div>
+          <p className="mt-2 truncate font-display text-lg font-bold tabular-nums text-rose-600 sm:text-2xl">
+            -{formatMoney(summaryStats.totalExpense)}
+          </p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            {summaryStats.expenseCount} transaction{summaryStats.expenseCount !== 1 ? "s" : ""}
+          </p>
+        </div>
 
-        <Card className="border-2 border-primary/20">
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Net Change
-              </CardTitle>
-              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                <ArrowLeftRight className="h-4 w-4 text-primary" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${summaryStats.netChange >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
-              {summaryStats.netChange >= 0 ? "+" : ""}{formatMoney(summaryStats.netChange)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {summaryStats.netChange >= 0 ? "Net savings" : "Net loss"}
-            </p>
-          </CardContent>
-        </Card>
+        <div className="p-3 sm:p-4">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
+            <ArrowLeftRight className="h-3.5 w-3.5 text-primary" />
+            Net
+          </div>
+          <p className={`mt-2 truncate font-display text-lg font-bold tabular-nums sm:text-2xl ${summaryStats.netChange >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+            {summaryStats.netChange >= 0 ? "+" : ""}{formatMoney(summaryStats.netChange)}
+          </p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            {summaryStats.netChange >= 0 ? "Net savings" : "Net loss"}
+          </p>
+        </div>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Transfers
-              </CardTitle>
-              <div className="h-8 w-8 rounded-full bg-blue-500/10 flex items-center justify-center">
-                <ArrowLeftRight className="h-4 w-4 text-blue-600" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{summaryStats.transferCount}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              between accounts
-            </p>
-          </CardContent>
-        </Card>
+        <div className="p-3 sm:p-4">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
+            <ArrowLeftRight className="h-3.5 w-3.5 text-blue-600" />
+            Transfers
+          </div>
+          <p className="mt-2 font-display text-lg font-bold tabular-nums sm:text-2xl">{summaryStats.transferCount}</p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">between accounts</p>
+        </div>
       </div>
 
       {/* Trend Chart */}
-      <Card>
-        <CardHeader>
+      <Card className="surface-tonal expressive-card gap-0 py-0">
+        <CardHeader className="p-4 pb-2 sm:p-6 sm:pb-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <CardTitle>Transaction Trends</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-base sm:text-lg">Transaction Trends</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">
                 Income vs expenses over time
               </CardDescription>
             </div>
 
             {/* Date Range Filters */}
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="hidden flex-wrap items-center gap-2 sm:flex">
               <Button
                 variant={dateRangePreset === "today" ? "default" : "outline"}
                 size="sm"
@@ -543,6 +581,14 @@ export default function TransactionsPage() {
               >
                 90 Days
               </Button>
+              <Button
+                variant={dateRangePreset === "year" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setDateRangePreset("year")}
+                className="h-8"
+              >
+                Year
+              </Button>
               <Popover open={showCustomDatePicker} onOpenChange={setShowCustomDatePicker}>
                 <PopoverTrigger asChild>
                   <Button
@@ -555,35 +601,18 @@ export default function TransactionsPage() {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-4" align="end">
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label className="text-xs">Start Date</Label>
-                      <Calendar
-                        mode="single"
-                        selected={customDateRange.start}
-                        onSelect={(date) => {
-                          if (date) {
-                            setCustomDateRange((prev) => ({ ...prev, start: date }));
-                            setDateRangePreset("custom");
-                          }
-                        }}
-                        initialFocus
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs">End Date</Label>
-                      <Calendar
-                        mode="single"
-                        selected={customDateRange.end}
-                        onSelect={(date) => {
-                          if (date) {
-                            setCustomDateRange((prev) => ({ ...prev, end: date }));
-                            setDateRangePreset("custom");
-                          }
-                        }}
-                        initialFocus
-                      />
-                    </div>
+                  <div className="space-y-3">
+                    <Label className="text-xs">Select a date range</Label>
+                    <Calendar
+                      mode="range"
+                      numberOfMonths={2}
+                      selected={{ from: customDateRange.start, to: customDateRange.end }}
+                      onSelect={handleCustomRangeSelect}
+                      initialFocus
+                    />
+                    <p className="text-center text-xs text-muted-foreground">
+                      {format(customDateRange.start, "MMM d, yyyy")} – {format(customDateRange.end, "MMM d, yyyy")}
+                    </p>
                     <Button
                       size="sm"
                       className="w-full"
@@ -597,7 +626,7 @@ export default function TransactionsPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
           <TransactionTrendChart
             transactions={filteredTransactions.map((t: any) => ({
               date: t.occurredAt instanceof Timestamp ? t.occurredAt.toDate() : new Date(t.occurredAt),
@@ -606,46 +635,47 @@ export default function TransactionsPage() {
               currency: t.currency,
             }))}
             dateRange={dateRange}
+            showSummary={false}
           />
         </CardContent>
       </Card>
 
       {/* Search Bar */}
-      <div className="flex gap-3">
+      <div className="relative flex gap-3">
+        <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           placeholder="Search transactions..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="max-w-md"
+          className="h-12 rounded-full border-0 bg-card pl-11 pr-5 shadow-sm sm:max-w-md"
         />
       </div>
 
       {/* Transactions Table */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Receipt className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <CardTitle>Transaction History</CardTitle>
-                <CardDescription>
-                  {summaryStats.total} total transaction{summaryStats.total !== 1 ? "s" : ""}
-                </CardDescription>
-              </div>
+      <Card className="surface-tonal gap-0 overflow-hidden py-0">
+        <CardHeader className="p-4 pb-3 sm:p-6">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <CardTitle className="text-base sm:text-lg">History</CardTitle>
+              <CardDescription>
+                {summaryStats.total} total transaction{summaryStats.total !== 1 ? "s" : ""}
+              </CardDescription>
             </div>
             {hasFilters && (
-              <Button variant="ghost" size="sm" onClick={() => setFilters({})}>
+              <Button variant="ghost" size="sm" onClick={() => {
+                setFilters({});
+                setSearchQuery("");
+                setDateRangePreset("month");
+              }} className="h-8 shrink-0 px-2 text-xs">
                 <X className="h-4 w-4 mr-1" />
-                Clear Filters
+                Clear
               </Button>
             )}
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3 p-4 pt-0 sm:space-y-4 sm:p-6 sm:pt-0">
           {/* Filters */}
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground uppercase tracking-wider">
                 Account
@@ -654,7 +684,7 @@ export default function TransactionsPage() {
                 value={filters.accountId ?? "all"}
                 onValueChange={(v) => setFilters((f) => ({ ...f, accountId: v === "all" ? undefined : v }))}
               >
-                <SelectTrigger className="h-10">
+                <SelectTrigger className="h-10 rounded-xl px-3">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -682,7 +712,7 @@ export default function TransactionsPage() {
                   }))
                 }
               >
-                <SelectTrigger className="h-10">
+                <SelectTrigger className="h-10 rounded-xl px-3">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -699,14 +729,14 @@ export default function TransactionsPage() {
               </Select>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="col-span-2 space-y-1.5 sm:col-span-1">
               <div className="flex items-center justify-between">
                 <Label className="text-xs text-muted-foreground uppercase tracking-wider">
                   Category
                 </Label>
                 <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1">
+                    <Button variant="ghost" size="sm" className="h-6 gap-1 px-2 text-xs">
                       <Settings2 className="h-3 w-3" />
                       Manage
                     </Button>
@@ -837,7 +867,7 @@ export default function TransactionsPage() {
                 value={filters.categoryId ?? "all"}
                 onValueChange={(v) => setFilters((f) => ({ ...f, categoryId: v === "all" ? undefined : v }))}
               >
-                <SelectTrigger className="h-10">
+                <SelectTrigger className="h-10 rounded-xl px-3">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -854,14 +884,14 @@ export default function TransactionsPage() {
         </CardContent>
 
         {/* Mobile Card View */}
-        <div className="md:hidden">
+        <div className="px-4 pb-4 md:hidden">
           {loading ? (
-            <div className="p-6 text-center text-muted-foreground">
+            <div className="rounded-2xl border border-dashed p-6 text-center text-muted-foreground">
               Loading transactions…
             </div>
           ) : filteredTransactions.length ? (
-            <div className="divide-y">
-              {(filteredTransactions as any[]).map((t) => {
+            <ul className="overflow-hidden rounded-[2rem] bg-card shadow-sm">
+              {(filteredTransactions as any[]).map((t, idx) => {
                 const occurredAt = t.occurredAt instanceof Timestamp ? t.occurredAt.toDate() : new Date();
                 const accountName = t.accountId ? accounts.find((a: any) => a.id === t.accountId)?.name : null;
                 const categoryName = t.categoryId
@@ -876,121 +906,118 @@ export default function TransactionsPage() {
                   : null;
 
                 return (
-                  <div key={t.id} className="p-4 hover:bg-muted/50 transition-colors">
-                    <div className="flex items-start justify-between gap-3">
-                      {/* Left: Icon, Details, Meta */}
-                      <div className="flex gap-3 flex-1 min-w-0">
-                        <div className={`h-10 w-10 shrink-0 rounded-xl flex items-center justify-center ${t.kind === "income"
-                            ? "bg-emerald-500/10"
-                            : t.kind === "expense"
-                              ? "bg-rose-500/10"
-                              : "bg-blue-500/10"
-                          }`}>
-                          {getTransactionIcon(t.kind)}
-                        </div>
-
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0 flex-1">
-                              {t.note ? (
-                                <div className="font-semibold truncate">{t.note}</div>
-                              ) : (
-                                <div className="font-semibold capitalize text-muted-foreground">{t.kind}</div>
-                              )}
-                              <div className="text-xs text-muted-foreground mt-0.5">
-                                {t.kind === "transfer" ? (
-                                  <span>{fromAccountName} → {toAccountName}</span>
-                                ) : (
-                                  <span>
-                                    {accountName}
-                                    {categoryName && <span> · {categoryName}</span>}
-                                    {eventName && <span> · {eventName}</span>}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-xs text-muted-foreground/70 mt-1">
-                                {format(occurredAt, "MMM d, yyyy")}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
+                  <li
+                    key={t.id}
+                    className={`motion-expressive flex items-center justify-between gap-3 px-4 py-3.5 transition-colors active:bg-muted/50 ${
+                      idx > 0 ? "border-t border-border/60" : ""
+                    }`}
+                  >
+                    {/* Left: Icon, Details, Meta */}
+                    <div className="flex min-w-0 flex-1 gap-3">
+                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${t.kind === "income"
+                          ? "bg-emerald-500/10"
+                          : t.kind === "expense"
+                            ? "bg-rose-500/10"
+                            : "bg-blue-500/10"
+                        }`}>
+                        {getTransactionIcon(t.kind)}
                       </div>
 
-                      {/* Right: Amount & Actions */}
-                      <div className="flex items-start gap-2 shrink-0">
-                        <div className="text-right">
-                          <div className={`font-bold tabular-nums text-base ${t.kind === "income"
-                              ? "text-emerald-600"
-                              : t.kind === "expense"
-                                ? "text-rose-600"
-                                : ""
-                            }`}>
-                            {t.kind === "expense" ? "-" : t.kind === "income" ? "+" : ""}
-                            {formatMoney(t.amount ?? 0)}
-                          </div>
+                      <div className="min-w-0 flex-1">
+                        {t.note ? (
+                          <div className="truncate text-sm font-semibold">{t.note}</div>
+                        ) : (
+                          <div className="text-sm font-semibold capitalize text-muted-foreground">{t.kind}</div>
+                        )}
+                        <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                          {t.kind === "transfer" ? (
+                            <span>{fromAccountName} → {toAccountName}</span>
+                          ) : (
+                            <span>
+                              {accountName}
+                              {categoryName && <span> · {categoryName}</span>}
+                              {eventName && <span> · {eventName}</span>}
+                            </span>
+                          )}
                         </div>
-
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0"
-                            >
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setEdit(t);
-                                form.reset({
-                                  kind: t.kind,
-                                  amount: t.amount ?? 0,
-                                  occurredAt,
-                                  note: t.note ?? "",
-                                  accountId: t.accountId,
-                                  categoryId: t.categoryId,
-                                  eventId: t.eventId,
-                                  fromAccountId: t.fromAccountId,
-                                  toAccountId: t.toAccountId,
-                                });
-                              }}
-                            >
-                              <Pencil className="h-4 w-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onClick={async () => {
-                                if (!user) return;
-                                if (!confirm("Delete this transaction?")) return;
-                                try {
-                                  await deleteTransaction(user.uid, t.id, t.updatedAt);
-                                  toast.success("Transaction deleted");
-                                } catch (e) {
-                                  toast.error("Failed to delete", {
-                                    description: e instanceof Error ? e.message : undefined,
-                                  });
-                                }
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <div className="mt-1 text-[11px] text-muted-foreground">
+                          {format(occurredAt, "MMM d, HH:mm")}
+                        </div>
                       </div>
                     </div>
-                  </div>
+
+                    {/* Right: Amount & Actions */}
+                    <div className="flex shrink-0 items-center gap-1">
+                      <div className={`max-w-[112px] truncate text-sm font-bold tabular-nums ${t.kind === "income"
+                          ? "text-emerald-600"
+                          : t.kind === "expense"
+                            ? "text-rose-600"
+                            : ""
+                        }`}>
+                        {t.kind === "expense" ? "-" : t.kind === "income" ? "+" : ""}
+                        {formatMoney(t.amount ?? 0)}
+                      </div>
+
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 rounded-full p-0 text-muted-foreground"
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setEdit(t);
+                              form.reset({
+                                kind: t.kind,
+                                amount: t.amount ?? 0,
+                                occurredAt,
+                                note: t.note ?? "",
+                                accountId: t.accountId,
+                                categoryId: t.categoryId,
+                                eventId: t.eventId,
+                                fromAccountId: t.fromAccountId,
+                                toAccountId: t.toAccountId,
+                              });
+                            }}
+                          >
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={async () => {
+                              if (!user) return;
+                              if (!confirm("Delete this transaction?")) return;
+                              try {
+                                await deleteTransaction(user.uid, t.id, t.updatedAt);
+                                toast.success("Transaction deleted");
+                              } catch (e) {
+                                toast.error("Failed to delete", {
+                                  description: e instanceof Error ? e.message : undefined,
+                                });
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </li>
                 );
               })}
-            </div>
+            </ul>
           ) : (
-            <div className="py-16 px-4">
+            <div className="rounded-[2rem] border border-dashed px-4 py-12">
               <div className="flex flex-col items-center gap-3 max-w-sm mx-auto text-center">
-                <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
-                  <Receipt className="h-8 w-8 text-muted-foreground" />
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                  <Receipt className="h-6 w-6 text-muted-foreground" />
                 </div>
                 <div>
                   <p className="font-medium">No transactions found</p>
