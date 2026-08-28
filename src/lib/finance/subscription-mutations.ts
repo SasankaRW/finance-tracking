@@ -37,7 +37,7 @@ function round2(x: number) {
 
 const createSubscriptionInputSchema = z.object({
   name: z.string().min(1).max(64),
-  kind: z.enum(["subscription", "loan"]).default("subscription"),
+  kind: z.enum(["subscription", "loan", "rent"]).default("subscription"),
   amount: z.number().positive().finite(),
   currency: z.string().min(3).max(3).default(DEFAULT_CURRENCY),
   accountId: z.string().min(1),
@@ -107,7 +107,7 @@ export async function createSubscription(
 const updateSubscriptionInputSchema = z.object({
   subscriptionId: z.string().min(1),
   name: z.string().min(1).max(64),
-  kind: z.enum(["subscription", "loan"]).default("subscription"),
+  kind: z.enum(["subscription", "loan", "rent"]).default("subscription"),
   amount: z.number().positive().finite(),
   currency: z.string().min(3).max(3).default(DEFAULT_CURRENCY),
   accountId: z.string().min(1),
@@ -241,7 +241,7 @@ export async function recordSubscriptionPayment(
       categoryId,
       subscriptionId,
       occurredAt,
-      note: `${s.kind === "loan" ? "Loan payment" : "Subscription"}: ${s.name ?? "Payment"}`,
+      note: `${s.kind === "loan" ? "Loan payment" : s.kind === "rent" ? "Rent" : "Subscription"}: ${s.name ?? "Payment"}`,
       ...(fxRate
         ? {
             fxOriginalAmount: amount,

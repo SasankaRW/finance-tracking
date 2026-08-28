@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/lib/auth/auth-provider";
 import { ThemeColorProvider } from "@/lib/theme/theme-color-provider";
+import { ConfirmDialogProvider } from "@/components/confirm-dialog";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -24,8 +25,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <ThemeColorProvider>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
-            {children}
-            <Toaster richColors closeButton />
+            <ConfirmDialogProvider>
+              {children}
+              <Toaster richColors closeButton />
+            </ConfirmDialogProvider>
           </AuthProvider>
         </QueryClientProvider>
       </ThemeColorProvider>

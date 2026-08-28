@@ -2,14 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Calendar, Layers, List, LogOut, Settings, Target } from "lucide-react";
+import { Calendar, Layers, List, LogOut, Plus, Settings, Target, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CashlyLogo } from "@/components/cashly-logo";
 import { signOutEverywhere } from "@/lib/auth/auth-actions";
 import { useAuth } from "@/lib/auth/auth-provider";
+import { CreateTransactionDialog } from "@/app/app/transactions/create-transaction-dialog";
+import { Button } from "@/components/ui/button";
 
 const navItems = [
   { href: "/app", label: "Dashboard", icon: Layers },
+  { href: "/app/accounts", label: "Accounts", icon: Wallet },
   { href: "/app/transactions", label: "Transactions", icon: List },
   { href: "/app/planning", label: "Planning", icon: Target },
   { href: "/app/events", label: "Events", icon: Calendar },
@@ -122,6 +125,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </div>
       </nav>
+
+      <div className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-4 z-30 md:hidden">
+        <CreateTransactionDialog
+          trigger={
+            <Button
+              size="icon-lg"
+              className="motion-expressive h-16 w-16 rounded-[1.4rem] shadow-xl active:scale-90 active:rounded-full"
+              aria-label="Add transaction"
+            >
+              <Plus className="h-7 w-7" />
+            </Button>
+          }
+        />
+      </div>
     </div>
   );
 }

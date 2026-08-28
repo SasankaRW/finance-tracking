@@ -40,6 +40,8 @@ const salaryInputSchema = z.object({
   accountId: z.string().min(1),
   categoryId: z.string().min(1),
   depositMode: z.enum(["keep_salary_currency", "convert_to_account_currency"]).default("convert_to_account_currency"),
+  // Fraction withheld (tax, etc.) between gross converted pay and what actually lands in the account, e.g. 0.1375 for 13.75%.
+  taxRate: z.number().min(0).max(1).optional(),
   nextPaydayAt: z.date(),
 });
 
@@ -78,6 +80,7 @@ export async function createSalaryProfile(
       accountId: values.accountId,
       categoryId: values.categoryId,
       depositMode: values.depositMode,
+      taxRate: values.taxRate ?? null,
       status: "active",
       nextPaydayAt: Timestamp.fromDate(values.nextPaydayAt),
       createdAt: serverTimestamp(),
@@ -109,6 +112,7 @@ export async function updateSalaryProfile(
       accountId: values.accountId,
       categoryId: values.categoryId,
       depositMode: values.depositMode,
+      taxRate: values.taxRate ?? null,
       status: values.status,
       nextPaydayAt: Timestamp.fromDate(values.nextPaydayAt),
       updatedAt: serverTimestamp(),
@@ -140,10 +144,23 @@ export async function deleteSalaryProfile(uid: string, salaryProfileId: string) 
   });
 }
 
+function clampTaxRate(rate: number) {
+  if (!Number.isFinite(rate)) return 0;
+  return Math.min(0.95, Math.max(0, rate));
+}
+
+/**
+ * Records one salary payday. `receivedAmount`, when provided, is what actually landed in the
+ * account (in the account's currency) and overrides the tax-adjusted estimate. Since gross pay
+ * and the tax/withholding rate are rarely exact, the profile's stored taxRate is recalibrated
+ * from the gap between the pre-tax converted amount and receivedAmount so future estimates track
+ * the real deduction.
+ */
 export async function recordSalaryPayment(
   uid: string,
   salaryProfileId: string,
   occurredAtDate: Date = new Date(),
+  receivedAmount?: number,
 ) {
   const db = getFirebaseDb();
   const sRef = salaryProfileDoc(uid, salaryProfileId);
@@ -166,15 +183,26 @@ export async function recordSalaryPayment(
       salary.depositMode === "keep_salary_currency"
         ? "keep_salary_currency"
         : "convert_to_account_currency";
-    let amount = originalAmount;
+    let grossAmount = originalAmount;
     let fxRate: number | null = null;
     if (depositMode === "keep_salary_currency" && salaryCurrency !== accountCurrency) {
       throw new Error(`To keep salary in ${salaryCurrency}, choose a ${salaryCurrency} account.`);
     }
     if (depositMode === "convert_to_account_currency" && salaryCurrency !== accountCurrency) {
       fxRate = await fetchFxRate(salaryCurrency, accountCurrency);
-      amount = round2(originalAmount * fxRate);
+      grossAmount = round2(originalAmount * fxRate);
     }
+
+    const storedTaxRate =
+      typeof salary.taxRate === "number" ? clampTaxRate(salary.taxRate) : 0;
+    const estimatedAmount = round2(grossAmount * (1 - storedTaxRate));
+    const amount = typeof receivedAmount === "number" && receivedAmount > 0 ? receivedAmount : estimatedAmount;
+
+    // Recalibrate the tax rate from the actual amount received so next month's estimate improves.
+    const appliedTaxRate =
+      typeof receivedAmount === "number" && receivedAmount > 0 && grossAmount > 0
+        ? clampTaxRate(1 - receivedAmount / grossAmount)
+        : storedTaxRate;
 
     const prev = aSnap.data().balance as number;
     const txId = newId();
@@ -192,9 +220,11 @@ export async function recordSalaryPayment(
       categoryId: salary.categoryId,
       occurredAt,
       note: fxRate
-        ? `Salary: ${salary.employerName ?? "Paycheck"} (${formatCurrencyCode(salaryCurrency)} ${originalAmount} at ${fxRate.toFixed(4)})`
+        ? `Salary: ${salary.employerName ?? "Paycheck"} (${formatCurrencyCode(salaryCurrency)} ${originalAmount} at ${fxRate.toFixed(4)}${appliedTaxRate > 0 ? `, ${(appliedTaxRate * 100).toFixed(2)}% withheld` : ""})`
         : `Salary: ${salary.employerName ?? "Paycheck"}`,
       salaryProfileId,
+      salaryGrossAmount: grossAmount,
+      salaryTaxRate: appliedTaxRate,
       ...(fxRate
         ? {
             fxOriginalAmount: originalAmount,
@@ -216,6 +246,7 @@ export async function recordSalaryPayment(
       salary.nextPaydayAt instanceof Timestamp ? salary.nextPaydayAt.toDate() : occurredAtDate;
 
     trx.update(sRef, {
+      taxRate: appliedTaxRate,
       lastPaidAt: serverTimestamp(),
       nextPaydayAt: Timestamp.fromDate(nextMonthlyPayday(currentNextPayday, occurredAtDate)),
       updatedAt: serverTimestamp(),

@@ -6,6 +6,7 @@ import { Timestamp } from "firebase/firestore";
 import { ArrowDownLeft, ArrowUpRight, CheckCircle2, HandCoins, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth/auth-provider";
+import { useConfirm } from "@/components/confirm-dialog";
 import { createDebt, deleteDebt } from "@/lib/finance/debt-mutations";
 import { useDebts } from "@/lib/finance/hooks";
 import { formatCurrencyCode, formatMoney } from "@/lib/format";
@@ -48,6 +49,7 @@ function toDate(value: unknown) {
 
 export function DebtPillsPanel() {
   const { user } = useAuth();
+  const confirm = useConfirm();
   const { debts, loading } = useDebts();
   const [open, setOpen] = React.useState(false);
   const [personName, setPersonName] = React.useState("");
@@ -287,7 +289,7 @@ export function DebtPillsPanel() {
                     aria-label="Delete"
                     onClick={async () => {
                       if (!user) return;
-                      if (!confirm("Delete this money tracker?")) return;
+                      if (!(await confirm({ title: "Delete this money tracker?", destructive: true }))) return;
                       try {
                         await deleteDebt(user.uid, debt.id);
                         toast.success("Money tracker deleted");

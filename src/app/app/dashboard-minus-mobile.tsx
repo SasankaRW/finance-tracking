@@ -4,10 +4,29 @@ import * as React from "react";
 import Link from "next/link";
 import { format, differenceInDays, endOfMonth } from "date-fns";
 import { Timestamp } from "firebase/firestore";
-import { BarChart3, Banknote, Pencil } from "lucide-react";
+import { BarChart3, Banknote, ChevronRight, Pencil } from "lucide-react";
 import { formatMoney } from "@/lib/format";
 import { DebtPillsSummary } from "@/components/debt-pills-summary";
+import { UpcomingBillsPanel } from "@/components/upcoming-bills-panel";
+import { PendingImportsPanel } from "@/components/pending-imports-panel";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+
+const PIE_COLORS = ["#22c55e", "#3b82f6", "#f97316", "#a855f7", "#ef4444", "#14b8a6"];
+
+type CategorySpend = {
+  categoryId: string;
+  name: string;
+  value: number;
+};
 
 type Tx = {
   id: string;
@@ -34,10 +53,9 @@ export function DashboardMinusMobile({
   balanceCurrency,
   balanceMissingRate,
   accountCount,
-  dailyAverage,
-  monthlyAverage,
   recentTransactions,
   categoryNameById,
+  expenseByCategory,
   usdToLkr,
   cashInHand,
   cashMissingRate,
@@ -55,14 +73,14 @@ export function DashboardMinusMobile({
   balanceCurrency: string;
   balanceMissingRate: boolean;
   accountCount: number;
-  dailyAverage: number;
-  monthlyAverage: number;
   recentTransactions: Tx[];
   categoryNameById: Map<string, string>;
+  expenseByCategory: CategorySpend[];
   usdToLkr?: number | null;
   cashInHand?: number;
   cashMissingRate?: boolean;
 }) {
+  const [categoryDialogOpen, setCategoryDialogOpen] = React.useState(false);
   const daysLeft = differenceInDays(endOfMonth(new Date()), new Date()) + 1;
   const availablePct =
     budgetStatus.overallLimit && budgetPercentUsed !== null
@@ -177,21 +195,81 @@ export function DashboardMinusMobile({
           <div className="grid grid-cols-2 gap-3">
             <div className="motion-expressive rounded-[2rem] rounded-br-lg bg-secondary p-4 text-secondary-foreground">
               <p className="font-display text-2xl font-bold tabular-nums">
-                {formatMoney(dailyAverage, budgetStatus.overallCurrency)}
+                {formatMoney(todayTotal)}
               </p>
-              <p className="mt-1 text-sm font-semibold">Daily avg</p>
-              <p className="mt-0.5 text-[11px] opacity-70">incl. upcoming bills</p>
+              <p className="mt-1 text-sm font-semibold">Daily spend</p>
+              <p className="mt-0.5 text-[11px] opacity-70">{format(new Date(), "MMM d")}</p>
             </div>
-            <div className="tonal-primary motion-expressive rounded-[2rem] rounded-bl-lg p-4">
-              <p className="font-display text-2xl font-bold tabular-nums">
-                {formatMoney(monthlyAverage, budgetStatus.overallCurrency)}
-              </p>
-              <p className="mt-1 text-sm font-semibold">Monthly avg</p>
-              <p className="mt-0.5 text-[11px] text-muted-foreground">projected this month</p>
-            </div>
+            <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
+              <DialogTrigger asChild>
+                <button
+                  type="button"
+                  className="tonal-primary motion-expressive press-expressive relative w-full rounded-[2rem] rounded-bl-lg p-4 text-left"
+                >
+                  <ChevronRight className="absolute right-3.5 top-3.5 h-4 w-4 opacity-50" />
+                  <p className="font-display text-2xl font-bold tabular-nums">
+                    {formatMoney(budgetStatus.totalSpent)}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold">Monthly spend</p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">tap for breakdown</p>
+                </button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Spending by category</DialogTitle>
+                  <DialogDescription>
+                    {format(new Date(), "MMMM yyyy")} · {formatMoney(budgetStatus.totalSpent)} spent
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogBody className="space-y-3">
+                  {expenseByCategory.length > 0 ? (
+                    expenseByCategory.map((cat, idx) => {
+                      const pct =
+                        budgetStatus.totalSpent > 0
+                          ? Math.round((cat.value / budgetStatus.totalSpent) * 100)
+                          : 0;
+                      return (
+                        <div key={cat.categoryId} className="rounded-2xl border p-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex min-w-0 items-center gap-3">
+                              <div
+                                className="h-3 w-3 shrink-0 rounded-full"
+                                style={{ backgroundColor: PIE_COLORS[idx % PIE_COLORS.length] }}
+                              />
+                              <span className="truncate text-sm font-medium">{cat.name}</span>
+                            </div>
+                            <span className="shrink-0 text-sm font-semibold tabular-nums">
+                              {formatMoney(cat.value)}
+                            </span>
+                          </div>
+                          <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
+                            <div
+                              className="h-full rounded-full"
+                              style={{
+                                width: `${pct}%`,
+                                backgroundColor: PIE_COLORS[idx % PIE_COLORS.length],
+                              }}
+                            />
+                          </div>
+                          <p className="mt-2 text-xs text-muted-foreground">{pct}% of spending</p>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="py-8 text-center text-sm text-muted-foreground">
+                      No expenses recorded yet this month.
+                    </div>
+                  )}
+                </DialogBody>
+              </DialogContent>
+            </Dialog>
           </div>
         </>
       )}
+
+      <PendingImportsPanel />
+
+      <UpcomingBillsPanel />
 
       <DebtPillsSummary />
 

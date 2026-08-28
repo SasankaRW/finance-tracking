@@ -11,7 +11,6 @@ import {
   Building2,
   CreditCard,
   Plus,
-  MoreHorizontal,
   Pencil,
   Trash2,
   PiggyBank,
@@ -19,12 +18,15 @@ import {
   EyeOff,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-provider";
+import { useConfirm } from "@/components/confirm-dialog";
+import { RowActionsMenu } from "@/components/row-actions-menu";
 import { useAccounts } from "@/lib/finance/hooks";
 import { createAccount } from "@/lib/finance/mutations";
 import { updateAccount, deleteAccount } from "@/lib/finance/account-mutations";
 import { formatCurrencyCode, formatMoney } from "@/lib/format";
 import { COMMON_CURRENCIES, DEFAULT_CURRENCY, HOME_CURRENCY } from "@/shared/currency";
 import { useFxRates } from "@/lib/fx/use-fx-rates";
+import { SettingsStatTile } from "@/app/app/settings/settings-stat-tile";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -60,13 +62,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const createSchema = z.object({
   name: z.string().min(1).max(64),
@@ -89,10 +86,90 @@ const updateSchema = z.object({
 type UpdateValues = z.infer<typeof updateSchema>;
 
 const accountTypes = [
-  { value: "cash", label: "Cash", icon: Wallet, description: "Physical currency" },
-  { value: "bank", label: "Bank", icon: Building2, description: "Bank account" },
-  { value: "card", label: "Card", icon: CreditCard, description: "Credit/Debit" },
+  { value: "cash", label: "Cash", icon: Wallet, description: "Physical currency", pill: "bg-emerald-200/90 text-emerald-900" },
+  { value: "bank", label: "Bank", icon: Building2, description: "Bank account", pill: "bg-blue-200/90 text-blue-900" },
+  { value: "card", label: "Card", icon: CreditCard, description: "Credit/Debit", pill: "bg-purple-200/90 text-purple-900" },
 ] as const;
+
+function AccountTypeSelector({ form }: { form: any }) {
+  return (
+    <div className="space-y-2">
+      <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+        Account Type
+      </Label>
+      <div className="flex flex-wrap gap-2">
+        {accountTypes.map((type) => {
+          const Icon = type.icon;
+          const isSelected = form.watch("type") === type.value;
+          return (
+            <button
+              key={type.value}
+              type="button"
+              onClick={() =>
+                form.setValue("type", type.value, {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                })
+              }
+              className={`motion-expressive press-expressive inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-bold transition-all ${
+                isSelected ? type.pill : "bg-muted text-muted-foreground"
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {type.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function IncludeInTotalsToggle({ form }: { form: any }) {
+  const checked = Boolean(form.watch("includeInTotals"));
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-2xl border p-3">
+      <div>
+        <p className="text-sm font-medium">Include in total balance</p>
+        <p className="text-xs text-muted-foreground">Show this account in your net worth</p>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label="Include in total balance"
+        onClick={() =>
+          form.setValue("includeInTotals", !checked, {
+            shouldDirty: true,
+            shouldValidate: true,
+          })
+        }
+        className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
+          checked ? "bg-primary" : "bg-muted"
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
+            checked ? "translate-x-5" : "translate-x-0"
+          }`}
+        />
+      </button>
+    </div>
+  );
+}
+
+// Converts an account's balance to a display string, plus an optional secondary line
+// (e.g. the original USD amount) when the primary value is a converted estimate.
+function accountDisplayBalance(balance: number, currency: string, usdToLkr: number | null) {
+  const cur = formatCurrencyCode(currency);
+  if (cur === HOME_CURRENCY) {
+    return { primary: formatMoney(balance, HOME_CURRENCY), secondary: null as string | null };
+  }
+  if (cur === "USD" && typeof usdToLkr === "number") {
+    return { primary: formatMoney(balance * usdToLkr, HOME_CURRENCY), secondary: formatMoney(balance, "USD") };
+  }
+  return { primary: formatMoney(balance, cur), secondary: null as string | null };
+}
 
 const getAccountIcon = (type: string) => {
   switch (type) {
@@ -109,6 +186,7 @@ const getAccountIcon = (type: string) => {
 
 export default function AccountsPage() {
   const { user } = useAuth();
+  const confirm = useConfirm();
   const { accounts, loading } = useAccounts();
   const { data: fxUsd, isLoading: fxLoading } = useFxRates("USD", [HOME_CURRENCY]);
   const usdToLkr = fxUsd?.rates?.[HOME_CURRENCY] ?? null;
@@ -209,8 +287,8 @@ export default function AccountsPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Accounts</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <h1 className="font-display text-xl font-bold tracking-tight sm:text-2xl">Accounts</h1>
+          <p className="mt-1 hidden text-sm text-muted-foreground sm:block">
             Manage your cash, bank, and card accounts
           </p>
         </div>
@@ -231,39 +309,7 @@ export default function AccountsPage() {
             </DialogHeader>
             <form onSubmit={submitCreate}>
               <DialogBody className="space-y-5">
-                {/* Account Type Selector */}
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">
-                    Account Type
-                  </Label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {accountTypes.map((type) => {
-                      const Icon = type.icon;
-                      const isSelected = createForm.watch("type") === type.value;
-                      return (
-                        <button
-                          key={type.value}
-                          type="button"
-                          onClick={() =>
-                            createForm.setValue("type", type.value, {
-                              shouldDirty: true,
-                              shouldValidate: true,
-                            })
-                          }
-                          className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 transition-all ${isSelected
-                              ? "border-primary bg-primary/5"
-                              : "border-transparent bg-muted/50 hover:bg-muted"
-                            }`}
-                        >
-                          <Icon className={`h-5 w-5 ${isSelected ? "text-primary" : "text-muted-foreground"}`} />
-                          <span className={`text-xs font-medium ${isSelected ? "text-primary" : "text-muted-foreground"}`}>
-                            {type.label}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                <AccountTypeSelector form={createForm} />
 
                 {/* Account Name */}
                 <div className="space-y-2">
@@ -323,24 +369,7 @@ export default function AccountsPage() {
                   </div>
                 </div>
 
-                {/* Include in Totals */}
-                <label className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 accent-primary rounded"
-                    checked={Boolean(createForm.watch("includeInTotals"))}
-                    onChange={(e) =>
-                      createForm.setValue("includeInTotals", e.target.checked, {
-                        shouldDirty: true,
-                        shouldValidate: true,
-                      })
-                    }
-                  />
-                  <div>
-                    <p className="text-sm font-medium">Include in total balance</p>
-                    <p className="text-xs text-muted-foreground">Show this account in your net worth</p>
-                  </div>
-                </label>
+                <IncludeInTotalsToggle form={createForm} />
               </DialogBody>
 
               <DialogFooter>
@@ -357,81 +386,44 @@ export default function AccountsPage() {
       </div>
 
       {/* Summary Stats */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-2 border-primary/20">
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Balance
-              </CardTitle>
-              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                <PiggyBank className="h-4 w-4 text-primary" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {hasUnsupportedCurrency || missingUsdRate
-                ? "—"
-                : formatMoney(totalBalanceLkr, HOME_CURRENCY)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {accountCounts.total} account{accountCounts.total !== 1 ? "s" : ""}
-              {accountCounts.excluded > 0 && ` · ${accountCounts.excluded} excluded`}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Cash
-              </CardTitle>
-              <div className="h-8 w-8 rounded-full bg-emerald-500/10 flex items-center justify-center">
-                <Wallet className="h-4 w-4 text-emerald-600" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{accountCounts.cash}</div>
-            <p className="text-xs text-muted-foreground mt-1">cash account{accountCounts.cash !== 1 ? "s" : ""}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Bank
-              </CardTitle>
-              <div className="h-8 w-8 rounded-full bg-blue-500/10 flex items-center justify-center">
-                <Building2 className="h-4 w-4 text-blue-600" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{accountCounts.bank}</div>
-            <p className="text-xs text-muted-foreground mt-1">bank account{accountCounts.bank !== 1 ? "s" : ""}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Cards
-              </CardTitle>
-              <div className="h-8 w-8 rounded-full bg-purple-500/10 flex items-center justify-center">
-                <CreditCard className="h-4 w-4 text-purple-600" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{accountCounts.card}</div>
-            <p className="text-xs text-muted-foreground mt-1">card account{accountCounts.card !== 1 ? "s" : ""}</p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+        <SettingsStatTile
+          label="Total Balance"
+          highlighted
+          icon={PiggyBank}
+          iconWrapClassName="bg-primary/10"
+          iconClassName="text-primary"
+          value={
+            hasUnsupportedCurrency || missingUsdRate
+              ? "—"
+              : formatMoney(totalBalanceLkr, HOME_CURRENCY)
+          }
+          sub={`${accountCounts.total} account${accountCounts.total !== 1 ? "s" : ""}${accountCounts.excluded > 0 ? ` · ${accountCounts.excluded} excluded` : ""}`}
+        />
+        <SettingsStatTile
+          label="Cash"
+          icon={Wallet}
+          iconWrapClassName="bg-emerald-500/10"
+          iconClassName="text-emerald-600"
+          value={accountCounts.cash}
+          sub={`cash account${accountCounts.cash !== 1 ? "s" : ""}`}
+        />
+        <SettingsStatTile
+          label="Bank"
+          icon={Building2}
+          iconWrapClassName="bg-blue-500/10"
+          iconClassName="text-blue-600"
+          value={accountCounts.bank}
+          sub={`bank account${accountCounts.bank !== 1 ? "s" : ""}`}
+        />
+        <SettingsStatTile
+          label="Cards"
+          icon={CreditCard}
+          iconWrapClassName="bg-purple-500/10"
+          iconClassName="text-purple-600"
+          value={accountCounts.card}
+          sub={`card account${accountCounts.card !== 1 ? "s" : ""}`}
+        />
       </div>
 
       {/* Accounts Table */}
@@ -465,19 +457,22 @@ export default function AccountsPage() {
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
-                    Loading accounts…
-                  </TableCell>
-                </TableRow>
+                Array.from({ length: 3 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell colSpan={5} className="py-4">
+                      <Skeleton className="h-8 w-full rounded-xl" />
+                    </TableCell>
+                  </TableRow>
+                ))
               ) : accounts.length ? (
                 accounts.map((a: any) => {
                   const isExcluded = a.includeInTotals === false;
+                  const display = accountDisplayBalance(a.balance ?? 0, a.currency, usdToLkr);
                   return (
                     <TableRow key={a.id} className={`group ${isExcluded ? "opacity-60" : ""}`}>
                       <TableCell className="pl-6">
                         <div className="flex items-center gap-3">
-                          <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${a.type === "cash"
+                          <div className={`flex h-10 w-10 items-center justify-center rounded-2xl ${a.type === "cash"
                               ? "bg-emerald-500/10 text-emerald-600"
                               : a.type === "bank"
                                 ? "bg-blue-500/10 text-blue-600"
@@ -509,43 +504,20 @@ export default function AccountsPage() {
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="font-semibold tabular-nums">
-                          {(() => {
-                            const bal = a.balance ?? 0;
-                            const cur = formatCurrencyCode(a.currency);
-                            if (cur === HOME_CURRENCY) return formatMoney(bal, HOME_CURRENCY);
-                            if (cur === "USD" && typeof usdToLkr === "number")
-                              return formatMoney(bal * usdToLkr, HOME_CURRENCY);
-                            return formatMoney(bal, cur);
-                          })()}
-                        </div>
-                        {(() => {
-                          const bal = a.balance ?? 0;
-                          const cur = formatCurrencyCode(a.currency);
-                          if (cur !== HOME_CURRENCY && cur === "USD" && typeof usdToLkr === "number") {
-                            return (
-                              <div className="text-xs text-muted-foreground tabular-nums">
-                                {formatMoney(bal, "USD")}
-                              </div>
-                            );
-                          }
-                          return null;
-                        })()}
+                        <div className="font-semibold tabular-nums">{display.primary}</div>
+                        {display.secondary && (
+                          <div className="text-xs text-muted-foreground tabular-nums">{display.secondary}</div>
+                        )}
                       </TableCell>
                       <TableCell className="text-right pr-6">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 focus:opacity-100"
-                            >
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => {
+                        <RowActionsMenu
+                          ariaLabel={`${a.name} actions`}
+                          triggerClassName="h-8 w-8 p-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 focus:opacity-100"
+                          actions={[
+                            {
+                              label: "Edit",
+                              icon: Pencil,
+                              onClick: () => {
                                 setEdit(a);
                                 editForm.reset({
                                   accountId: a.id,
@@ -555,16 +527,15 @@ export default function AccountsPage() {
                                   balance: a.balance ?? 0,
                                   includeInTotals: a.includeInTotals !== false,
                                 });
-                              }}
-                            >
-                              <Pencil className="h-4 w-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onClick={async () => {
+                              },
+                            },
+                            {
+                              label: "Delete",
+                              icon: Trash2,
+                              destructive: true,
+                              onClick: async () => {
                                 if (!user) return;
-                                if (!confirm("Are you sure you want to delete this account?")) return;
+                                if (!(await confirm({ title: "Delete this account?", description: "This can't be undone.", destructive: true }))) return;
                                 try {
                                   await deleteAccount(user.uid, a.id);
                                   toast.success("Account deleted");
@@ -573,13 +544,10 @@ export default function AccountsPage() {
                                     description: e instanceof Error ? e.message : undefined,
                                   });
                                 }
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                              },
+                            },
+                          ]}
+                        />
                       </TableCell>
                     </TableRow>
                   );
@@ -613,11 +581,15 @@ export default function AccountsPage() {
       {/* Mobile Card List */}
       <div className="grid gap-4 md:hidden">
         {loading ? (
-          <Card>
-            <CardContent className="py-10 text-center text-muted-foreground">
-              Loading accounts...
-            </CardContent>
-          </Card>
+          <>
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Card key={i}>
+                <CardContent className="p-4">
+                  <Skeleton className="h-14 w-full rounded-xl" />
+                </CardContent>
+              </Card>
+            ))}
+          </>
         ) : accounts.length ? (
           accounts.map((a: any) => {
             const isExcluded = a.includeInTotals === false;
@@ -625,7 +597,7 @@ export default function AccountsPage() {
               <Card key={a.id} className={isExcluded ? "opacity-70" : ""}>
                 <CardContent className="p-4 flex items-center gap-4">
                   <div
-                    className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border ${a.type === "cash"
+                    className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border ${a.type === "cash"
                         ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600"
                         : a.type === "bank"
                           ? "bg-blue-500/10 border-blue-500/20 text-blue-600"
@@ -651,24 +623,16 @@ export default function AccountsPage() {
 
                   <div className="text-right shrink-0">
                     <div className="font-bold tabular-nums text-lg">
-                      {(() => {
-                        const bal = a.balance ?? 0;
-                        const cur = formatCurrencyCode(a.currency);
-                        if (cur === HOME_CURRENCY) return formatMoney(bal, HOME_CURRENCY);
-                        if (cur === "USD" && typeof usdToLkr === "number")
-                          return formatMoney(bal * usdToLkr, HOME_CURRENCY);
-                        return formatMoney(bal, cur);
-                      })()}
+                      {accountDisplayBalance(a.balance ?? 0, a.currency, usdToLkr).primary}
                     </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="-mr-2 h-8 w-8 text-muted-foreground">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => {
+                    <RowActionsMenu
+                      ariaLabel={`${a.name} actions`}
+                      triggerClassName="-mr-2 h-8 w-8 text-muted-foreground"
+                      actions={[
+                        {
+                          label: "Edit",
+                          icon: Pencil,
+                          onClick: () => {
                             setEdit(a);
                             editForm.reset({
                               accountId: a.id,
@@ -678,16 +642,15 @@ export default function AccountsPage() {
                               balance: a.balance ?? 0,
                               includeInTotals: a.includeInTotals !== false,
                             });
-                          }}
-                        >
-                          <Pencil className="h-4 w-4 mr-2" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onClick={async () => {
+                          },
+                        },
+                        {
+                          label: "Delete",
+                          icon: Trash2,
+                          destructive: true,
+                          onClick: async () => {
                             if (!user) return;
-                            if (!confirm("Are you sure you want to delete this account?")) return;
+                            if (!(await confirm({ title: "Delete this account?", description: "This can't be undone.", destructive: true }))) return;
                             try {
                               await deleteAccount(user.uid, a.id);
                               toast.success("Account deleted");
@@ -696,13 +659,10 @@ export default function AccountsPage() {
                                 description: e instanceof Error ? e.message : undefined,
                               });
                             }
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                          },
+                        },
+                      ]}
+                    />
                   </div>
                 </CardContent>
               </Card>
@@ -742,39 +702,7 @@ export default function AccountsPage() {
           </DialogHeader>
           <form onSubmit={submitEdit}>
             <DialogBody className="space-y-5">
-              {/* Account Type */}
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground uppercase tracking-wider">
-                  Account Type
-                </Label>
-                <div className="grid grid-cols-3 gap-2">
-                  {accountTypes.map((type) => {
-                    const Icon = type.icon;
-                    const isSelected = editForm.watch("type") === type.value;
-                    return (
-                      <button
-                        key={type.value}
-                        type="button"
-                        onClick={() =>
-                          editForm.setValue("type", type.value, {
-                            shouldDirty: true,
-                            shouldValidate: true,
-                          })
-                        }
-                        className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 transition-all ${isSelected
-                            ? "border-primary bg-primary/5"
-                            : "border-transparent bg-muted/50 hover:bg-muted"
-                          }`}
-                      >
-                        <Icon className={`h-5 w-5 ${isSelected ? "text-primary" : "text-muted-foreground"}`} />
-                        <span className={`text-xs font-medium ${isSelected ? "text-primary" : "text-muted-foreground"}`}>
-                          {type.label}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              <AccountTypeSelector form={editForm} />
 
               {/* Account Name */}
               <div className="space-y-2">
@@ -832,24 +760,7 @@ export default function AccountsPage() {
                 </div>
               </div>
 
-              {/* Include in Totals */}
-              <label className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 accent-primary rounded"
-                  checked={Boolean(editForm.watch("includeInTotals"))}
-                  onChange={(e) =>
-                    editForm.setValue("includeInTotals", e.target.checked, {
-                      shouldDirty: true,
-                      shouldValidate: true,
-                    })
-                  }
-                />
-                <div>
-                  <p className="text-sm font-medium">Include in total balance</p>
-                  <p className="text-xs text-muted-foreground">Show this account in your net worth</p>
-                </div>
-              </label>
+              <IncludeInTotalsToggle form={editForm} />
             </DialogBody>
 
             <DialogFooter>

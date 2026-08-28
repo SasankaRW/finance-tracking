@@ -153,7 +153,7 @@ export const subscriptionDocSchema = z.object({
   schemaVersion: z.literal(1),
   id: z.string().min(1),
   name: z.string().min(1).max(64),
-  kind: z.enum(["subscription", "loan"]).optional(),
+  kind: z.enum(["subscription", "loan", "rent"]).optional(),
   amount: z.number().positive().finite(),
   currency: z.string().min(3).max(3),
   accountId: z.string().min(1),
@@ -197,11 +197,49 @@ export const salaryProfileDocSchema = z.object({
   categoryId: z.string().min(1),
   status: salaryStatusSchema,
   depositMode: salaryDepositModeSchema.optional(),
+  taxRate: z.number().min(0).max(1).optional(),
   nextPaydayAt: firestoreTimestampLikeSchema,
   lastPaidAt: firestoreTimestampLikeSchema.optional(),
   createdAt: firestoreTimestampLikeSchema,
   updatedAt: firestoreTimestampLikeSchema,
 });
 export type SalaryProfileDoc = z.infer<typeof salaryProfileDocSchema>;
+
+export const smsRuleDocSchema = z.object({
+  schemaVersion: z.literal(1),
+  id: z.string().min(1),
+  label: z.string().min(1).max(64),
+  senderMatch: z.string().min(1).max(32),
+  accountId: z.string().min(1),
+  kind: z.enum(["income", "expense"]),
+  pattern: z.string().min(1).max(500),
+  noteTemplate: z.string().max(200).optional(),
+  enabled: z.boolean(),
+  createdAt: firestoreTimestampLikeSchema,
+  updatedAt: firestoreTimestampLikeSchema,
+});
+export type SmsRuleDoc = z.infer<typeof smsRuleDocSchema>;
+
+export const pendingImportStatusSchema = z.enum(["pending", "approved", "dismissed"]);
+export type PendingImportStatus = z.infer<typeof pendingImportStatusSchema>;
+
+export const pendingImportDocSchema = z.object({
+  schemaVersion: z.literal(1),
+  id: z.string().min(1),
+  status: pendingImportStatusSchema,
+  rawMessage: z.string().min(1).max(2000),
+  sender: z.string().max(64).optional(),
+  receivedAt: firestoreTimestampLikeSchema,
+  matchedRuleId: z.string().min(1).optional(),
+  accountId: z.string().min(1).optional(),
+  kind: z.enum(["income", "expense"]).optional(),
+  amount: z.number().positive().finite().optional(),
+  occurredAt: firestoreTimestampLikeSchema.optional(),
+  suggestedNote: z.string().max(280).optional(),
+  resultTransactionId: z.string().min(1).optional(),
+  createdAt: firestoreTimestampLikeSchema,
+  updatedAt: firestoreTimestampLikeSchema,
+});
+export type PendingImportDoc = z.infer<typeof pendingImportDocSchema>;
 
 

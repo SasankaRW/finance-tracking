@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { AppLockGate } from "@/components/app-lock-gate";
 import { WidgetSessionSync } from "@/components/widget-session-sync";
+import { SmsImportSync } from "@/components/sms-import-sync";
 import { AppShell } from "@/app/app/shell";
 
 const PENDING_ROUTE_KEY = "cashly:pending-route";
@@ -62,6 +63,7 @@ export function AppLayoutClient({
   return (
     <AppLockGate user={user}>
       {widgetSyncReady && <WidgetSessionSync user={user} />}
+      <SmsImportSync user={user} />
       <AppShell>{children}</AppShell>
     </AppLockGate>
   );

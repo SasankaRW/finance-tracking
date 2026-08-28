@@ -10,25 +10,21 @@ import {
   Tag,
   TrendingUp,
   TrendingDown,
-  MoreHorizontal,
   Pencil,
   Trash2,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-provider";
+import { useConfirm } from "@/components/confirm-dialog";
+import { RowActionsMenu } from "@/components/row-actions-menu";
 import { useCategories } from "@/lib/finance/hooks";
 import {
   createCategory,
   deleteCategory,
   renameCategory,
 } from "@/lib/finance/category-mutations";
+import { SettingsStatTile } from "@/app/app/settings/settings-stat-tile";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogBody,
@@ -50,12 +46,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 
 const createSchema = z.object({
@@ -72,6 +62,7 @@ type RenameValues = z.infer<typeof renameSchema>;
 
 function CategoryTable({ kind }: { kind: "income" | "expense" }) {
   const { user } = useAuth();
+  const confirm = useConfirm();
   const { categories, loading, error } = useCategories(kind);
   const [createOpen, setCreateOpen] = React.useState(false);
   const [edit, setEdit] = React.useState<any | null>(null);
@@ -119,7 +110,7 @@ function CategoryTable({ kind }: { kind: "income" | "expense" }) {
       {/* Header with Add Button */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${
+          <div className={`h-10 w-10 rounded-2xl flex items-center justify-center ${
             isIncome ? "bg-emerald-500/10" : "bg-rose-500/10"
           }`}>
             {isIncome ? (
@@ -206,7 +197,7 @@ function CategoryTable({ kind }: { kind: "income" | "expense" }) {
                   <TableRow key={c.id} className="group">
                     <TableCell className="pl-6">
                       <div className="flex items-center gap-3">
-                        <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${
+                        <div className={`flex h-9 w-9 items-center justify-center rounded-2xl ${
                           isIncome ? "bg-emerald-500/10" : "bg-rose-500/10"
                         }`}>
                           <Tag className={`h-4 w-4 ${isIncome ? "text-emerald-600" : "text-rose-600"}`} />
@@ -215,31 +206,25 @@ function CategoryTable({ kind }: { kind: "income" | "expense" }) {
                       </div>
                     </TableCell>
                     <TableCell className="text-right pr-6">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 focus:opacity-100"
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => {
+                      <RowActionsMenu
+                        ariaLabel={`${c.name} actions`}
+                        triggerClassName="h-8 w-8 p-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 focus:opacity-100"
+                        actions={[
+                          {
+                            label: "Rename",
+                            icon: Pencil,
+                            onClick: () => {
                               setEdit(c);
                               editForm.reset({ categoryId: c.id, name: c.name });
-                            }}
-                          >
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Rename
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onClick={async () => {
+                            },
+                          },
+                          {
+                            label: "Delete",
+                            icon: Trash2,
+                            destructive: true,
+                            onClick: async () => {
                               if (!user) return;
-                              if (!confirm("Delete this category?")) return;
+                              if (!(await confirm({ title: "Delete this category?", destructive: true }))) return;
                               try {
                                 await deleteCategory(user.uid, c.id);
                                 toast.success("Category deleted");
@@ -248,13 +233,10 @@ function CategoryTable({ kind }: { kind: "income" | "expense" }) {
                                   description: e instanceof Error ? e.message : undefined,
                                 });
                               }
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                            },
+                          },
+                        ]}
+                      />
                     </TableCell>
                   </TableRow>
                 ))
@@ -325,46 +307,30 @@ export default function CategoriesPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Categories</h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        <h1 className="font-display text-xl font-bold tracking-tight sm:text-2xl">Categories</h1>
+        <p className="mt-1 hidden text-sm text-muted-foreground sm:block">
           Organize your transactions with custom categories
         </p>
       </div>
 
       {/* Summary Stats */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Expense Categories
-              </CardTitle>
-              <div className="h-8 w-8 rounded-full bg-rose-500/10 flex items-center justify-center">
-                <TrendingDown className="h-4 w-4 text-rose-600" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{expenseCategories.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">for tracking expenses</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Income Categories
-              </CardTitle>
-              <div className="h-8 w-8 rounded-full bg-emerald-500/10 flex items-center justify-center">
-                <TrendingUp className="h-4 w-4 text-emerald-600" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{incomeCategories.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">for tracking income</p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-2 gap-2 sm:gap-3">
+        <SettingsStatTile
+          label="Expense Categories"
+          icon={TrendingDown}
+          iconWrapClassName="bg-rose-500/10"
+          iconClassName="text-rose-600"
+          value={expenseCategories.length}
+          sub="for tracking expenses"
+        />
+        <SettingsStatTile
+          label="Income Categories"
+          icon={TrendingUp}
+          iconWrapClassName="bg-emerald-500/10"
+          iconClassName="text-emerald-600"
+          value={incomeCategories.length}
+          sub="for tracking income"
+        />
       </div>
 
       {/* Category Tabs */}

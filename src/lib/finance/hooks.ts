@@ -17,7 +17,9 @@ import {
   categoriesCol,
   debtsCol,
   eventsCol,
+  pendingImportsCol,
   salaryProfilesCol,
+  smsRulesCol,
   subscriptionsCol,
   transactionsCol,
 } from "@/lib/firestore/refs";
@@ -191,6 +193,34 @@ export function useSalaryProfiles() {
   const map = React.useCallback((snap: QuerySnapshot) => docs(snap), []);
   const state = useRealtimeQuery(q, map);
   return { ...state, salaryProfiles: state.data ?? [] };
+}
+
+export function useSmsRules() {
+  const { user } = useAuth();
+  const q = React.useMemo(() => {
+    if (!user) return null;
+    return query(smsRulesCol(user.uid), orderBy("createdAt", "asc"));
+  }, [user]);
+
+  const map = React.useCallback((snap: QuerySnapshot) => docs(snap), []);
+  const state = useRealtimeQuery(q, map);
+  return { ...state, smsRules: state.data ?? [] };
+}
+
+export function usePendingImports() {
+  const { user } = useAuth();
+  const q = React.useMemo(() => {
+    if (!user) return null;
+    return query(
+      pendingImportsCol(user.uid),
+      where("status", "==", "pending"),
+      orderBy("receivedAt", "desc"),
+    );
+  }, [user]);
+
+  const map = React.useCallback((snap: QuerySnapshot) => docs(snap), []);
+  const state = useRealtimeQuery(q, map);
+  return { ...state, pendingImports: state.data ?? [] };
 }
 
 

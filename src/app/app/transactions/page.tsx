@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { useSearchParams } from "next/navigation";
-import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subDays, subMonths } from "date-fns";
@@ -13,7 +12,6 @@ import {
   TrendingUp,
   TrendingDown,
   ArrowLeftRight,
-  MoreHorizontal,
   Pencil,
   Trash2,
   X,
@@ -25,9 +23,12 @@ import {
   Settings2,
   CalendarIcon,
   Search,
+  MailPlus,
 } from "lucide-react";
 import { Timestamp } from "firebase/firestore";
 import { useAuth } from "@/lib/auth/auth-provider";
+import { useConfirm } from "@/components/confirm-dialog";
+import { RowActionsMenu } from "@/components/row-actions-menu";
 import { useAccounts, useCategories, useEvents, useTransactions } from "@/lib/finance/hooks";
 import {
   deleteTransaction,
@@ -39,9 +40,12 @@ import {
 } from "@/lib/finance/category-mutations";
 import { formatCurrencyCode, formatMoney } from "@/lib/format";
 import { downloadTextFile, toCsv } from "@/lib/export/csv";
+import { transactionFormSchema, type TransactionFormValues } from "@/lib/finance/transaction-form-schema";
 import { COMMON_CURRENCIES, HOME_CURRENCY } from "@/shared/currency";
 import { useFxRates } from "@/lib/fx/use-fx-rates";
 import { CreateTransactionDialog } from "@/app/app/transactions/create-transaction-dialog";
+import { PendingImportsPanel } from "@/components/pending-imports-panel";
+import { PasteMessageDialog } from "@/components/paste-message-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -76,47 +80,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { TransactionTrendChart } from "@/components/transaction-trend-chart";
-
-const kindSchema = z.enum(["expense", "income", "transfer"]);
-
-const createSchema = z
-  .object({
-    kind: kindSchema,
-    amount: z.number().positive().finite(),
-    accountId: z.string().optional(),
-    categoryId: z.string().optional(),
-    eventId: z.string().optional(),
-    fromAccountId: z.string().optional(),
-    toAccountId: z.string().optional(),
-    occurredAt: z.date(),
-    note: z.string().max(280).optional(),
-  })
-  .superRefine((v, ctx) => {
-    if (v.kind === "transfer") {
-      if (!v.fromAccountId) ctx.addIssue({ code: "custom", path: ["fromAccountId"], message: "Required" });
-      if (!v.toAccountId) ctx.addIssue({ code: "custom", path: ["toAccountId"], message: "Required" });
-      if (v.fromAccountId && v.toAccountId && v.fromAccountId === v.toAccountId) {
-        ctx.addIssue({ code: "custom", path: ["toAccountId"], message: "Must be different" });
-      }
-    } else {
-      if (!v.accountId) ctx.addIssue({ code: "custom", path: ["accountId"], message: "Required" });
-      if (!v.categoryId) ctx.addIssue({ code: "custom", path: ["categoryId"], message: "Required" });
-    }
-  });
-
-type CreateValues = z.infer<typeof createSchema>;
 
 export default function TransactionsPage() {
   const searchParams = useSearchParams();
   const { user } = useAuth();
+  const confirm = useConfirm();
   const { accounts } = useAccounts();
   const { categories: expenseCats } = useCategories("expense");
   const { categories: incomeCats } = useCategories("income");
@@ -224,7 +194,7 @@ export default function TransactionsPage() {
 
   const handleDeleteCategory = async (categoryId: string) => {
     if (!user) return;
-    if (!confirm("Delete this category?")) return;
+    if (!(await confirm({ title: "Delete this category?", destructive: true }))) return;
     try {
       await deleteCategory(user.uid, categoryId);
       toast.success("Category deleted");
@@ -235,8 +205,8 @@ export default function TransactionsPage() {
     }
   };
 
-  const form = useForm<CreateValues>({
-    resolver: zodResolver(createSchema),
+  const form = useForm<TransactionFormValues>({
+    resolver: zodResolver(transactionFormSchema),
     defaultValues: {
       kind: "expense",
       amount: 0,
@@ -253,7 +223,7 @@ export default function TransactionsPage() {
     return a ? formatCurrencyCode(a.currency) : "";
   }, [accounts, form]);
 
-  async function submitEdit(values: CreateValues) {
+  async function submitEdit(values: TransactionFormValues) {
     if (!user || !edit) return;
     try {
       await editTransaction(user.uid, {
@@ -383,7 +353,16 @@ export default function TransactionsPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-[auto_1fr] items-center gap-2 sm:flex">
+        <div className="grid grid-cols-[auto_auto_1fr] items-center gap-2 sm:flex">
+          <PasteMessageDialog
+            trigger={
+              <Button variant="outline" size="sm" className="h-10 rounded-xl px-3">
+                <MailPlus className="h-4 w-4 mr-1" />
+                <span className="hidden sm:inline">Add from message</span>
+              </Button>
+            }
+          />
+
           <Button
             variant="outline"
             size="sm"
@@ -427,6 +406,8 @@ export default function TransactionsPage() {
           />
         </div>
       </div>
+
+      <PendingImportsPanel />
 
       <div className="scrollbar-hide -mx-3 flex gap-2 overflow-x-auto px-3 sm:hidden">
         {([
@@ -914,7 +895,7 @@ export default function TransactionsPage() {
                   >
                     {/* Left: Icon, Details, Meta */}
                     <div className="flex min-w-0 flex-1 gap-3">
-                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${t.kind === "income"
+                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl ${t.kind === "income"
                           ? "bg-emerald-500/10"
                           : t.kind === "expense"
                             ? "bg-rose-500/10"
@@ -958,19 +939,14 @@ export default function TransactionsPage() {
                         {formatMoney(t.amount ?? 0)}
                       </div>
 
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 rounded-full p-0 text-muted-foreground"
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => {
+                      <RowActionsMenu
+                        ariaLabel={`${t.note || t.kind} actions`}
+                        triggerClassName="h-8 w-8 rounded-full p-0 text-muted-foreground"
+                        actions={[
+                          {
+                            label: "Edit",
+                            icon: Pencil,
+                            onClick: () => {
                               setEdit(t);
                               form.reset({
                                 kind: t.kind,
@@ -983,16 +959,15 @@ export default function TransactionsPage() {
                                 fromAccountId: t.fromAccountId,
                                 toAccountId: t.toAccountId,
                               });
-                            }}
-                          >
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onClick={async () => {
+                            },
+                          },
+                          {
+                            label: "Delete",
+                            icon: Trash2,
+                            destructive: true,
+                            onClick: async () => {
                               if (!user) return;
-                              if (!confirm("Delete this transaction?")) return;
+                              if (!(await confirm({ title: "Delete this transaction?", destructive: true }))) return;
                               try {
                                 await deleteTransaction(user.uid, t.id, t.updatedAt);
                                 toast.success("Transaction deleted");
@@ -1001,13 +976,10 @@ export default function TransactionsPage() {
                                   description: e instanceof Error ? e.message : undefined,
                                 });
                               }
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                            },
+                          },
+                        ]}
+                      />
                     </div>
                   </li>
                 );
@@ -1073,7 +1045,7 @@ export default function TransactionsPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${t.kind === "income"
+                          <div className={`h-8 w-8 rounded-2xl flex items-center justify-center ${t.kind === "income"
                             ? "bg-emerald-500/10"
                             : t.kind === "expense"
                               ? "bg-rose-500/10"
@@ -1115,19 +1087,14 @@ export default function TransactionsPage() {
                         </span>
                       </TableCell>
                       <TableCell className="text-right pr-6">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 focus:opacity-100"
-                            >
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => {
+                        <RowActionsMenu
+                          ariaLabel={`${t.note || t.kind} actions`}
+                          triggerClassName="h-8 w-8 p-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 focus:opacity-100"
+                          actions={[
+                            {
+                              label: "Edit",
+                              icon: Pencil,
+                              onClick: () => {
                                 setEdit(t);
                                 form.reset({
                                   kind: t.kind,
@@ -1140,16 +1107,15 @@ export default function TransactionsPage() {
                                   fromAccountId: t.fromAccountId,
                                   toAccountId: t.toAccountId,
                                 });
-                              }}
-                            >
-                              <Pencil className="h-4 w-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onClick={async () => {
+                              },
+                            },
+                            {
+                              label: "Delete",
+                              icon: Trash2,
+                              destructive: true,
+                              onClick: async () => {
                                 if (!user) return;
-                                if (!confirm("Delete this transaction?")) return;
+                                if (!(await confirm({ title: "Delete this transaction?", destructive: true }))) return;
                                 try {
                                   await deleteTransaction(user.uid, t.id, t.updatedAt);
                                   toast.success("Transaction deleted");
@@ -1158,13 +1124,10 @@ export default function TransactionsPage() {
                                     description: e instanceof Error ? e.message : undefined,
                                   });
                                 }
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                              },
+                            },
+                          ]}
+                        />
                       </TableCell>
                     </TableRow>
                   );

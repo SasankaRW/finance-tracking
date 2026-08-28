@@ -29,6 +29,7 @@ import {
   PiggyBank,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-provider";
+import { useConfirm } from "@/components/confirm-dialog";
 import { useBudgets, useCategories, useTransactions } from "@/lib/finance/hooks";
 import { createBudget, deleteBudget } from "@/lib/finance/budget-mutations";
 import { COMMON_CURRENCIES, DEFAULT_CURRENCY, HOME_CURRENCY } from "@/shared/currency";
@@ -91,8 +92,23 @@ function monthToDate(month: string) {
   return new Date(parseInt(year), parseInt(monthNum) - 1, 1);
 }
 
+// Shared by the mobile card and desktop table rows so the over/warning/ok color logic can't drift.
+function budgetTone(b: { remaining: number; percent: number }) {
+  const over = b.remaining < 0;
+  const warning = b.percent >= 80 && !over;
+  return {
+    over,
+    warning,
+    textClass: over ? "text-destructive" : warning ? "text-amber-600" : "text-primary",
+    iconBgClass: over ? "bg-destructive/10" : warning ? "bg-amber-500/10" : "bg-primary/10",
+    barClass: over ? "bg-destructive" : warning ? "bg-amber-500" : "bg-primary",
+    badgeVariant: (over ? "destructive" : warning ? "secondary" : "outline") as "destructive" | "secondary" | "outline",
+  };
+}
+
 export default function BudgetsPage({ embedded = false }: { embedded?: boolean }) {
   const { user } = useAuth();
+  const confirm = useConfirm();
   const [mode, setMode] = React.useState<SummaryMode>("monthly");
   const [month, setMonth] = React.useState(currentMonth());
   const { budgets, loading, error } = useBudgets(month);
@@ -291,7 +307,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
         {!embedded && (
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Budgets</h1>
+              <h1 className="font-display text-xl font-bold tracking-tight sm:text-2xl">Budgets</h1>
               <Badge variant="secondary" className="font-mono text-[11px]">
                 {monthName}
               </Badge>
@@ -433,6 +449,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
               <Button
                 variant="outline"
                 size="icon"
+                aria-label="Previous period"
                 onClick={() => {
                   if (mode === "weekly") navigateWeek("prev");
                   else if (mode === "yearly") navigateYear("prev");
@@ -447,6 +464,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
               <Button
                 variant="outline"
                 size="icon"
+                aria-label="Next period"
                 onClick={() => {
                   if (mode === "weekly") navigateWeek("next");
                   else if (mode === "yearly") navigateYear("next");
@@ -559,9 +577,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
                 </div>
               ) : budgetRows.length ? (
                 budgetRows.map((b) => {
-                  const over = b.remaining < 0;
-                  const warning = b.percent >= 80 && !over;
-                  const tone = over ? "text-destructive" : warning ? "text-amber-600" : "text-primary";
+                  const tone = budgetTone(b);
 
                   return (
                     <Card key={b.id} className="surface-container-high py-0 shadow-sm">
@@ -569,10 +585,8 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl ${
-                                over ? "bg-destructive/10" : warning ? "bg-amber-500/10" : "bg-primary/10"
-                              }`}>
-                                <Target className={`h-4 w-4 ${tone}`} />
+                              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl ${tone.iconBgClass}`}>
+                                <Target className={`h-4 w-4 ${tone.textClass}`} />
                               </div>
                               <div className="min-w-0">
                                 <p className="truncate font-semibold">{b.scopeName}</p>
@@ -582,9 +596,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
                               </div>
                             </div>
                           </div>
-                          <Badge variant={over ? "destructive" : warning ? "secondary" : "outline"}>
-                            {b.percent}%
-                          </Badge>
+                          <Badge variant={tone.badgeVariant}>{b.percent}%</Badge>
                         </div>
 
                         <div className="space-y-2">
@@ -598,15 +610,13 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
                           </div>
                           <div className="h-2.5 overflow-hidden rounded-full bg-muted">
                             <div
-                              className={`h-full rounded-full transition-all ${
-                                over ? "bg-destructive" : warning ? "bg-amber-500" : "bg-primary"
-                              }`}
+                              className={`h-full rounded-full transition-all ${tone.barClass}`}
                               style={{ width: `${b.percent}%` }}
                             />
                           </div>
                           <div className="flex items-center justify-between gap-3 text-sm">
                             <span className="text-muted-foreground">Remaining</span>
-                            <span className={`font-semibold tabular-nums ${over ? "text-destructive" : ""}`}>
+                            <span className={`font-semibold tabular-nums ${tone.over ? "text-destructive" : ""}`}>
                               {b.missingUsdRate || b.unsupportedCurrency
                                 ? "-"
                                 : formatMoney(b.remaining, b.currency)}
@@ -621,7 +631,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
                           className="w-full text-destructive hover:text-destructive"
                           onClick={async () => {
                             if (!user) return;
-                            if (!confirm("Delete this budget?")) return;
+                            if (!(await confirm({ title: "Delete this budget?", destructive: true }))) return;
                             try {
                               await deleteBudget(user.uid, b.id);
                               toast.success("Budget deleted");
@@ -684,18 +694,13 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
                 ) : budgetRows.length ? (
                   budgetRows.map((b) => {
                     const isOverall = !b.categoryId;
-                    const over = b.remaining < 0;
-                    const warning = b.percent >= 80 && !over;
+                    const tone = budgetTone(b);
                     return (
                       <TableRow key={b.id} className="group">
                         <TableCell className="pl-6">
                           <div className="flex items-center gap-3">
-                            <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-                              over ? "bg-destructive/10" : warning ? "bg-amber-500/10" : "bg-primary/10"
-                            }`}>
-                              <Target className={`h-4 w-4 ${
-                                over ? "text-destructive" : warning ? "text-amber-600" : "text-primary"
-                              }`} />
+                            <div className={`flex h-10 w-10 items-center justify-center rounded-2xl ${tone.iconBgClass}`}>
+                              <Target className={`h-4 w-4 ${tone.textClass}`} />
                             </div>
                             <div>
                               <div className="font-medium">{b.scopeName}</div>
@@ -723,27 +728,25 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
                                   ? "—"
                                   : formatMoney(b.spentInBudgetCurrency, b.currency)}
                               </span>
-                              <span className={`font-medium ${over ? "text-destructive" : warning ? "text-amber-600" : ""}`}>
+                              <span className={`font-medium ${tone.over ? "text-destructive" : tone.warning ? "text-amber-600" : ""}`}>
                                 {b.percent}%
                               </span>
                             </div>
                             <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
                               <div
-                                className={`h-full rounded-full transition-all ${
-                                  over ? "bg-destructive" : warning ? "bg-amber-500" : "bg-primary"
-                                }`}
+                                className={`h-full rounded-full transition-all ${tone.barClass}`}
                                 style={{ width: `${b.percent}%` }}
                               />
                             </div>
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
-                          <span className={`font-semibold tabular-nums ${over ? "text-destructive" : ""}`}>
+                          <span className={`font-semibold tabular-nums ${tone.over ? "text-destructive" : ""}`}>
                             {b.missingUsdRate || b.unsupportedCurrency
                               ? "—"
                               : formatMoney(b.remaining, b.currency)}
                           </span>
-                          {over && (
+                          {tone.over && (
                             <div className="text-xs text-destructive">over budget</div>
                           )}
                         </TableCell>
@@ -751,10 +754,11 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
                           <Button
                             variant="ghost"
                             size="sm"
+                            aria-label={`Delete ${b.scopeName} budget`}
                             className="h-8 w-8 p-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 text-destructive hover:text-destructive"
                             onClick={async () => {
                               if (!user) return;
-                              if (!confirm("Delete this budget?")) return;
+                              if (!(await confirm({ title: "Delete this budget?", destructive: true }))) return;
                               try {
                                 await deleteBudget(user.uid, b.id);
                                 toast.success("Budget deleted");

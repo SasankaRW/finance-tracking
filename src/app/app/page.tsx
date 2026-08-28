@@ -33,6 +33,8 @@ import { useAccrualStats, useQuickStats, useSparklineData } from "@/lib/finance/
 import { SparklineChart } from "@/components/sparkline-chart";
 import { useMediaQuery } from "@/lib/hooks/use-media-query";
 import { DebtPillsSummary } from "@/components/debt-pills-summary";
+import { UpcomingBillsPanel } from "@/components/upcoming-bills-panel";
+import { PendingImportsPanel } from "@/components/pending-imports-panel";
 import { DashboardMinusMobile } from "@/app/app/dashboard-minus-mobile";
 
 const MoneyFlowChart = dynamic(
@@ -299,28 +301,13 @@ export default function DashboardPage() {
         balanceCurrency={HOME_CURRENCY}
         balanceMissingRate={missingUsdRate}
         accountCount={accountSummary.total}
-        dailyAverage={accrualStats.accrualDailyAverage}
-        monthlyAverage={accrualStats.accrualMonthlyProjected}
         recentTransactions={recentTransactions}
         categoryNameById={categoryNameById}
+        expenseByCategory={expenseByCategory}
         usdToLkr={usdToLkr}
         cashInHand={cashInHandLkr}
         cashMissingRate={cashMissingUsdRate || cashUnsupportedCurrency}
       />
-
-      <div className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-4 z-30 md:hidden">
-        <CreateTransactionDialog
-          trigger={
-            <Button
-              size="icon-lg"
-              className="motion-expressive h-16 w-16 rounded-[1.4rem] shadow-xl active:scale-90 active:rounded-full"
-              aria-label="Add transaction"
-            >
-              <Plus className="h-7 w-7" />
-            </Button>
-          }
-        />
-      </div>
 
       <div className="hidden md:block space-y-4 sm:space-y-6">
       {!isLoading && budgetPercentUsed !== null && (
@@ -443,6 +430,10 @@ export default function DashboardPage() {
           </div>
         </CardContent>
       </Card>
+
+      <PendingImportsPanel />
+
+      <UpcomingBillsPanel />
 
       <DebtPillsSummary />
 

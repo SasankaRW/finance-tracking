@@ -9,6 +9,7 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { MapPin, Plus, Trash2, Calendar, TrendingUp, PiggyBank, Archive } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-provider";
+import { useConfirm } from "@/components/confirm-dialog";
 import { useEvents, useTransactions } from "@/lib/finance/hooks";
 import { createEvent, deleteEvent } from "@/lib/finance/event-mutations";
 import { formatMoney } from "@/lib/format";
@@ -51,6 +52,7 @@ type CreateValues = z.infer<typeof createSchema>;
 
 export default function EventsPage() {
   const { user } = useAuth();
+  const confirm = useConfirm();
   const { events, loading: eventsLoading } = useEvents();
   const { transactions } = useTransactions();
 
@@ -284,7 +286,7 @@ export default function EventsPage() {
                     className="motion-expressive press-expressive flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                     onClick={async () => {
                       if (!user) return;
-                      if (!confirm("Delete this trip?")) return;
+                      if (!(await confirm({ title: "Delete this trip?", destructive: true }))) return;
                       try {
                         await deleteEvent(user.uid, e.id);
                         toast.success("Event deleted");

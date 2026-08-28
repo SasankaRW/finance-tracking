@@ -16,6 +16,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(SystemThemePlugin.class);
         registerPlugin(NativeBiometricPlugin.class);
         registerPlugin(WidgetSessionPlugin.class);
+        registerPlugin(SmsImportPlugin.class);
         super.onCreate(savedInstanceState);
         openRouteFromIntent(getIntent());
     }

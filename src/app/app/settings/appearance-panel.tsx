@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { RotateCcw, Smartphone } from "lucide-react";
+import { useTheme } from "next-themes";
+import { Monitor, Moon, RotateCcw, Smartphone, Sun } from "lucide-react";
 import { useThemeColor } from "@/lib/theme/theme-color-provider";
 import {
   DEFAULT_PRIMARY_COLOR,
@@ -24,7 +25,14 @@ function toColorInputValue(hex: string): string {
   return (normalizeHexColor(hex) ?? DEFAULT_PRIMARY_COLOR).toLowerCase();
 }
 
+const THEME_OPTIONS = [
+  { value: "light", label: "Light", icon: Sun },
+  { value: "dark", label: "Dark", icon: Moon },
+  { value: "system", label: "System", icon: Monitor },
+] as const;
+
 export function AppearancePanel() {
+  const { theme, setTheme } = useTheme();
   const { color, mode, systemColorAvailable, setColor, setUseSystemColor, resetColor } =
     useThemeColor();
   const [hexInput, setHexInput] = React.useState(color);
@@ -62,7 +70,39 @@ export function AppearancePanel() {
   const isDefault = mode === "custom" && color === DEFAULT_PRIMARY_COLOR;
 
   return (
-    <Card className="surface-tonal max-w-xl">
+    <div className="max-w-xl space-y-4">
+      <Card className="surface-tonal">
+        <CardHeader>
+          <CardTitle>Theme</CardTitle>
+          <CardDescription>Choose how Cashly looks on this device.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-3 gap-2">
+            {THEME_OPTIONS.map((option) => {
+              const Icon = option.icon;
+              const active = (theme ?? "system") === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setTheme(option.value)}
+                  className={`flex flex-col items-center gap-1.5 rounded-2xl border p-3 text-sm font-medium transition-colors ${
+                    active
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "hover:bg-muted"
+                  }`}
+                >
+                  <Icon className="h-5 w-5" />
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="surface-tonal">
       <CardHeader>
         <CardTitle>Appearance</CardTitle>
         <CardDescription>
@@ -233,6 +273,7 @@ export function AppearancePanel() {
           </Button>
         </div>
       </CardContent>
-    </Card>
+      </Card>
+    </div>
   );
 }

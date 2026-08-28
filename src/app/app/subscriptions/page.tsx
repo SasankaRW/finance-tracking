@@ -4,24 +4,24 @@ import * as React from "react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { format, isPast, isToday, isTomorrow, differenceInDays } from "date-fns";
+import { format, differenceInDays } from "date-fns";
 import { toast } from "sonner";
 import {
   Plus,
   Repeat,
-  MoreHorizontal,
   Pencil,
   Trash2,
   Pause,
   Play,
   CheckCircle2,
   CalendarIcon,
-  AlertTriangle,
   Clock,
   HandCoins,
 } from "lucide-react";
 import { Timestamp } from "firebase/firestore";
 import { useAuth } from "@/lib/auth/auth-provider";
+import { useConfirm } from "@/components/confirm-dialog";
+import { RowActionsMenu, type RowAction } from "@/components/row-actions-menu";
 import { useAccounts, useCategories, useSubscriptions } from "@/lib/finance/hooks";
 import {
   createSubscription,
@@ -30,6 +30,7 @@ import {
   setSubscriptionStatus,
   updateSubscription,
 } from "@/lib/finance/subscription-mutations";
+import { getBillKindIcon, getBillKindLabel, getDueDateInfo } from "@/lib/finance/bill-status";
 import { formatCurrencyCode, formatMoney } from "@/lib/format";
 import { COMMON_CURRENCIES } from "@/shared/currency";
 import { Button } from "@/components/ui/button";
@@ -51,12 +52,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -80,7 +75,7 @@ import {
 
 const monthlyBillSchema = z.object({
   name: z.string().min(1).max(64),
-  kind: z.enum(["subscription", "loan"]),
+  kind: z.enum(["subscription", "loan", "rent"]),
   amount: z.number().positive().finite(),
   currency: z.string().min(3).max(3),
   accountId: z.string().min(1),
@@ -130,26 +125,107 @@ function getLoanProgress(item: any) {
   return { total, paid: safePaid, remaining, percent };
 }
 
-function getDueDateInfo(date: Date) {
-  if (isPast(date) && !isToday(date)) {
-    const days = differenceInDays(new Date(), date);
-    return { label: `${days}d overdue`, variant: "destructive" as const, icon: AlertTriangle };
+function editValuesFor(s: any, acct: any, nextDue: Date): UpdateValues {
+  return {
+    subscriptionId: s.id,
+    name: s.name ?? "",
+    kind: s.kind === "loan" ? "loan" : s.kind === "rent" ? "rent" : "subscription",
+    amount: s.amount ?? 0,
+    currency: formatCurrencyCode(s.currency ?? acct?.currency),
+    accountId: s.accountId ?? "",
+    categoryId: s.categoryId ?? "",
+    nextDueAt: nextDue,
+    interval: "monthly",
+    loanTotalPayments: s.loanTotalPayments ?? 12,
+    loanPaidPayments: s.loanPaidPayments ?? 0,
+    status: s.status === "completed" ? "completed" : s.status === "paused" ? "paused" : "active",
+  };
+}
+
+// Shared by the mobile card and desktop table row menus so "mark paid"/"pause"/"delete" behave
+// (and read) identically everywhere they appear.
+function buildBillActions({
+  s,
+  isCompleted,
+  isLoan,
+  loanProgress,
+  user,
+  confirm,
+  onEdit,
+}: {
+  s: any;
+  isCompleted: boolean;
+  isLoan: boolean;
+  loanProgress: ReturnType<typeof getLoanProgress> | null;
+  user: { uid: string } | null | undefined;
+  confirm: ReturnType<typeof useConfirm>;
+  onEdit: () => void;
+}): RowAction[] {
+  const actions: RowAction[] = [];
+
+  if (!isCompleted) {
+    actions.push({
+      label: "Mark paid",
+      icon: CheckCircle2,
+      onClick: async () => {
+        if (!user) return;
+        try {
+          await recordSubscriptionPayment(user.uid, s.id);
+          toast.success(isLoan && loanProgress?.remaining === 1 ? "Loan completed" : "Payment recorded");
+        } catch (e) {
+          toast.error("Failed to record payment", {
+            description: e instanceof Error ? e.message : undefined,
+          });
+        }
+      },
+    });
   }
-  if (isToday(date)) {
-    return { label: "Due today", variant: "default" as const, icon: Clock };
+
+  actions.push({ label: "Edit", icon: Pencil, onClick: onEdit });
+
+  if (!isCompleted) {
+    actions.push({
+      label: s.status === "active" ? "Pause" : "Resume",
+      icon: s.status === "active" ? Pause : Play,
+      onClick: async () => {
+        if (!user) return;
+        const nextStatus = s.status === "active" ? "paused" : "active";
+        try {
+          await setSubscriptionStatus(user.uid, s.id, nextStatus);
+          toast.success(nextStatus === "paused" ? "Monthly bill paused" : "Monthly bill resumed");
+        } catch (e) {
+          toast.error("Failed to update status", {
+            description: e instanceof Error ? e.message : undefined,
+          });
+        }
+      },
+    });
   }
-  if (isTomorrow(date)) {
-    return { label: "Tomorrow", variant: "secondary" as const, icon: Clock };
-  }
-  const days = differenceInDays(date, new Date());
-  if (days <= 7) {
-    return { label: `In ${days}d`, variant: "secondary" as const, icon: Clock };
-  }
-  return { label: format(date, "MMM d"), variant: "outline" as const, icon: CalendarIcon };
+
+  actions.push({
+    label: "Delete",
+    icon: Trash2,
+    destructive: true,
+    onClick: async () => {
+      if (!user) return;
+      if (!(await confirm({ title: "Delete this monthly bill?", destructive: true }))) return;
+      try {
+        await deleteSubscription(user.uid, s.id);
+        toast.success("Monthly bill deleted");
+      } catch (e) {
+        toast.error("Failed to delete monthly bill", {
+          description: e instanceof Error ? e.message : undefined,
+        });
+      }
+    },
+  });
+
+  return actions;
 }
 
 export default function SubscriptionsPage({ embedded = false }: { embedded?: boolean }) {
   const { user } = useAuth();
+  const confirm = useConfirm();
   const { accounts } = useAccounts();
   const { categories: expenseCats } = useCategories("expense");
   const { subscriptions, loading, error } = useSubscriptions();
@@ -238,6 +314,24 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
     [expenseCats],
   );
 
+  // Precomputed once and shared by both the mobile card list and the desktop table below,
+  // instead of each view re-deriving the same fields per row.
+  const billRows = React.useMemo(() => {
+    return (subscriptions as any[]).map((s) => {
+      const nextDue = s.nextDueAt instanceof Timestamp ? s.nextDueAt.toDate() : new Date();
+      const acct = accountById.get(s.accountId);
+      const cat = categoryById.get(s.categoryId);
+      const cur = formatCurrencyCode(s.currency ?? acct?.currency);
+      const dueInfo = s.status === "active" ? getDueDateInfo(nextDue) : null;
+      const isPaused = s.status === "paused";
+      const isLoan = s.kind === "loan";
+      const isCompleted = s.status === "completed";
+      const loanProgress = isLoan ? getLoanProgress(s) : null;
+      const KindIcon = getBillKindIcon(s.kind);
+      return { s, nextDue, acct, cat, cur, dueInfo, isPaused, isLoan, isCompleted, loanProgress, KindIcon };
+    });
+  }, [subscriptions, accountById, categoryById]);
+
   const { active, paused, loans, totalMonthly, dueThisWeek } = React.useMemo(() => {
     let activeCount = 0;
     let pausedCount = 0;
@@ -300,7 +394,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
         {!embedded && (
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Bills & Loans</h1>
+              <h1 className="font-display text-xl font-bold tracking-tight sm:text-2xl">Bills & Loans</h1>
               <Badge variant="secondary" className="font-mono text-[11px]">
                 Monthly
               </Badge>
@@ -347,6 +441,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                     <SelectContent>
                       <SelectItem value="subscription">Subscription</SelectItem>
                       <SelectItem value="loan">Loan payment</SelectItem>
+                      <SelectItem value="rent">Rent</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -357,7 +452,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                     Name
                   </Label>
                   <Input
-                    placeholder="e.g., Netflix, Car loan, Home loan"
+                    placeholder="e.g., Netflix, Car loan, Apartment rent"
                     className="h-11"
                     {...createForm.register("name")}
                   />
@@ -367,7 +462,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                 <div className="grid grid-cols-3 gap-3">
                   <div className="col-span-2 space-y-2">
                     <Label className="text-xs text-muted-foreground uppercase tracking-wider">
-                      {createKind === "loan" ? "Monthly Payment" : "Amount"}
+                      {createKind === "loan" ? "Monthly Payment" : createKind === "rent" ? "Monthly Rent" : "Amount"}
                     </Label>
                     <Input
                       type="number"
@@ -596,17 +691,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                 Failed to load monthly bills{error?.message ? `: ${error.message}` : ""}
               </div>
             ) : subscriptions.length ? (
-              (subscriptions as any[]).map((s) => {
-                const nextDue = s.nextDueAt instanceof Timestamp ? s.nextDueAt.toDate() : new Date();
-                const acct = accountById.get(s.accountId);
-                const cat = categoryById.get(s.categoryId);
-                const cur = formatCurrencyCode(s.currency ?? acct?.currency);
-                const dueInfo = s.status === "active" ? getDueDateInfo(nextDue) : null;
-                const isPaused = s.status === "paused";
-                const isLoan = s.kind === "loan";
-                const isCompleted = s.status === "completed";
-                const loanProgress = isLoan ? getLoanProgress(s) : null;
-
+              billRows.map(({ s, nextDue, acct, cat, cur, dueInfo, isPaused, isLoan, isCompleted, loanProgress, KindIcon }) => {
                 return (
                   <Card key={s.id} className={`surface-container-high py-0 shadow-sm ${isPaused ? "opacity-70" : ""}`}>
                     <CardContent className="space-y-4 p-4">
@@ -615,126 +700,32 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                           <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
                             isPaused ? "bg-muted" : "bg-primary/10"
                           }`}>
-                            {isLoan ? (
-                              <HandCoins className={`h-5 w-5 ${isPaused ? "text-muted-foreground" : "text-primary"}`} />
-                            ) : (
-                              <Repeat className={`h-5 w-5 ${isPaused ? "text-muted-foreground" : "text-primary"}`} />
-                            )}
+                            <KindIcon className={`h-5 w-5 ${isPaused ? "text-muted-foreground" : "text-primary"}`} />
                           </div>
                           <div className="min-w-0">
                             <p className="truncate font-semibold">{s.name}</p>
                             <p className="text-xs text-muted-foreground">
-                              {isLoan ? "Loan payment" : "Subscription"} · {acct?.name ?? "-"} · {cat?.name ?? "-"}
+                              {getBillKindLabel(s.kind)} · {acct?.name ?? "-"} · {cat?.name ?? "-"}
                             </p>
                           </div>
                         </div>
 
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon-sm" className="-mr-2 -mt-1">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            {!isCompleted && (
-                              <DropdownMenuItem
-                                onClick={async () => {
-                                  if (!user) return;
-                                  try {
-                                    await recordSubscriptionPayment(user.uid, s.id);
-                                    toast.success(
-                                      isLoan && loanProgress?.remaining === 1
-                                        ? "Loan completed"
-                                        : "Payment recorded",
-                                    );
-                                  } catch (e) {
-                                    toast.error("Failed to record payment", {
-                                      description: e instanceof Error ? e.message : undefined,
-                                    });
-                                  }
-                                }}
-                              >
-                                <CheckCircle2 className="h-4 w-4 mr-2" />
-                                Mark paid
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setEdit(s);
-                                editForm.reset({
-                                  subscriptionId: s.id,
-                                  name: s.name ?? "",
-                                  kind: s.kind === "loan" ? "loan" : "subscription",
-                                  amount: s.amount ?? 0,
-                                  currency: formatCurrencyCode(s.currency ?? acct?.currency),
-                                  accountId: s.accountId ?? "",
-                                  categoryId: s.categoryId ?? "",
-                                  nextDueAt: nextDue,
-                                  interval: "monthly",
-                                  loanTotalPayments: s.loanTotalPayments ?? 12,
-                                  loanPaidPayments: s.loanPaidPayments ?? 0,
-                                  status:
-                                    s.status === "completed"
-                                      ? "completed"
-                                      : s.status === "paused"
-                                        ? "paused"
-                                        : "active",
-                                });
-                              }}
-                            >
-                              <Pencil className="h-4 w-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            {!isCompleted && (
-                              <DropdownMenuItem
-                                onClick={async () => {
-                                  if (!user) return;
-                                  const nextStatus = s.status === "active" ? "paused" : "active";
-                                  try {
-                                    await setSubscriptionStatus(user.uid, s.id, nextStatus);
-                                    toast.success(
-                                      nextStatus === "paused" ? "Monthly bill paused" : "Monthly bill resumed",
-                                    );
-                                  } catch (e) {
-                                    toast.error("Failed to update status", {
-                                      description: e instanceof Error ? e.message : undefined,
-                                    });
-                                  }
-                                }}
-                              >
-                                {s.status === "active" ? (
-                                  <>
-                                    <Pause className="h-4 w-4 mr-2" />
-                                    Pause
-                                  </>
-                                ) : (
-                                  <>
-                                    <Play className="h-4 w-4 mr-2" />
-                                    Resume
-                                  </>
-                                )}
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onClick={async () => {
-                                if (!user) return;
-                                if (!confirm("Delete this monthly bill?")) return;
-                                try {
-                                  await deleteSubscription(user.uid, s.id);
-                                  toast.success("Monthly bill deleted");
-                                } catch (e) {
-                                  toast.error("Failed to delete monthly bill", {
-                                    description: e instanceof Error ? e.message : undefined,
-                                  });
-                                }
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <RowActionsMenu
+                          ariaLabel={`${s.name} actions`}
+                          triggerClassName="-mr-2 -mt-1 h-9 w-9 p-0"
+                          actions={buildBillActions({
+                            s,
+                            isCompleted,
+                            isLoan,
+                            loanProgress,
+                            user,
+                            confirm,
+                            onEdit: () => {
+                              setEdit(s);
+                              editForm.reset(editValuesFor(s, acct, nextDue));
+                            },
+                          })}
+                        />
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2">
@@ -825,34 +816,20 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                   </TableCell>
                 </TableRow>
               ) : subscriptions.length ? (
-                (subscriptions as any[]).map((s) => {
-                  const nextDue = s.nextDueAt instanceof Timestamp ? s.nextDueAt.toDate() : new Date();
-                  const acct = accountById.get(s.accountId);
-                  const cat = categoryById.get(s.categoryId);
-                  const cur = formatCurrencyCode(s.currency ?? acct?.currency);
-                  const dueInfo = s.status === "active" ? getDueDateInfo(nextDue) : null;
-                  const isPaused = s.status === "paused";
-                  const isLoan = s.kind === "loan";
-                  const isCompleted = s.status === "completed";
-                  const loanProgress = isLoan ? getLoanProgress(s) : null;
-
+                billRows.map(({ s, nextDue, acct, cat, cur, dueInfo, isPaused, isLoan, isCompleted, loanProgress, KindIcon }) => {
                   return (
                     <TableRow key={s.id} className={`group ${isPaused ? "opacity-60" : ""}`}>
                       <TableCell className="pl-6">
                         <div className="flex items-center gap-3">
-                          <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
+                          <div className={`flex h-10 w-10 items-center justify-center rounded-2xl ${
                             isPaused ? "bg-muted" : "bg-primary/10"
                           }`}>
-                            {isLoan ? (
-                              <HandCoins className={`h-4 w-4 ${isPaused ? "text-muted-foreground" : "text-primary"}`} />
-                            ) : (
-                              <Repeat className={`h-4 w-4 ${isPaused ? "text-muted-foreground" : "text-primary"}`} />
-                            )}
+                            <KindIcon className={`h-4 w-4 ${isPaused ? "text-muted-foreground" : "text-primary"}`} />
                           </div>
                           <div>
                             <div className="font-medium">{s.name}</div>
                             <div className="text-xs text-muted-foreground">
-                              {isLoan ? "Loan payment" : "Subscription"} · {acct?.name ?? "—"} · {cat?.name ?? "—"}
+                              {getBillKindLabel(s.kind)} · {acct?.name ?? "—"} · {cat?.name ?? "—"}
                             </div>
                             {loanProgress && loanProgress.total > 0 && (
                               <div className="mt-2 max-w-[260px] space-y-1">
@@ -900,116 +877,22 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                         )}
                       </TableCell>
                       <TableCell className="text-right pr-6">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 focus:opacity-100"
-                            >
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            {!isCompleted && (
-                              <DropdownMenuItem
-                                onClick={async () => {
-                                  if (!user) return;
-                                  try {
-                                    await recordSubscriptionPayment(user.uid, s.id);
-                                    toast.success(
-                                      isLoan && loanProgress?.remaining === 1
-                                        ? "Loan completed"
-                                        : "Payment recorded",
-                                    );
-                                  } catch (e) {
-                                    toast.error("Failed to record payment", {
-                                      description: e instanceof Error ? e.message : undefined,
-                                    });
-                                  }
-                                }}
-                              >
-                                <CheckCircle2 className="h-4 w-4 mr-2" />
-                                Mark paid
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setEdit(s);
-                                editForm.reset({
-                                  subscriptionId: s.id,
-                                  name: s.name ?? "",
-                                  kind: s.kind === "loan" ? "loan" : "subscription",
-                                  amount: s.amount ?? 0,
-                                  currency: formatCurrencyCode(s.currency ?? acct?.currency),
-                                  accountId: s.accountId ?? "",
-                                  categoryId: s.categoryId ?? "",
-                                  nextDueAt: nextDue,
-                                  interval: "monthly",
-                                  loanTotalPayments: s.loanTotalPayments ?? 12,
-                                  loanPaidPayments: s.loanPaidPayments ?? 0,
-                                  status:
-                                    s.status === "completed"
-                                      ? "completed"
-                                      : s.status === "paused"
-                                        ? "paused"
-                                        : "active",
-                                });
-                              }}
-                            >
-                              <Pencil className="h-4 w-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            {!isCompleted && (
-                              <DropdownMenuItem
-                                onClick={async () => {
-                                  if (!user) return;
-                                  const nextStatus = s.status === "active" ? "paused" : "active";
-                                  try {
-                                    await setSubscriptionStatus(user.uid, s.id, nextStatus);
-                                    toast.success(
-                                      nextStatus === "paused" ? "Monthly bill paused" : "Monthly bill resumed",
-                                    );
-                                  } catch (e) {
-                                    toast.error("Failed to update status", {
-                                      description: e instanceof Error ? e.message : undefined,
-                                    });
-                                  }
-                                }}
-                              >
-                                {s.status === "active" ? (
-                                  <>
-                                    <Pause className="h-4 w-4 mr-2" />
-                                    Pause
-                                  </>
-                                ) : (
-                                  <>
-                                    <Play className="h-4 w-4 mr-2" />
-                                    Resume
-                                  </>
-                                )}
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onClick={async () => {
-                                if (!user) return;
-                                if (!confirm("Delete this subscription?")) return;
-                                try {
-                                  await deleteSubscription(user.uid, s.id);
-                                  toast.success("Subscription deleted");
-                                } catch (e) {
-                                  toast.error("Failed to delete subscription", {
-                                    description: e instanceof Error ? e.message : undefined,
-                                  });
-                                }
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <RowActionsMenu
+                          ariaLabel={`${s.name} actions`}
+                          triggerClassName="h-8 w-8 p-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 focus:opacity-100"
+                          actions={buildBillActions({
+                            s,
+                            isCompleted,
+                            isLoan,
+                            loanProgress,
+                            user,
+                            confirm,
+                            onEdit: () => {
+                              setEdit(s);
+                              editForm.reset(editValuesFor(s, acct, nextDue));
+                            },
+                          })}
+                        />
                       </TableCell>
                     </TableRow>
                   );
@@ -1074,6 +957,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                   <SelectContent>
                     <SelectItem value="subscription">Subscription</SelectItem>
                     <SelectItem value="loan">Loan payment</SelectItem>
+                    <SelectItem value="rent">Rent</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1090,7 +974,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-2">
                   <Label className="text-xs text-muted-foreground uppercase tracking-wider">
-                    {editKind === "loan" ? "Monthly Payment" : "Amount"}
+                    {editKind === "loan" ? "Monthly Payment" : editKind === "rent" ? "Monthly Rent" : "Amount"}
                   </Label>
                   <Input
                     type="number"
