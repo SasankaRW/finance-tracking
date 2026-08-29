@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Calendar, Layers, List, LogOut, Plus, Settings, Target, Wallet } from "lucide-react";
+import { Calendar, Layers, List, LogOut, Plus, Settings, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CashlyLogo } from "@/components/cashly-logo";
 import { signOutEverywhere } from "@/lib/auth/auth-actions";
@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button";
 
 const navItems = [
   { href: "/app", label: "Dashboard", icon: Layers },
-  { href: "/app/accounts", label: "Accounts", icon: Wallet },
   { href: "/app/transactions", label: "Transactions", icon: List },
   { href: "/app/planning", label: "Planning", icon: Target },
   { href: "/app/events", label: "Events", icon: Calendar },

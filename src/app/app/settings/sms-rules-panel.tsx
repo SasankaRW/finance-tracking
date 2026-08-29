@@ -13,6 +13,7 @@ import {
   Play,
   Plus,
   ShieldAlert,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-provider";
@@ -359,6 +360,7 @@ export function SmsRulesPanel() {
   const [edit, setEdit] = React.useState<any | null>(null);
   const [editForm, setEditForm] = React.useState<RuleFormState>(EMPTY_FORM);
   const [submitting, setSubmitting] = React.useState(false);
+  const [addingDefaults, setAddingDefaults] = React.useState(false);
 
   const accountById = React.useMemo(
     () => new Map((accounts as any[]).map((a) => [a.id, a])),
@@ -437,11 +439,62 @@ export function SmsRulesPanel() {
     }
   };
 
+  const addDefaultRules = async () => {
+    if (!user) return;
+    const existingLabels = new Set((smsRules as any[]).map((r) => r.label));
+    const missing = PRESETS.filter((p) => !existingLabels.has(p.label));
+    if (!missing.length) {
+      toast.info("All default rules are already added");
+      return;
+    }
+    const defaultAccountId =
+      (accounts as any[]).find((a) => a.type === "bank")?.id ??
+      (accounts as any[]).find((a) => a.type === "card")?.id ??
+      (accounts as any[])[0]?.id;
+    if (!defaultAccountId) {
+      toast.error("Add an account first", {
+        description: "Default rules need an account to attach to.",
+      });
+      return;
+    }
+    setAddingDefaults(true);
+    try {
+      for (const preset of missing) {
+        await createSmsRule(user.uid, {
+          label: preset.label,
+          senderMatch: "BOC",
+          accountId: defaultAccountId,
+          kind: preset.kind,
+          pattern: preset.pattern,
+        });
+      }
+      toast.success(`Added ${missing.length} default rule${missing.length !== 1 ? "s" : ""}`, {
+        description: "Edit any rule to change its sender or account.",
+      });
+    } catch (e) {
+      toast.error("Failed to add default rules", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
+      setAddingDefaults(false);
+    }
+  };
+
   return (
     <div className="space-y-4 sm:space-y-6">
       <PermissionCard />
 
-      <div className="flex justify-end">
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full sm:w-auto"
+          disabled={addingDefaults}
+          onClick={() => void addDefaultRules()}
+        >
+          <Sparkles className="h-4 w-4 mr-2" />
+          {addingDefaults ? "Adding..." : "Add Default Rules"}
+        </Button>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>
             <Button className="w-full sm:w-auto">
