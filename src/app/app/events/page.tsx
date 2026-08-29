@@ -50,7 +50,7 @@ const createSchema = z
 
 type CreateValues = z.infer<typeof createSchema>;
 
-export default function EventsPage() {
+export default function EventsPage({ embedded = false }: { embedded?: boolean }) {
   const { user } = useAuth();
   const confirm = useConfirm();
   const { events, loading: eventsLoading } = useEvents();
@@ -94,13 +94,15 @@ export default function EventsPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="font-display text-xl font-bold tracking-tight sm:text-2xl">Events</h1>
-          <p className="mt-1 hidden text-sm text-muted-foreground sm:block">
-            Track event budgets separately while still deducting from real accounts
-          </p>
-        </div>
+      <div className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${embedded ? "items-stretch sm:items-center" : ""}`}>
+        {!embedded && (
+          <div>
+            <h1 className="font-display text-xl font-bold tracking-tight sm:text-2xl">Events</h1>
+            <p className="mt-1 hidden text-sm text-muted-foreground sm:block">
+              Track event budgets separately while still deducting from real accounts
+            </p>
+          </div>
+        )}
 
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
@@ -283,7 +285,7 @@ export default function EventsPage() {
                   <button
                     type="button"
                     aria-label="Delete event"
-                    className="motion-expressive press-expressive flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    className="motion-expressive press-expressive flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                     onClick={async () => {
                       if (!user) return;
                       if (!(await confirm({ title: "Delete this trip?", destructive: true }))) return;
@@ -302,13 +304,13 @@ export default function EventsPage() {
                 </div>
 
                 <div className="mt-4 flex items-end justify-between gap-3">
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-xs text-muted-foreground">Spent</p>
-                    <p className="font-display text-xl font-bold tabular-nums">{formatMoney(spent, currency)}</p>
+                    <p className="truncate font-display text-xl font-bold tabular-nums">{formatMoney(spent, currency)}</p>
                   </div>
-                  <div className="text-right">
+                  <div className="min-w-0 text-right">
                     <p className="text-xs text-muted-foreground">Budget range</p>
-                    <p className="text-sm font-medium tabular-nums">
+                    <p className="truncate text-sm font-medium tabular-nums">
                       {formatMoney(min, currency)} – {formatMoney(max, currency)}
                     </p>
                     <p className={`mt-0.5 text-xs ${over ? "text-destructive" : "text-muted-foreground"}`}>

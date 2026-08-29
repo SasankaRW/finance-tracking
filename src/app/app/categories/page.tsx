@@ -175,8 +175,8 @@ function CategoryTable({ kind }: { kind: "income" | "expense" }) {
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/50 hover:bg-muted/50">
-                <TableHead className="pl-6">Category</TableHead>
-                <TableHead className="w-[60px] pr-6" />
+                <TableHead className="pl-4 sm:pl-6">Category</TableHead>
+                <TableHead className="w-[60px] pr-4 sm:pr-6" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -195,20 +195,20 @@ function CategoryTable({ kind }: { kind: "income" | "expense" }) {
               ) : categories.length ? (
                 categories.map((c: any) => (
                   <TableRow key={c.id} className="group">
-                    <TableCell className="pl-6">
-                      <div className="flex items-center gap-3">
-                        <div className={`flex h-9 w-9 items-center justify-center rounded-2xl ${
+                    <TableCell className="pl-4 sm:pl-6">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl ${
                           isIncome ? "bg-emerald-500/10" : "bg-rose-500/10"
                         }`}>
                           <Tag className={`h-4 w-4 ${isIncome ? "text-emerald-600" : "text-rose-600"}`} />
                         </div>
-                        <span className="font-medium">{c.name}</span>
+                        <span className="truncate font-medium">{c.name}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-right pr-6">
+                    <TableCell className="text-right pr-4 sm:pr-6">
                       <RowActionsMenu
                         ariaLabel={`${c.name} actions`}
-                        triggerClassName="h-8 w-8 p-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 focus:opacity-100"
+                        triggerClassName="p-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 focus:opacity-100"
                         actions={[
                           {
                             label: "Rename",

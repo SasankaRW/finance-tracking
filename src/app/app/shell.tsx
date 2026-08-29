@@ -17,9 +17,10 @@ const navItems = [
   { href: "/app/events", label: "Events", icon: Calendar },
 ];
 
-// Mobile has no top bar, so the bottom nav also carries Settings.
+// Mobile's bottom nav drops Events to save space (still reachable from desktop's
+// top nav) and carries Settings instead, since mobile has no top bar.
 const mobileNavItems = [
-  ...navItems,
+  ...navItems.filter((item) => item.href !== "/app/events"),
   { href: "/app/settings", label: "Settings", icon: Settings },
 ];
 

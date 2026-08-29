@@ -697,10 +697,10 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                     <CardContent className="space-y-4 p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex min-w-0 items-start gap-3">
-                          <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
+                          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl ${
                             isPaused ? "bg-muted" : "bg-primary/10"
                           }`}>
-                            <KindIcon className={`h-5 w-5 ${isPaused ? "text-muted-foreground" : "text-primary"}`} />
+                            <KindIcon className={`h-4 w-4 ${isPaused ? "text-muted-foreground" : "text-primary"}`} />
                           </div>
                           <div className="min-w-0">
                             <p className="truncate font-semibold">{s.name}</p>
@@ -712,7 +712,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
 
                         <RowActionsMenu
                           ariaLabel={`${s.name} actions`}
-                          triggerClassName="-mr-2 -mt-1 h-9 w-9 p-0"
+                          triggerClassName="-mr-3 -mt-2 p-0"
                           actions={buildBillActions({
                             s,
                             isCompleted,
@@ -755,16 +755,16 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                       )}
 
                       <div className="flex items-end justify-between gap-3">
-                        <div>
+                        <div className="min-w-0">
                           <p className="text-xs text-muted-foreground">Monthly amount</p>
-                          <p className="text-lg font-bold tabular-nums">
+                          <p className="truncate text-lg font-bold tabular-nums">
                             {formatMoney(s.amount ?? 0, cur)}
                           </p>
                         </div>
                         {loanProgress && loanProgress.total > 0 && (
-                          <div className="text-right">
+                          <div className="min-w-0 text-right">
                             <p className="text-xs text-muted-foreground">Remaining</p>
-                            <p className="font-semibold tabular-nums">
+                            <p className="truncate font-semibold tabular-nums">
                               {formatMoney((s.amount ?? 0) * loanProgress.remaining, cur)}
                             </p>
                           </div>

@@ -193,8 +193,8 @@ export function DashboardMinusMobile({
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="motion-expressive rounded-[2rem] rounded-br-lg bg-secondary p-4 text-secondary-foreground">
-              <p className="font-display text-2xl font-bold tabular-nums">
+            <div className="motion-expressive min-w-0 rounded-[2rem] rounded-br-lg bg-secondary p-4 text-secondary-foreground">
+              <p className="truncate font-display text-2xl font-bold tabular-nums">
                 {formatMoney(todayTotal)}
               </p>
               <p className="mt-1 text-sm font-semibold">Daily spend</p>
@@ -204,10 +204,10 @@ export function DashboardMinusMobile({
               <DialogTrigger asChild>
                 <button
                   type="button"
-                  className="tonal-primary motion-expressive press-expressive relative w-full rounded-[2rem] rounded-bl-lg p-4 text-left"
+                  className="tonal-primary motion-expressive press-expressive relative min-w-0 w-full rounded-[2rem] rounded-bl-lg p-4 text-left"
                 >
                   <ChevronRight className="absolute right-3.5 top-3.5 h-4 w-4 opacity-50" />
-                  <p className="font-display text-2xl font-bold tabular-nums">
+                  <p className="truncate font-display text-2xl font-bold tabular-nums">
                     {formatMoney(budgetStatus.totalSpent)}
                   </p>
                   <p className="mt-1 text-sm font-semibold">Monthly spend</p>

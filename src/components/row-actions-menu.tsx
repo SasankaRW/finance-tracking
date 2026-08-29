@@ -23,7 +23,7 @@ export type RowAction = {
 export function RowActionsMenu({
   ariaLabel,
   actions,
-  triggerClassName = "h-8 w-8 p-0",
+  triggerClassName = "p-0",
 }: {
   ariaLabel: string;
   actions: RowAction[];
@@ -32,7 +32,7 @@ export function RowActionsMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" aria-label={ariaLabel} className={triggerClassName}>
+        <Button variant="ghost" size="icon-touch" aria-label={ariaLabel} className={triggerClassName}>
           <MoreHorizontal className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>

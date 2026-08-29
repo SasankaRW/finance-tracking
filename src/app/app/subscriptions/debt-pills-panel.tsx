@@ -12,6 +12,7 @@ import { useDebts } from "@/lib/finance/hooks";
 import { formatCurrencyCode, formatMoney } from "@/lib/format";
 import { COMMON_CURRENCIES } from "@/shared/currency";
 import { SettleDebtDialog } from "@/components/settle-debt-dialog";
+import { RowActionsMenu } from "@/components/row-actions-menu";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -271,37 +272,34 @@ export function DebtPillsPanel() {
                       due {format(due, "MMM d")}
                     </span>
                   )}
-                  <Button
-                    type="button"
-                    size="icon-sm"
-                    variant="ghost"
-                    className="h-7 w-7 shrink-0"
-                    aria-label={isReceivable ? "Mark received" : "Mark paid"}
-                    onClick={() => setSettlingDebt(debt)}
-                  >
-                    <CheckCircle2 className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    size="icon-sm"
-                    variant="ghost"
-                    className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
-                    aria-label="Delete"
-                    onClick={async () => {
-                      if (!user) return;
-                      if (!(await confirm({ title: "Delete this money tracker?", destructive: true }))) return;
-                      try {
-                        await deleteDebt(user.uid, debt.id);
-                        toast.success("Money tracker deleted");
-                      } catch (err) {
-                        toast.error("Failed to delete tracker", {
-                          description: err instanceof Error ? err.message : undefined,
-                        });
-                      }
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <RowActionsMenu
+                    ariaLabel={`${debt.personName} actions`}
+                    triggerClassName="-mr-1 shrink-0"
+                    actions={[
+                      {
+                        label: isReceivable ? "Mark received" : "Mark paid",
+                        icon: CheckCircle2,
+                        onClick: () => setSettlingDebt(debt),
+                      },
+                      {
+                        label: "Delete",
+                        icon: Trash2,
+                        destructive: true,
+                        onClick: async () => {
+                          if (!user) return;
+                          if (!(await confirm({ title: "Delete this money tracker?", destructive: true }))) return;
+                          try {
+                            await deleteDebt(user.uid, debt.id);
+                            toast.success("Money tracker deleted");
+                          } catch (err) {
+                            toast.error("Failed to delete tracker", {
+                              description: err instanceof Error ? err.message : undefined,
+                            });
+                          }
+                        },
+                      },
+                    ]}
+                  />
                 </div>
               );
             })}

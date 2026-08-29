@@ -44,13 +44,13 @@ import { AppearancePanel } from "@/app/app/settings/appearance-panel";
 import { SmsRulesPanel } from "@/app/app/settings/sms-rules-panel";
 import { AccountsPanel } from "@/app/app/settings/accounts-panel";
 
-const TAB_VALUES = ["appearance", "accounts", "salary", "messages", "security"] as const;
+const TAB_VALUES = ["accounts", "appearance", "salary", "messages", "security"] as const;
 
 export default function SettingsPage() {
   const searchParams = useSearchParams();
   const requestedTab = searchParams.get("tab");
   const defaultTab =
-    TAB_VALUES.find((tab) => tab === requestedTab) ?? "appearance";
+    TAB_VALUES.find((tab) => tab === requestedTab) ?? "accounts";
   const { user } = useAuth();
   const confirm = useConfirm();
 
@@ -179,18 +179,18 @@ export default function SettingsPage() {
       <Tabs defaultValue={defaultTab} key={defaultTab} className="space-y-4 sm:space-y-6">
         <TabsList className="grid h-auto w-full grid-cols-5 gap-1 p-1 sm:inline-flex sm:h-11 sm:w-fit sm:gap-0">
           <TabsTrigger
-            value="appearance"
-            className="h-auto min-h-11 flex-none flex-col gap-0.5 px-1 py-2 text-[10px] leading-none sm:h-full sm:flex-1 sm:flex-row sm:gap-2 sm:px-4 sm:py-1 sm:text-sm"
-          >
-            <Palette className="h-4 w-4 shrink-0" />
-            <span className="max-w-full truncate">Appearance</span>
-          </TabsTrigger>
-          <TabsTrigger
             value="accounts"
             className="h-auto min-h-11 flex-none flex-col gap-0.5 px-1 py-2 text-[10px] leading-none sm:h-full sm:flex-1 sm:flex-row sm:gap-2 sm:px-4 sm:py-1 sm:text-sm"
           >
             <Wallet className="h-4 w-4 shrink-0" />
             <span className="max-w-full truncate">Accounts</span>
+          </TabsTrigger>
+          <TabsTrigger
+            value="appearance"
+            className="h-auto min-h-11 flex-none flex-col gap-0.5 px-1 py-2 text-[10px] leading-none sm:h-full sm:flex-1 sm:flex-row sm:gap-2 sm:px-4 sm:py-1 sm:text-sm"
+          >
+            <Palette className="h-4 w-4 shrink-0" />
+            <span className="max-w-full truncate">Appearance</span>
           </TabsTrigger>
           <TabsTrigger
             value="salary"
@@ -215,12 +215,12 @@ export default function SettingsPage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="appearance">
-          <AppearancePanel />
-        </TabsContent>
-
         <TabsContent value="accounts">
           <AccountsPanel />
+        </TabsContent>
+
+        <TabsContent value="appearance">
+          <AppearancePanel />
         </TabsContent>
 
         <TabsContent value="salary">

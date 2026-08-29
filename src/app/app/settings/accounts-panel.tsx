@@ -587,7 +587,7 @@ export function AccountsPanel() {
               <Card key={a.id} className={isExcluded ? "opacity-70" : ""}>
                 <CardContent className="p-4 flex items-center gap-4">
                   <div
-                    className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border ${a.type === "cash"
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border ${a.type === "cash"
                         ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600"
                         : a.type === "bank"
                           ? "bg-blue-500/10 border-blue-500/20 text-blue-600"
@@ -617,7 +617,7 @@ export function AccountsPanel() {
                     </div>
                     <RowActionsMenu
                       ariaLabel={`${a.name} actions`}
-                      triggerClassName="-mr-2 h-8 w-8 text-muted-foreground"
+                      triggerClassName="-mr-3 text-muted-foreground"
                       actions={[
                         {
                           label: "Edit",

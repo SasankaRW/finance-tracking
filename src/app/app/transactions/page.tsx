@@ -929,7 +929,7 @@ export default function TransactionsPage() {
 
                     {/* Right: Amount & Actions */}
                     <div className="flex shrink-0 items-center gap-1">
-                      <div className={`max-w-[112px] truncate text-sm font-bold tabular-nums ${t.kind === "income"
+                      <div className={`shrink-0 whitespace-nowrap text-sm font-bold tabular-nums ${t.kind === "income"
                           ? "text-emerald-600"
                           : t.kind === "expense"
                             ? "text-rose-600"
@@ -941,7 +941,7 @@ export default function TransactionsPage() {
 
                       <RowActionsMenu
                         ariaLabel={`${t.note || t.kind} actions`}
-                        triggerClassName="h-8 w-8 rounded-full p-0 text-muted-foreground"
+                        triggerClassName="rounded-full p-0 text-muted-foreground"
                         actions={[
                           {
                             label: "Edit",
