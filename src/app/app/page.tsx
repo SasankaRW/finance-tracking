@@ -19,10 +19,14 @@ import {
   Banknote,
   ArrowRight,
   AlertCircle,
+  Eye,
+  EyeOff,
   Plus,
 } from "lucide-react";
 import { useAccounts, useBudgets, useCategories, useSubscriptions, useTransactions } from "@/lib/finance/hooks";
-import { formatCurrencyCode, formatMoney } from "@/lib/format";
+import { getCategoryIcon } from "@/lib/finance/category-icons";
+import { formatCurrencyCode, formatMoney, formatMoneyCompact } from "@/lib/format";
+import { useBalanceVisibility } from "@/lib/hooks/use-balance-visibility";
 import { DEFAULT_CURRENCY, HOME_CURRENCY } from "@/shared/currency";
 import { useFxRates } from "@/lib/fx/use-fx-rates";
 import { CreateTransactionDialog } from "@/app/app/transactions/create-transaction-dialog";
@@ -55,6 +59,7 @@ function toDate(value: unknown) {
 
 export default function DashboardPage() {
   const isDesktop = useMediaQuery("(min-width: 640px)");
+  const { hidden: balanceHidden, toggle: toggleBalanceHidden } = useBalanceVisibility();
   const isLargeDesktop = useMediaQuery("(min-width: 1024px)");
   const { accounts, loading: accountsLoading } = useAccounts();
   const { data: fxUsd } = useFxRates("USD", [HOME_CURRENCY]);
@@ -74,6 +79,7 @@ export default function DashboardPage() {
 
   const isLoading = accountsLoading || transactionsLoading || budgetsLoading;
   const { categories: expenseCategories } = useCategories("expense");
+  const { categories: incomeCategories } = useCategories("income");
 
   const { totalBalanceLkr, missingUsdRate, hasUnsupportedCurrency } =
     React.useMemo(() => {
@@ -200,13 +206,17 @@ export default function DashboardPage() {
       const key = t.categoryId ?? "uncategorized";
       map.set(key, (map.get(key) ?? 0) + (t.amount ?? 0));
     }
-    const nameById = new Map(expenseCategories.map((c: any) => [c.id, c.name]));
+    const categoryById = new Map(expenseCategories.map((c: any) => [c.id, c]));
     return Array.from(map.entries())
-      .map(([categoryId, value]) => ({
-        categoryId,
-        name: nameById.get(categoryId) ?? "Uncategorized",
-        value,
-      }))
+      .map(([categoryId, value]) => {
+        const category = categoryById.get(categoryId);
+        return {
+          categoryId,
+          name: category?.name ?? "Uncategorized",
+          value,
+          icon: category?.icon as string | undefined,
+        };
+      })
       .sort((a, b) => b.value - a.value)
       .slice(0, 6);
   }, [currentMonthTransactions, expenseCategories]);
@@ -258,9 +268,20 @@ export default function DashboardPage() {
 
   const pieColors = ["#22c55e", "#3b82f6", "#f97316", "#a855f7", "#ef4444", "#14b8a6"];
 
+  // Covers both kinds so an income-categorized transaction (e.g. "Salary") in
+  // the Today list resolves to its real name/icon instead of falling back to
+  // the plain "Income" label.
+  const allCategoriesForLookup = React.useMemo(
+    () => [...expenseCategories, ...incomeCategories],
+    [expenseCategories, incomeCategories],
+  );
   const categoryNameById = React.useMemo(
-    () => new Map(expenseCategories.map((c: any) => [c.id, c.name])),
-    [expenseCategories],
+    () => new Map(allCategoriesForLookup.map((c: any) => [c.id, c.name])),
+    [allCategoriesForLookup],
+  );
+  const categoryIconById = React.useMemo(
+    () => new Map(allCategoriesForLookup.map((c: any) => [c.id, getCategoryIcon(c)])),
+    [allCategoriesForLookup],
   );
 
   const recentTransactions = React.useMemo(() => {
@@ -303,6 +324,8 @@ export default function DashboardPage() {
         accountCount={accountSummary.total}
         recentTransactions={recentTransactions}
         categoryNameById={categoryNameById}
+        categoryIconById={categoryIconById}
+        accounts={accounts as any}
         expenseByCategory={expenseByCategory}
         usdToLkr={usdToLkr}
         cashInHand={cashInHandLkr}
@@ -360,7 +383,7 @@ export default function DashboardPage() {
         />
       </div>
 
-      <Card className="hero-card relative overflow-hidden shadow-lg">
+      <Card className="hero-card relative overflow-hidden">
         <div className="absolute -right-10 -top-12 h-36 w-36 rounded-full bg-white/8 blur-2xl" />
         <div className="hero-card-glow absolute -bottom-16 left-8 h-28 w-28 rounded-full blur-2xl" />
         <CardContent className="relative space-y-4 p-4 sm:space-y-5 sm:p-6">
@@ -370,10 +393,30 @@ export default function DashboardPage() {
               {isLoading ? (
                 <Skeleton className="h-10 w-48 bg-white/20" />
               ) : (
-                <div className="font-display truncate text-3xl font-bold tracking-tight text-white sm:text-5xl">
-                  {missingUsdRate || hasUnsupportedCurrency
-                    ? "-"
-                    : formatMoney(totalBalanceLkr, HOME_CURRENCY)}
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`font-display truncate text-3xl font-bold tracking-tight text-white transition-[filter] duration-300 sm:text-5xl ${
+                      balanceHidden ? "select-none blur-md" : ""
+                    }`}
+                  >
+                    {missingUsdRate || hasUnsupportedCurrency
+                      ? "-"
+                      : Math.abs(totalBalanceLkr) >= 1_000_000
+                        ? formatMoneyCompact(totalBalanceLkr, HOME_CURRENCY)
+                        : formatMoney(totalBalanceLkr, HOME_CURRENCY)}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={toggleBalanceHidden}
+                    aria-label={balanceHidden ? "Show balance" : "Hide balance"}
+                    className="motion-expressive press-expressive flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/70"
+                  >
+                    {balanceHidden ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
                 </div>
               )}
               {!isLoading && (
@@ -387,7 +430,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {!isLoading && sparklineData.values.length > 0 && isDesktop && (
+          {!isLoading && !balanceHidden && sparklineData.values.length > 0 && isDesktop && (
             <div className="rounded-2xl bg-white/10 p-3">
               <SparklineChart
                 data={sparklineData.values}
@@ -437,7 +480,7 @@ export default function DashboardPage() {
 
       <DebtPillsSummary />
 
-      <div className="grid grid-cols-2 divide-x divide-y divide-border/60 overflow-hidden rounded-[2rem] bg-card shadow-sm sm:grid-cols-4 sm:divide-y-0">
+      <div className="elevation-1 grid grid-cols-2 divide-x divide-y divide-border/60 overflow-hidden rounded-[2rem] bg-card sm:grid-cols-4 sm:divide-y-0">
         {[
           {
             label: "Cash",
@@ -509,7 +552,7 @@ export default function DashboardPage() {
       )}
 
       <div className="grid gap-3 sm:gap-4 lg:grid-cols-2">
-        <Card className="surface-tonal shadow-sm">
+        <Card className="surface-tonal">
           <CardHeader className="p-4 pb-2 sm:p-6 sm:pb-2">
             <CardTitle className="text-base">Money Flow</CardTitle>
             <CardDescription>{monthName}</CardDescription>
@@ -572,7 +615,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="surface-tonal shadow-sm">
+        <Card className="surface-tonal">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -653,7 +696,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <Card className="surface-tonal shadow-sm">
+      <Card className="surface-tonal">
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between gap-3">
             <div>

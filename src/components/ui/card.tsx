@@ -7,7 +7,12 @@ function Card({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card"
       className={cn(
-        "expressive-card motion-expressive bg-card text-card-foreground flex flex-col gap-4 rounded-3xl border py-4 shadow-sm sm:gap-6 sm:py-6",
+        // Borderless below md: mobile surfaces sit flat on the page (matching the
+        // dashboard), the border only earns its keep on wider desktop layouts.
+        // elevation-1 (not shadow-sm) so every Card across the app — this is
+        // the shared primitive nearly all of them go through — picks up the
+        // same neumorphic depth as the dashboard.
+        "expressive-card motion-expressive elevation-1 bg-card text-card-foreground flex flex-col gap-4 rounded-3xl border-0 py-4 sm:gap-6 sm:py-6 md:border",
         className
       )}
       {...props}

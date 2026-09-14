@@ -46,6 +46,10 @@
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
+  --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-ios-spring: cubic-bezier(0.34, 1.25, 0.64, 1);
+  --animate-ios-in: ios-in 340ms cubic-bezier(0.32, 0.72, 0, 1) var(--tw-animation-delay, 0s) both;
+  --animate-ios-fade: fade-in 240ms cubic-bezier(0.32, 0.72, 0, 1) var(--tw-animation-delay, 0s) both;
 }
 
 /* Material You dynamic color: every neutral surface is tinted from the seed
@@ -148,6 +152,18 @@
   }
   to {
     opacity: 1;
+  }
+}
+
+/* iOS-style entrance: a short rise with a hint of scale, on a damped ease-out. */
+@keyframes ios-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
   }
 }
 
@@ -276,17 +292,27 @@
   transition: transform 0.2s ease-out;
 }
 
+/* iOS-style motion: transforms ride a lightly damped spring, colors and shadows
+   a plain ease-out, so nothing feels bouncy but every change feels physical. */
 .motion-expressive {
   transition:
-    transform 350ms cubic-bezier(0.34, 1.56, 0.64, 1),
-    background-color 200ms ease,
-    border-color 200ms ease,
-    box-shadow 200ms ease,
-    border-radius 350ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    transform 260ms cubic-bezier(0.34, 1.25, 0.64, 1),
+    background-color 160ms cubic-bezier(0.32, 0.72, 0, 1),
+    border-color 160ms cubic-bezier(0.32, 0.72, 0, 1),
+    box-shadow 160ms cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 160ms cubic-bezier(0.32, 0.72, 0, 1),
+    /* Plain ease-out, not the spring above: a shape (roundness) overshooting
+       past its target reads as a glitch — corners flashing sharper than
+       either end state — not as a bounce. That was the FAB's cracked-corner
+       bug on press-release. */
+    border-radius 220ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
+/* Press in fast; release rides the spring above. */
 .press-expressive:active {
-  transform: scale(0.95);
+  transform: scale(0.97);
+  transition-duration: 110ms;
+  transition-timing-function: ease-out;
 }
 
 /* M3 Expressive tonal fills derived from the dynamic seed color */
@@ -314,6 +340,12 @@
 
 .surface-container-high {
   background: color-mix(in oklch, var(--card) 88%, var(--muted) 12%);
+  /* Explicit border regardless of breakpoint: these are individual list-item
+     cards (bill/budget rows) floating on a page whose background is only a
+     few percent darker in dark mode — without an edge they visually merge
+     into the page. The border-0-below-md rule on the plain Card component
+     is meant for flatter, single cards, not stacked list items like these. */
+  border: 1px solid color-mix(in oklch, var(--border) 82%, var(--primary) 18%);
 }
 
 .expressive-card {
@@ -341,13 +373,104 @@
       var(--hero-via) 48%,
       var(--hero-to) 100%
     );
+  /* Deeper spread + a hairline top highlight (light catching a raised edge)
+     on top of the existing hero-tinted glow — the card that should feel like
+     it's lifted furthest off the page. */
   box-shadow:
-    0 1px 2px oklch(0 0 0 / 0.12),
-    0 16px 40px color-mix(in oklch, var(--hero-to) 38%, transparent);
+    inset 0 1px 0 rgb(255 255 255 / 12%),
+    0 2px 4px oklch(0 0 0 / 0.14),
+    0 28px 56px color-mix(in oklch, var(--hero-to) 42%, transparent);
+  /* This is the actual fix for the corner-clip bug: a rounded child inside a
+     horizontally-scrolling (overflow-x + scroll-snap) container is a known
+     Chromium/WebView case where the rounded-corner clip mask fails at the
+     edge, leaving a sliver of the square box visible — independent of which
+     transform triggers the layer promotion (which is why removing
+     motion-expressive and the entrance animation from the scroller didn't
+     fully fix it). Applying an opaque mask forces the browser onto its mask
+     compositing path instead of the buggy overflow-clip path; the mask
+     itself is invisible (solid white = fully opaque) since it only changes
+     *how* the corner is rendered, not what shows through it.
+     `-webkit-` prefix needed for Android WebView/Chromium coverage. */
+  -webkit-mask-image: -webkit-radial-gradient(white, white);
+  mask-image: radial-gradient(white, white);
 }
 
 .hero-card-glow {
   background: color-mix(in oklch, var(--hero-glow) 16%, transparent);
+}
+
+/* ============================================
+   SOFT NEUMORPHIC ELEVATION
+   Dual light+dark shadows on opposite corners so a surface looks embossed —
+   molded up out of the same material as the page — rather than a flat card
+   floating on top of it. --neu-light/--neu-dark are the two shadow tints;
+   --elevation-1/2/3 just scale their offset/blur/spread for three depths.
+   The hero card keeps its own hand-tuned colorful glow (below) rather than
+   this treatment — it's a vivid gradient meant to stand out as the one
+   accent surface, not blend in the way a molded/embossed element should.
+   ============================================ */
+:root {
+  /* --neu-light stays around only for the press-in state below (a bright
+     spot *inside* a pressed depression reads fine, since it's contained and
+     transient). For the resting/raised state, a blurred *outer* light shadow
+     is what was creating the glow-halo — swapped for --neu-highlight, a
+     crisp inset line along the top edge (the same technique .hero-card
+     already uses, which never had this problem). */
+  --neu-light: oklch(1 0 0 / 85%);
+  --neu-highlight: oklch(1 0 0 / 55%);
+  --neu-dark: color-mix(in oklch, var(--foreground) 22%, transparent);
+  --elevation-1: inset 0 1px 0 var(--neu-highlight), 5px 6px 14px var(--neu-dark);
+  --elevation-2: inset 0 1px 0 var(--neu-highlight), 7px 9px 20px var(--neu-dark);
+  --elevation-3: inset 0 1px 0 var(--neu-highlight), 10px 13px 28px var(--neu-dark);
+}
+
+.dark {
+  --neu-light: oklch(1 0 0 / 16%);
+  --neu-highlight: oklch(1 0 0 / 8%);
+  --neu-dark: oklch(0 0 0 / 55%);
+}
+
+.elevation-1 {
+  box-shadow: var(--elevation-1);
+  transition: box-shadow 140ms ease-out;
+}
+
+.elevation-2 {
+  box-shadow: var(--elevation-2);
+  transition: box-shadow 140ms ease-out;
+}
+
+.elevation-3 {
+  box-shadow: var(--elevation-3);
+  transition: box-shadow 140ms ease-out;
+}
+
+/* A raised (embossed) surface should look pushed IN when tapped, not just
+   scaled down — that's the actual physical behavior an emboss implies, and
+   it's what makes the depth read as something you interact with rather than
+   a static picture of depth. Scoped to real button/link tags rather than a
+   class name: an elevation-tagged plain <div> (an info tile, a list
+   container) isn't meant to "press" just because something inside it is
+   tappable — a real <button>/<a> is the reliable signal for that. */
+button.elevation-1:active,
+a.elevation-1:active,
+button.elevation-2:active,
+a.elevation-2:active,
+button.elevation-3:active,
+a.elevation-3:active {
+  box-shadow:
+    inset 5px 5px 10px var(--neu-dark),
+    inset -5px -5px 10px var(--neu-light);
+  transition: box-shadow 60ms ease-out;
+}
+
+/* Shared ambient light for the whole app shell — the same top-anchored glow
+   the lock screen already uses, extended to every authenticated page so
+   every card sits under one common light source instead of a flat fill. */
+.app-ambient-bg {
+  background:
+    radial-gradient(circle at 50% -10%, color-mix(in oklch, var(--hero-glow) 14%, transparent) 0%, transparent 40%),
+    var(--background);
 }
 
 .hero-card-glow-soft {

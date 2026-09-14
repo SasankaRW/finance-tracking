@@ -298,7 +298,7 @@ export function TransactionTrendChart({
     <div className={cn("space-y-3 sm:space-y-4", className)}>
       {showSummary && (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
-          <div className="rounded-2xl border bg-card p-3 shadow-sm">
+          <div className="elevation-1 rounded-2xl border bg-card p-3">
             <div className="flex items-center justify-between gap-2">
               <span className="text-[11px] font-medium text-muted-foreground sm:text-xs">
                 Total income
@@ -315,7 +315,7 @@ export function TransactionTrendChart({
             </p>
           </div>
 
-          <div className="rounded-2xl border bg-card p-3 shadow-sm">
+          <div className="elevation-1 rounded-2xl border bg-card p-3">
             <div className="flex items-center justify-between gap-2">
               <span className="text-[11px] font-medium text-muted-foreground sm:text-xs">
                 Total expense
@@ -334,7 +334,7 @@ export function TransactionTrendChart({
 
           <div
             className={cn(
-              "col-span-2 rounded-2xl border bg-card p-3 shadow-sm sm:col-span-1",
+              "col-span-2 elevation-1 rounded-2xl border bg-card p-3 sm:col-span-1",
               netChange >= 0 ? "border-emerald-500/20" : "border-rose-500/20",
             )}
           >
@@ -429,7 +429,7 @@ export function TransactionTrendChart({
                   const data = payload[0].payload as ChartDataPoint;
                   return (
                     <div
-                      className="min-w-38 rounded-2xl border p-3 shadow-lg"
+                      className="min-w-38 elevation-2 rounded-2xl border p-3"
                       style={{
                         backgroundColor: theme.card,
                         borderColor: theme.border,

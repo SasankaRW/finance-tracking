@@ -32,6 +32,7 @@ import {
 } from "@/lib/finance/salary-mutations";
 import { useFxRates } from "@/lib/fx/use-fx-rates";
 import { formatCurrencyCode, formatMoney } from "@/lib/format";
+import { getCategoryIcon } from "@/lib/finance/category-icons";
 import { COMMON_CURRENCIES, HOME_CURRENCY } from "@/shared/currency";
 import { Badge } from "@/components/ui/badge";
 import { SettingsStatTile } from "@/app/app/settings/settings-stat-tile";
@@ -44,6 +45,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogBody,
@@ -744,8 +746,10 @@ export function SalaryPanel() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="py-12 text-center text-sm text-muted-foreground">
-              Loading salary sources...
+            <div className="grid gap-3 lg:grid-cols-2">
+              {[1, 2].map((i) => (
+                <Skeleton key={i} className="h-24 w-full rounded-3xl" />
+              ))}
             </div>
           ) : error ? (
             <div className="py-12 text-center text-sm text-destructive">
@@ -787,15 +791,17 @@ export function SalaryPanel() {
                 const keepModeNeedsMatchingAccount =
                   depositMode === "keep_salary_currency" && currency !== accountCurrency;
 
+                const SourceIcon = category ? getCategoryIcon(category) : Wallet;
+
                 return (
                   <div
                     key={salary.id}
-                    className={`motion-expressive press-expressive rounded-3xl border bg-card/80 p-4 shadow-sm ${isPaused ? "opacity-70" : ""}`}
+                    className={`motion-expressive press-expressive elevation-1 rounded-3xl border bg-card/80 p-4 ${isPaused ? "opacity-70" : ""}`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex min-w-0 items-start gap-3">
                         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/10">
-                          <Wallet className="h-5 w-5 text-emerald-600" />
+                          <SourceIcon className="h-5 w-5 text-emerald-600" />
                         </div>
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">

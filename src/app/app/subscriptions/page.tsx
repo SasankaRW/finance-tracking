@@ -634,7 +634,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 divide-x divide-y divide-border/60 overflow-hidden rounded-[2rem] bg-card shadow-sm sm:grid-cols-4 sm:divide-y-0">
+      <div className="elevation-1 grid grid-cols-2 divide-x divide-y divide-border/60 overflow-hidden rounded-[2rem] bg-card sm:grid-cols-4 sm:divide-y-0">
         <div className="p-3 sm:p-4">
           <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
             <Repeat className="h-3.5 w-3.5 text-primary" />
@@ -675,7 +675,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
       </div>
 
       {/* Monthly Bills Table */}
-      <Card className="surface-tonal shadow-sm">
+      <Card className="surface-tonal">
         <CardHeader className="p-4 pb-2 sm:p-6 sm:pb-2">
           <CardTitle className="text-base">Monthly Bills</CardTitle>
           <CardDescription>Manage subscriptions and loan payments</CardDescription>
@@ -693,7 +693,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
             ) : subscriptions.length ? (
               billRows.map(({ s, nextDue, acct, cat, cur, dueInfo, isPaused, isLoan, isCompleted, loanProgress, KindIcon }) => {
                 return (
-                  <Card key={s.id} className={`surface-container-high py-0 shadow-sm ${isPaused ? "opacity-70" : ""}`}>
+                  <Card key={s.id} className={`surface-container-high py-0 ${isPaused ? "opacity-70" : ""}`}>
                     <CardContent className="space-y-4 p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex min-w-0 items-start gap-3">

@@ -38,13 +38,23 @@ const DialogOverlay = React.forwardRef<
     ref={ref}
     data-slot="dialog-overlay"
     className={cn(
-      "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/60 backdrop-blur-sm",
+      // No backdrop-blur here: animating opacity on a blurred layer forces a
+      // full re-blur every frame, which is what made this feel janky on
+      // mobile WebView — a plain dim is instant to composite either way.
+      "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/65 duration-200 ease-ios",
       className
     )}
     {...props}
   />
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
+
+// Drag-to-dismiss thresholds for the grabber below. Below sm, every dialog is
+// a bottom sheet, so this lives in the shared primitive rather than being
+// reimplemented per dialog.
+const DRAG_DISMISS_PX = 110
+const DRAG_DISMISS_VELOCITY = 0.6 // px/ms
+const DRAG_FLING_MS = 220
 
 function DialogContent({
   className,
@@ -54,17 +64,82 @@ function DialogContent({
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
+  const hiddenCloseRef = React.useRef<HTMLButtonElement>(null)
+  const dragStateRef = React.useRef<{ startY: number; startTime: number } | null>(null)
+  const [dragY, setDragY] = React.useState(0)
+  const [flinging, setFlinging] = React.useState(false)
+
+  const onGrabberPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    dragStateRef.current = { startY: e.clientY, startTime: performance.now() }
+    setFlinging(false)
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+  }
+
+  const onGrabberPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragStateRef.current) return
+    setDragY(Math.max(0, e.clientY - dragStateRef.current.startY))
+  }
+
+  const endGrabberDrag = () => {
+    const state = dragStateRef.current
+    dragStateRef.current = null
+    if (!state) return
+
+    const elapsed = Math.max(1, performance.now() - state.startTime)
+    const velocity = dragY / elapsed
+
+    if (dragY > DRAG_DISMISS_PX || velocity > DRAG_DISMISS_VELOCITY) {
+      // Finish the gesture as a smooth fling off-screen, then let Radix
+      // actually close/unmount once that's done — driving the exit from the
+      // CSS animate-out classes instead would restart from their own keyframe
+      // values and visibly snap back to center first.
+      setFlinging(true)
+      setDragY(1200)
+      window.setTimeout(() => hiddenCloseRef.current?.click(), DRAG_FLING_MS)
+    } else {
+      setDragY(0)
+    }
+  }
+
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "surface-tonal data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom sm:data-[state=closed]:zoom-out-95 sm:data-[state=open]:zoom-in-95 sm:data-[state=closed]:slide-out-to-top-2 sm:data-[state=open]:slide-in-from-top-2 fixed bottom-0 left-[50%] z-50 grid max-h-[92dvh] w-full translate-x-[-50%] overflow-y-auto rounded-t-[2rem] border border-b-0 shadow-2xl duration-200 outline-none sm:top-[50%] sm:bottom-auto sm:max-h-[calc(100dvh-2rem)] sm:max-w-lg sm:translate-y-[-50%] sm:rounded-3xl sm:border",
+          // No will-change-transform: forcing a persistent GPU layer on a
+          // rounded + overflow-clipping element is exactly the combination
+          // that caused the hero card's corner-clip bug earlier this session.
+          // The drag-to-dismiss gesture below still transforms this element
+          // via inline style just fine without the hint declared up front.
+          "surface-tonal elevation-3 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom sm:data-[state=closed]:zoom-out-95 sm:data-[state=open]:zoom-in-95 sm:data-[state=closed]:slide-out-to-top-2 sm:data-[state=open]:slide-in-from-top-2 fixed bottom-0 left-[50%] z-50 grid max-h-[92dvh] w-full translate-x-[-50%] overflow-y-auto rounded-t-[2rem] border border-b-0 duration-[250ms] ease-ios outline-none sm:top-[50%] sm:bottom-auto sm:max-h-[calc(100dvh-2rem)] sm:max-w-lg sm:translate-y-[-50%] sm:rounded-3xl sm:border",
           className
         )}
+        style={
+          dragY > 0
+            ? {
+                transform: `translate(-50%, ${dragY}px)`,
+                transition: flinging
+                  ? `transform ${DRAG_FLING_MS}ms cubic-bezier(0.32, 0.72, 0, 1)`
+                  : "none",
+              }
+            : undefined
+        }
         {...props}
       >
+        {/* Drag handle: mobile-only (every dialog below sm is a bottom sheet).
+            Scoped to just this small bar, not the whole header, so it never
+            steals a drag from scrollable content or the close/title area. */}
+        <div
+          onPointerDown={onGrabberPointerDown}
+          onPointerMove={onGrabberPointerMove}
+          onPointerUp={endGrabberDrag}
+          onPointerCancel={endGrabberDrag}
+          className="flex shrink-0 touch-none cursor-grab justify-center pt-3 pb-1 active:cursor-grabbing sm:hidden"
+        >
+          <div className="h-1.5 w-10 rounded-full bg-muted-foreground/30" />
+        </div>
+
         {children}
         {showCloseButton && (
           <DialogPrimitive.Close
@@ -75,6 +150,9 @@ function DialogContent({
             <span className="sr-only">Close</span>
           </DialogPrimitive.Close>
         )}
+        {/* Always present regardless of showCloseButton — the fling-dismiss
+            above needs a Close to trigger programmatically. */}
+        <DialogPrimitive.Close ref={hiddenCloseRef} tabIndex={-1} aria-hidden="true" className="hidden" />
       </DialogPrimitive.Content>
     </DialogPortal>
   )

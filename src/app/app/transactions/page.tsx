@@ -4,7 +4,7 @@ import * as React from "react";
 import { useSearchParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subDays, subMonths } from "date-fns";
+import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subDays, subMonths, isToday, isYesterday } from "date-fns";
 import { toast } from "sonner";
 import {
   Download,
@@ -19,7 +19,6 @@ import {
   ArrowDownRight,
   Receipt,
   Plus,
-  Tag,
   Settings2,
   CalendarIcon,
   Search,
@@ -30,14 +29,14 @@ import { useAuth } from "@/lib/auth/auth-provider";
 import { useConfirm } from "@/components/confirm-dialog";
 import { RowActionsMenu } from "@/components/row-actions-menu";
 import { useAccounts, useCategories, useEvents, useTransactions } from "@/lib/finance/hooks";
-import {
-  deleteTransaction,
-  editTransaction,
-} from "@/lib/finance/mutations";
+import { editTransaction } from "@/lib/finance/mutations";
+import { useDeleteTransactionWithUndo } from "@/lib/finance/use-delete-transaction";
 import {
   createCategory,
   deleteCategory,
 } from "@/lib/finance/category-mutations";
+import { CategoryIconPicker, getCategoryIcon } from "@/lib/finance/category-icons";
+import { SwipeableRow } from "@/components/swipeable-row";
 import { formatCurrencyCode, formatMoney } from "@/lib/format";
 import { downloadTextFile, toCsv } from "@/lib/export/csv";
 import { transactionFormSchema, type TransactionFormValues } from "@/lib/finance/transaction-form-schema";
@@ -150,18 +149,50 @@ export default function TransactionsPage() {
     }
   }, [dateRangePreset, customDateRange]);
 
+  // Deep link from the dashboard category breakdown: /app/transactions?categoryId=<id>
+  const categoryParam = searchParams.get("categoryId");
   const [filters, setFilters] = React.useState<{
     accountId?: string;
     categoryId?: string;
     eventId?: string;
     noEvent?: boolean;
-  }>({});
+  }>(() => (categoryParam ? { categoryId: categoryParam } : {}));
+  const appliedCategoryParam = React.useRef(categoryParam);
+
+  React.useEffect(() => {
+    if (categoryParam === appliedCategoryParam.current) return;
+    appliedCategoryParam.current = categoryParam;
+    if (!categoryParam) return;
+    setFilters((f) => ({ ...f, categoryId: categoryParam }));
+  }, [categoryParam]);
+
+  // Arriving with a category already filtered (e.g. from the dashboard's
+  // breakdown) is pointless if the filtered results are still a full page
+  // scroll away — jump straight to the History section once layout settles.
+  const historyAnchorRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (!categoryParam) return;
+    const id = window.setTimeout(() => {
+      historyAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 350);
+    return () => window.clearTimeout(id);
+  }, [categoryParam]);
+
   const { transactions, loading } = useTransactions(filters);
+
+  const [mobileFiltersOpen, setMobileFiltersOpen] = React.useState(false);
+  const activeFilterCount = [
+    filters.accountId,
+    filters.categoryId,
+    filters.eventId || filters.noEvent,
+  ].filter(Boolean).length;
 
   const [edit, setEdit] = React.useState<any | null>(null);
   const [categoryDialogOpen, setCategoryDialogOpen] = React.useState(false);
   const [newCategoryName, setNewCategoryName] = React.useState("");
   const [newCategoryKind, setNewCategoryKind] = React.useState<"expense" | "income">("expense");
+  const [newCategoryIcon, setNewCategoryIcon] = React.useState<string | undefined>(undefined);
+  const [iconPickerOpen, setIconPickerOpen] = React.useState(false);
   const [isCreatingCategory, setIsCreatingCategory] = React.useState(false);
 
   const allCategories = React.useMemo(
@@ -180,9 +211,11 @@ export default function TransactionsPage() {
       await createCategory(user.uid, {
         kind: newCategoryKind,
         name: newCategoryName.trim(),
+        icon: newCategoryIcon,
       });
       toast.success("Category created");
       setNewCategoryName("");
+      setNewCategoryIcon(undefined);
     } catch (e) {
       toast.error("Failed to create category", {
         description: e instanceof Error ? e.message : undefined,
@@ -204,6 +237,10 @@ export default function TransactionsPage() {
       });
     }
   };
+
+  // Shared by both the mobile and desktop row menus, plus the swipe action on
+  // mobile rows.
+  const handleDeleteTransaction = useDeleteTransactionWithUndo();
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionFormSchema),
@@ -249,17 +286,22 @@ export default function TransactionsPage() {
     }
   }
 
-  const getTransactionIcon = (txKind: string) => {
-    switch (txKind) {
-      case "income":
-        return <ArrowUpRight className="h-4 w-4 text-emerald-600" />;
-      case "expense":
-        return <ArrowDownRight className="h-4 w-4 text-rose-600" />;
-      case "transfer":
-        return <ArrowLeftRight className="h-4 w-4 text-blue-600" />;
-      default:
-        return null;
+  // Uses the category's own icon for income/expense rows when one is set —
+  // falls back to the plain directional arrow for transfers (no category) and
+  // for anything left uncategorized.
+  const getTransactionIcon = (t: any) => {
+    if (t.kind === "transfer") return <ArrowLeftRight className="h-4 w-4 text-blue-600" />;
+    const colorClass = t.kind === "income" ? "text-emerald-600" : "text-rose-600";
+    const category = t.categoryId ? allCategories.find((c: any) => c.id === t.categoryId) : null;
+    if (category) {
+      const Icon = getCategoryIcon(category);
+      return <Icon className={`h-4 w-4 ${colorClass}`} />;
     }
+    return t.kind === "income" ? (
+      <ArrowUpRight className={`h-4 w-4 ${colorClass}`} />
+    ) : (
+      <ArrowDownRight className={`h-4 w-4 ${colorClass}`} />
+    );
   };
 
   // Apply client-side filtering for date range and search
@@ -340,20 +382,56 @@ export default function TransactionsPage() {
     };
   }, [filteredTransactions, usdToLkr]);
 
+  // Group the (already date-desc) list into day buckets for the compact mobile list.
+  const groupedTransactions = React.useMemo(() => {
+    const groups: Array<{ key: string; label: string; items: any[]; net: number }> = [];
+    let current: { key: string; label: string; items: any[]; net: number } | null = null;
+
+    for (const t of filteredTransactions as any[]) {
+      const date = t.occurredAt instanceof Timestamp ? t.occurredAt.toDate() : new Date(t.occurredAt);
+      const key = format(date, "yyyy-MM-dd");
+
+      if (!current || current.key !== key) {
+        current = {
+          key,
+          label: isToday(date)
+            ? "Today"
+            : isYesterday(date)
+              ? "Yesterday"
+              : format(date, "EEE, MMM d"),
+          items: [],
+          net: 0,
+        };
+        groups.push(current);
+      }
+
+      current.items.push(t);
+      if (t.kind === "income") current.net += t.amount ?? 0;
+      if (t.kind === "expense") current.net -= t.amount ?? 0;
+    }
+
+    return groups;
+  }, [filteredTransactions]);
+
   const hasFilters = filters.accountId || filters.categoryId || filters.eventId || filters.noEvent || debouncedSearch.trim() || dateRangePreset !== "month";
+  const clearAllFilters = () => {
+    setFilters({});
+    setSearchQuery("");
+    setDateRangePreset("month");
+  };
 
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
           <h1 className="font-display text-xl font-bold tracking-tight sm:text-2xl">Transactions</h1>
           <p className="mt-1 hidden text-sm text-muted-foreground sm:block">
             Track and manage your financial activity
           </p>
         </div>
 
-        <div className="grid grid-cols-[auto_auto_1fr] items-center gap-2 sm:flex">
+        <div className="flex shrink-0 items-center gap-2">
           <PasteMessageDialog
             trigger={
               <Button variant="outline" size="sm" className="h-10 rounded-xl px-3">
@@ -403,6 +481,12 @@ export default function TransactionsPage() {
             openOnMount={shouldOpenQuickAdd}
             openSignal={quickAddSignal}
             defaultKind={quickAddKind}
+            trigger={
+              <Button className="hidden md:inline-flex">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Transaction
+              </Button>
+            }
           />
         </div>
       </div>
@@ -459,7 +543,7 @@ export default function TransactionsPage() {
       </div>
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-2 divide-x divide-y divide-border/60 overflow-hidden rounded-[2rem] bg-card shadow-sm sm:grid-cols-4 sm:divide-y-0">
+      <div className="elevation-1 grid grid-cols-2 divide-x divide-y divide-border/60 overflow-hidden rounded-[2rem] bg-card sm:grid-cols-4 sm:divide-y-0">
         <div className="p-3 sm:p-4">
           <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
             <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
@@ -468,7 +552,7 @@ export default function TransactionsPage() {
           <p className="mt-2 truncate font-display text-lg font-bold tabular-nums text-emerald-600 sm:text-2xl">
             +{formatMoney(summaryStats.totalIncome)}
           </p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
+          <p className="mt-0.5 hidden text-[11px] text-muted-foreground sm:block">
             {summaryStats.incomeCount} transaction{summaryStats.incomeCount !== 1 ? "s" : ""}
           </p>
         </div>
@@ -481,7 +565,7 @@ export default function TransactionsPage() {
           <p className="mt-2 truncate font-display text-lg font-bold tabular-nums text-rose-600 sm:text-2xl">
             -{formatMoney(summaryStats.totalExpense)}
           </p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
+          <p className="mt-0.5 hidden text-[11px] text-muted-foreground sm:block">
             {summaryStats.expenseCount} transaction{summaryStats.expenseCount !== 1 ? "s" : ""}
           </p>
         </div>
@@ -494,7 +578,7 @@ export default function TransactionsPage() {
           <p className={`mt-2 truncate font-display text-lg font-bold tabular-nums sm:text-2xl ${summaryStats.netChange >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
             {summaryStats.netChange >= 0 ? "+" : ""}{formatMoney(summaryStats.netChange)}
           </p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
+          <p className="mt-0.5 hidden text-[11px] text-muted-foreground sm:block">
             {summaryStats.netChange >= 0 ? "Net savings" : "Net loss"}
           </p>
         </div>
@@ -505,7 +589,7 @@ export default function TransactionsPage() {
             Transfers
           </div>
           <p className="mt-2 font-display text-lg font-bold tabular-nums sm:text-2xl">{summaryStats.transferCount}</p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">between accounts</p>
+          <p className="mt-0.5 hidden text-[11px] text-muted-foreground sm:block">between accounts</p>
         </div>
       </div>
 
@@ -514,8 +598,8 @@ export default function TransactionsPage() {
         <CardHeader className="p-4 pb-2 sm:p-6 sm:pb-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <CardTitle className="text-base sm:text-lg">Transaction Trends</CardTitle>
-              <CardDescription className="text-xs sm:text-sm">
+              <CardTitle className="text-sm sm:text-lg">Transaction Trends</CardTitle>
+              <CardDescription className="hidden text-xs sm:block sm:text-sm">
                 Income vs expenses over time
               </CardDescription>
             </div>
@@ -632,31 +716,60 @@ export default function TransactionsPage() {
         />
       </div>
 
-      {/* Transactions Table */}
-      <Card className="surface-tonal gap-0 overflow-hidden py-0">
-        <CardHeader className="p-4 pb-3 sm:p-6">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
+      {/* Scroll target for the categoryId deep link — sits right above the History
+          card so scrollIntoView lands with the card's own heading visible. */}
+      <div ref={historyAnchorRef} />
+
+      {/* Transactions Table. Below md the card dissolves into a flat section header
+          (the day-grouped list renders after it, directly on the page) and the filter
+          selects tuck behind a toggle so the list stays the focus. */}
+      <Card className="surface-tonal gap-0 overflow-hidden py-0 max-md:bg-transparent! max-md:shadow-none!">
+        <CardHeader className="p-4 pb-3 max-md:px-1 max-md:pb-2 max-md:pt-0 sm:p-6">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="h-4 w-1 shrink-0 rounded-full bg-primary md:hidden" aria-hidden="true" />
               <CardTitle className="text-base sm:text-lg">History</CardTitle>
-              <CardDescription>
+              <span className="text-xs font-semibold tabular-nums text-muted-foreground md:hidden">
+                {summaryStats.total}
+              </span>
+              <CardDescription className="hidden md:block">
                 {summaryStats.total} total transaction{summaryStats.total !== 1 ? "s" : ""}
               </CardDescription>
             </div>
-            {hasFilters && (
-              <Button variant="ghost" size="sm" onClick={() => {
-                setFilters({});
-                setSearchQuery("");
-                setDateRangePreset("month");
-              }} className="h-8 shrink-0 px-2 text-xs">
-                <X className="h-4 w-4 mr-1" />
-                Clear
+            <div className="flex shrink-0 items-center gap-1">
+              {hasFilters && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={clearAllFilters}
+                  aria-label="Clear filters"
+                  className="h-8 w-8 shrink-0 rounded-full p-0 md:w-auto md:rounded-md md:px-2.5"
+                >
+                  <X className="h-4 w-4 md:mr-1" />
+                  <span className="hidden md:inline">Clear</span>
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant={activeFilterCount > 0 ? "default" : "outline"}
+                size="sm"
+                onClick={() => setMobileFiltersOpen((open) => !open)}
+                aria-expanded={mobileFiltersOpen}
+                className="h-8 shrink-0 rounded-full px-3 text-xs md:hidden"
+              >
+                <Filter className="h-3.5 w-3.5 mr-1" />
+                Filters{activeFilterCount > 0 ? ` · ${activeFilterCount}` : ""}
               </Button>
-            )}
+            </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-3 p-4 pt-0 sm:space-y-4 sm:p-6 sm:pt-0">
+        <CardContent className="space-y-3 p-4 pt-0 max-md:px-0 sm:space-y-4 sm:p-6 sm:pt-0">
           {/* Filters */}
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
+          <div
+            className={`grid-cols-2 gap-2 max-md:elevation-1 max-md:rounded-[1.5rem] max-md:bg-card max-md:p-3 sm:grid-cols-3 sm:gap-3 ${
+              mobileFiltersOpen ? "grid" : "hidden md:grid"
+            }`}
+          >
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground uppercase tracking-wider">
                 Account
@@ -731,38 +844,70 @@ export default function TransactionsPage() {
                     </DialogHeader>
                     <DialogBody className="space-y-4">
                       {/* Add new category */}
-                      <div className="flex gap-2">
-                        <Select
-                          value={newCategoryKind}
-                          onValueChange={(v) => setNewCategoryKind(v as "expense" | "income")}
-                        >
-                          <SelectTrigger className="w-[110px] h-10">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="expense">Expense</SelectItem>
-                            <SelectItem value="income">Income</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Input
-                          placeholder="Category name..."
-                          value={newCategoryName}
-                          onChange={(e) => setNewCategoryName(e.target.value)}
-                          className="h-10 flex-1"
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              handleCreateCategory();
-                            }
-                          }}
-                        />
-                        <Button
-                          onClick={handleCreateCategory}
-                          disabled={isCreatingCategory || !newCategoryName.trim()}
-                          className="h-10"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <Popover open={iconPickerOpen} onOpenChange={setIconPickerOpen}>
+                            <PopoverTrigger asChild>
+                              <button
+                                type="button"
+                                aria-label="Choose icon"
+                                className="motion-expressive press-expressive flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground"
+                              >
+                                {React.createElement(
+                                  getCategoryIcon({
+                                    name: newCategoryName,
+                                    kind: newCategoryKind,
+                                    icon: newCategoryIcon,
+                                  }),
+                                  { className: "h-4.5 w-4.5" },
+                                )}
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-3" align="start">
+                              <CategoryIconPicker
+                                value={newCategoryIcon}
+                                onChange={(key) => {
+                                  setNewCategoryIcon(key);
+                                  setIconPickerOpen(false);
+                                }}
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          <Input
+                            placeholder="Category name..."
+                            value={newCategoryName}
+                            onChange={(e) => setNewCategoryName(e.target.value)}
+                            className="h-10 flex-1"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                handleCreateCategory();
+                              }
+                            }}
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <Select
+                            value={newCategoryKind}
+                            onValueChange={(v) => setNewCategoryKind(v as "expense" | "income")}
+                          >
+                            <SelectTrigger className="h-10 flex-1">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="expense">Expense</SelectItem>
+                              <SelectItem value="income">Income</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            onClick={handleCreateCategory}
+                            disabled={isCreatingCategory || !newCategoryName.trim()}
+                            className="h-10"
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            Add
+                          </Button>
+                        </div>
                       </div>
 
                       {/* Category Lists */}
@@ -776,13 +921,15 @@ export default function TransactionsPage() {
                           </div>
                           <div className="space-y-1">
                             {expenseCats.length ? (
-                              expenseCats.map((c: any) => (
+                              expenseCats.map((c: any) => {
+                                const RowIcon = getCategoryIcon(c);
+                                return (
                                 <div
                                   key={c.id}
                                   className="flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-muted group"
                                 >
                                   <div className="flex items-center gap-2">
-                                    <Tag className="h-3.5 w-3.5 text-rose-600" />
+                                    <RowIcon className="h-3.5 w-3.5 text-rose-600" />
                                     <span className="text-sm">{c.name}</span>
                                   </div>
                                   <Button
@@ -794,7 +941,8 @@ export default function TransactionsPage() {
                                     <Trash2 className="h-3.5 w-3.5" />
                                   </Button>
                                 </div>
-                              ))
+                                );
+                              })
                             ) : (
                               <p className="text-xs text-muted-foreground py-2">No expense categories</p>
                             )}
@@ -810,13 +958,15 @@ export default function TransactionsPage() {
                           </div>
                           <div className="space-y-1">
                             {incomeCats.length ? (
-                              incomeCats.map((c: any) => (
+                              incomeCats.map((c: any) => {
+                                const RowIcon = getCategoryIcon(c);
+                                return (
                                 <div
                                   key={c.id}
                                   className="flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-muted group"
                                 >
                                   <div className="flex items-center gap-2">
-                                    <Tag className="h-3.5 w-3.5 text-emerald-600" />
+                                    <RowIcon className="h-3.5 w-3.5 text-emerald-600" />
                                     <span className="text-sm">{c.name}</span>
                                   </div>
                                   <Button
@@ -828,7 +978,8 @@ export default function TransactionsPage() {
                                     <Trash2 className="h-3.5 w-3.5" />
                                   </Button>
                                 </div>
-                              ))
+                                );
+                              })
                             ) : (
                               <p className="text-xs text-muted-foreground py-2">No income categories</p>
                             )}
@@ -863,144 +1014,6 @@ export default function TransactionsPage() {
             </div>
           </div>
         </CardContent>
-
-        {/* Mobile Card View */}
-        <div className="px-4 pb-4 md:hidden">
-          {loading ? (
-            <div className="rounded-2xl border border-dashed p-6 text-center text-muted-foreground">
-              Loading transactions…
-            </div>
-          ) : filteredTransactions.length ? (
-            <ul className="overflow-hidden rounded-[2rem] bg-card shadow-sm">
-              {(filteredTransactions as any[]).map((t, idx) => {
-                const occurredAt = t.occurredAt instanceof Timestamp ? t.occurredAt.toDate() : new Date();
-                const accountName = t.accountId ? accounts.find((a: any) => a.id === t.accountId)?.name : null;
-                const categoryName = t.categoryId
-                  ? allCategories.find((c: any) => c.id === t.categoryId)?.name
-                  : null;
-                const eventName = t.eventId ? eventById.get(t.eventId) ?? null : null;
-                const fromAccountName = t.fromAccountId
-                  ? accounts.find((a: any) => a.id === t.fromAccountId)?.name
-                  : null;
-                const toAccountName = t.toAccountId
-                  ? accounts.find((a: any) => a.id === t.toAccountId)?.name
-                  : null;
-
-                return (
-                  <li
-                    key={t.id}
-                    className={`motion-expressive flex items-center justify-between gap-3 px-4 py-3.5 transition-colors active:bg-muted/50 ${
-                      idx > 0 ? "border-t border-border/60" : ""
-                    }`}
-                  >
-                    {/* Left: Icon, Details, Meta */}
-                    <div className="flex min-w-0 flex-1 gap-3">
-                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl ${t.kind === "income"
-                          ? "bg-emerald-500/10"
-                          : t.kind === "expense"
-                            ? "bg-rose-500/10"
-                            : "bg-blue-500/10"
-                        }`}>
-                        {getTransactionIcon(t.kind)}
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        {t.note ? (
-                          <div className="truncate text-sm font-semibold">{t.note}</div>
-                        ) : (
-                          <div className="text-sm font-semibold capitalize text-muted-foreground">{t.kind}</div>
-                        )}
-                        <div className="mt-0.5 truncate text-xs text-muted-foreground">
-                          {t.kind === "transfer" ? (
-                            <span>{fromAccountName} → {toAccountName}</span>
-                          ) : (
-                            <span>
-                              {accountName}
-                              {categoryName && <span> · {categoryName}</span>}
-                              {eventName && <span> · {eventName}</span>}
-                            </span>
-                          )}
-                        </div>
-                        <div className="mt-1 text-[11px] text-muted-foreground">
-                          {format(occurredAt, "MMM d, HH:mm")}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Right: Amount & Actions */}
-                    <div className="flex shrink-0 items-center gap-1">
-                      <div className={`shrink-0 whitespace-nowrap text-sm font-bold tabular-nums ${t.kind === "income"
-                          ? "text-emerald-600"
-                          : t.kind === "expense"
-                            ? "text-rose-600"
-                            : ""
-                        }`}>
-                        {t.kind === "expense" ? "-" : t.kind === "income" ? "+" : ""}
-                        {formatMoney(t.amount ?? 0)}
-                      </div>
-
-                      <RowActionsMenu
-                        ariaLabel={`${t.note || t.kind} actions`}
-                        triggerClassName="rounded-full p-0 text-muted-foreground"
-                        actions={[
-                          {
-                            label: "Edit",
-                            icon: Pencil,
-                            onClick: () => {
-                              setEdit(t);
-                              form.reset({
-                                kind: t.kind,
-                                amount: t.amount ?? 0,
-                                occurredAt,
-                                note: t.note ?? "",
-                                accountId: t.accountId,
-                                categoryId: t.categoryId,
-                                eventId: t.eventId,
-                                fromAccountId: t.fromAccountId,
-                                toAccountId: t.toAccountId,
-                              });
-                            },
-                          },
-                          {
-                            label: "Delete",
-                            icon: Trash2,
-                            destructive: true,
-                            onClick: async () => {
-                              if (!user) return;
-                              if (!(await confirm({ title: "Delete this transaction?", destructive: true }))) return;
-                              try {
-                                await deleteTransaction(user.uid, t.id, t.updatedAt);
-                                toast.success("Transaction deleted");
-                              } catch (e) {
-                                toast.error("Failed to delete", {
-                                  description: e instanceof Error ? e.message : undefined,
-                                });
-                              }
-                            },
-                          },
-                        ]}
-                      />
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <div className="rounded-[2rem] border border-dashed px-4 py-12">
-              <div className="flex flex-col items-center gap-3 max-w-sm mx-auto text-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-                  <Receipt className="h-6 w-6 text-muted-foreground" />
-                </div>
-                <div>
-                  <p className="font-medium">No transactions found</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {hasFilters ? "Try clearing your filters" : "Add your first transaction"}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
 
         {/* Desktop Table View */}
         <div className="border-t hidden md:block">
@@ -1051,7 +1064,7 @@ export default function TransactionsPage() {
                               ? "bg-rose-500/10"
                               : "bg-blue-500/10"
                             }`}>
-                            {getTransactionIcon(t.kind)}
+                            {getTransactionIcon(t)}
                           </div>
                         </div>
                       </TableCell>
@@ -1113,18 +1126,7 @@ export default function TransactionsPage() {
                               label: "Delete",
                               icon: Trash2,
                               destructive: true,
-                              onClick: async () => {
-                                if (!user) return;
-                                if (!(await confirm({ title: "Delete this transaction?", destructive: true }))) return;
-                                try {
-                                  await deleteTransaction(user.uid, t.id, t.updatedAt);
-                                  toast.success("Transaction deleted");
-                                } catch (e) {
-                                  toast.error("Failed to delete", {
-                                    description: e instanceof Error ? e.message : undefined,
-                                  });
-                                }
-                              },
+                              onClick: () => void handleDeleteTransaction(t),
                             },
                           ]}
                         />
@@ -1145,6 +1147,21 @@ export default function TransactionsPage() {
                           {hasFilters ? "Try clearing your filters" : "Add your first transaction"}
                         </p>
                       </div>
+                      {hasFilters ? (
+                        <Button variant="outline" size="sm" onClick={clearAllFilters}>
+                          <X className="h-4 w-4 mr-1" />
+                          Clear filters
+                        </Button>
+                      ) : (
+                        <CreateTransactionDialog
+                          trigger={
+                            <Button size="sm">
+                              <Plus className="h-4 w-4 mr-1" />
+                              Add transaction
+                            </Button>
+                          }
+                        />
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -1153,6 +1170,181 @@ export default function TransactionsPage() {
           </Table>
         </div>
       </Card>
+
+      {/* Mobile Card View - grouped by day, two lines per row */}
+      <div className="md:hidden">
+        {loading ? (
+          <div className="rounded-2xl border border-dashed p-6 text-center text-muted-foreground">
+            Loading transactions…
+          </div>
+        ) : groupedTransactions.length ? (
+          <div className="space-y-3">
+            {groupedTransactions.map((group, gi) => (
+              <div key={group.key} className="animate-ios-in" style={{ animationDelay: `${Math.min(gi, 5) * 50}ms` }}>
+                <div className="flex items-baseline justify-between gap-3 px-3 pb-1.5">
+                  <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                    {group.label}
+                  </span>
+                  {group.net !== 0 && (
+                    <span
+                      className={`text-[11px] font-semibold tabular-nums ${
+                        group.net > 0
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : "text-muted-foreground"
+                      }`}
+                    >
+                      {group.net > 0 ? "+" : "-"}
+                      {formatMoney(Math.abs(group.net))}
+                    </span>
+                  )}
+                </div>
+
+                <ul className="elevation-1 overflow-hidden rounded-[1.5rem] bg-card">
+                  {group.items.map((t: any, idx: number) => {
+                    const occurredAt =
+                      t.occurredAt instanceof Timestamp ? t.occurredAt.toDate() : new Date();
+                    const accountName = t.accountId
+                      ? accounts.find((a: any) => a.id === t.accountId)?.name
+                      : null;
+                    const categoryName = t.categoryId
+                      ? allCategories.find((c: any) => c.id === t.categoryId)?.name
+                      : null;
+                    const eventName = t.eventId ? eventById.get(t.eventId) ?? null : null;
+                    const fromAccountName = t.fromAccountId
+                      ? accounts.find((a: any) => a.id === t.fromAccountId)?.name
+                      : null;
+                    const toAccountName = t.toAccountId
+                      ? accounts.find((a: any) => a.id === t.toAccountId)?.name
+                      : null;
+
+                    const title = t.note?.trim() || categoryName || t.kind;
+                    const meta = [
+                      format(occurredAt, "HH:mm"),
+                      t.kind === "transfer"
+                        ? `${fromAccountName ?? "—"} → ${toAccountName ?? "—"}`
+                        : accountName,
+                      categoryName && categoryName !== title ? categoryName : null,
+                      eventName,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ");
+
+                    const startEdit = () => {
+                      setEdit(t);
+                      form.reset({
+                        kind: t.kind,
+                        amount: t.amount ?? 0,
+                        occurredAt,
+                        note: t.note ?? "",
+                        accountId: t.accountId,
+                        categoryId: t.categoryId,
+                        eventId: t.eventId,
+                        fromAccountId: t.fromAccountId,
+                        toAccountId: t.toAccountId,
+                      });
+                    };
+
+                    return (
+                      <li key={t.id} className={idx > 0 ? "border-t border-border/50" : ""}>
+                        <SwipeableRow onEdit={startEdit} onDelete={() => void handleDeleteTransaction(t)}>
+                          <div className="motion-expressive flex items-center gap-2.5 px-3 py-2.5 transition-colors active:bg-muted/50">
+                            <div
+                              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
+                                t.kind === "income"
+                                  ? "bg-emerald-500/10"
+                                  : t.kind === "expense"
+                                    ? "bg-rose-500/10"
+                                    : "bg-blue-500/10"
+                              }`}
+                            >
+                              {getTransactionIcon(t)}
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                              <p
+                                className={`truncate text-sm font-semibold leading-tight ${
+                                  t.note?.trim() || categoryName ? "" : "capitalize text-muted-foreground"
+                                }`}
+                              >
+                                {title}
+                              </p>
+                              <p className="mt-0.5 truncate text-[11px] leading-tight text-muted-foreground">
+                                {meta}
+                              </p>
+                            </div>
+
+                            <div className="flex shrink-0 items-center gap-0.5">
+                              <span
+                                className={`whitespace-nowrap text-sm font-bold tabular-nums ${
+                                  t.kind === "income"
+                                    ? "text-emerald-600 dark:text-emerald-400"
+                                    : t.kind === "expense"
+                                      ? "text-rose-600 dark:text-rose-400"
+                                      : ""
+                                }`}
+                              >
+                                {t.kind === "expense" ? "-" : t.kind === "income" ? "+" : ""}
+                                {formatMoney(t.amount ?? 0)}
+                              </span>
+
+                              <RowActionsMenu
+                                ariaLabel={`${t.note || t.kind} actions`}
+                                triggerClassName="-mr-1 h-9 w-9 shrink-0 rounded-full p-0 text-muted-foreground"
+                                actions={[
+                                  {
+                                    label: "Edit",
+                                    icon: Pencil,
+                                    onClick: startEdit,
+                                  },
+                                  {
+                                    label: "Delete",
+                                    icon: Trash2,
+                                    destructive: true,
+                                    onClick: () => void handleDeleteTransaction(t),
+                                  },
+                                ]}
+                              />
+                            </div>
+                          </div>
+                        </SwipeableRow>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-[2rem] border border-dashed px-4 py-12">
+            <div className="flex flex-col items-center gap-3 max-w-sm mx-auto text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                <Receipt className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="font-medium">No transactions found</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {hasFilters ? "Try clearing your filters" : "Add your first transaction"}
+                </p>
+              </div>
+              {hasFilters ? (
+                <Button variant="outline" size="sm" onClick={clearAllFilters}>
+                  <X className="h-4 w-4 mr-1" />
+                  Clear filters
+                </Button>
+              ) : (
+                <CreateTransactionDialog
+                  trigger={
+                    <Button size="sm">
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add transaction
+                    </Button>
+                  }
+                />
+              )}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Edit Dialog */}
       <Dialog open={Boolean(edit)} onOpenChange={(v) => (!v ? setEdit(null) : v)}>

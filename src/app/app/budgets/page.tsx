@@ -35,6 +35,7 @@ import { createBudget, deleteBudget } from "@/lib/finance/budget-mutations";
 import { COMMON_CURRENCIES, DEFAULT_CURRENCY, HOME_CURRENCY } from "@/shared/currency";
 import { useFxRates } from "@/lib/fx/use-fx-rates";
 import { formatCurrencyCode, formatMoney } from "@/lib/format";
+import { getCategoryIcon } from "@/lib/finance/category-icons";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -205,11 +206,16 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
   const budgetRows = React.useMemo(() => {
     if (mode !== "monthly") return [];
 
-    const nameById = new Map(expenseCategories.map((c: any) => [c.id, c.name]));
+    const categoryById = new Map(expenseCategories.map((c: any) => [c.id, c]));
 
     return (budgets as any[]).map((b) => {
       const currency = formatCurrencyCode(b.currency ?? HOME_CURRENCY);
-      const scopeName = b.categoryId ? nameById.get(b.categoryId) ?? "Category" : "Overall";
+      const category = b.categoryId ? categoryById.get(b.categoryId) : null;
+      const scopeName = category?.name ?? (b.categoryId ? "Category" : "Overall");
+      // "Overall" (no category) keeps the Target icon — it's the one row that
+      // genuinely isn't a single category, so a generic goal icon is correct
+      // there rather than a mismatch.
+      const icon = category ? getCategoryIcon(category) : Target;
 
       let spentInBudgetCurrency = 0;
       let missingUsdRate = false;
@@ -239,6 +245,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
       return {
         ...b,
         scopeName,
+        icon,
         currency,
         spentInBudgetCurrency,
         remaining,
@@ -433,7 +440,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
 
       {/* Period Selector Tabs */}
       <Tabs value={mode} onValueChange={(v) => setMode(v as SummaryMode)} className="space-y-4 sm:space-y-6">
-        <Card className="surface-tonal py-3 shadow-sm sm:py-4">
+        <Card className="surface-tonal py-3 sm:py-4">
           <CardContent className="space-y-3 px-3 sm:px-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <TabsList className="grid w-full grid-cols-4 sm:w-fit">
@@ -481,7 +488,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
 
         {/* Summary Cards */}
         <TabsContent value={mode} className="mt-0">
-          <div className="grid grid-cols-2 divide-x divide-y divide-border/60 overflow-hidden rounded-[2rem] bg-card shadow-sm sm:grid-cols-4 sm:divide-y-0">
+          <div className="elevation-1 grid grid-cols-2 divide-x divide-y divide-border/60 overflow-hidden rounded-[2rem] bg-card sm:grid-cols-4 sm:divide-y-0">
             <div className="p-3 sm:p-4">
               <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
                 <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
@@ -551,7 +558,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
 
       {/* Budgets Table - Only in Monthly View */}
       {mode === "monthly" && (
-        <Card className="surface-tonal shadow-sm">
+        <Card className="surface-tonal">
           <CardHeader className="p-4 pb-2 sm:p-6 sm:pb-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -580,13 +587,13 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
                   const tone = budgetTone(b);
 
                   return (
-                    <Card key={b.id} className="surface-container-high py-0 shadow-sm">
+                    <Card key={b.id} className="surface-container-high py-0">
                       <CardContent className="space-y-4 p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
                               <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl ${tone.iconBgClass}`}>
-                                <Target className={`h-4 w-4 ${tone.textClass}`} />
+                                <b.icon className={`h-4 w-4 ${tone.textClass}`} />
                               </div>
                               <div className="min-w-0">
                                 <p className="truncate font-semibold">{b.scopeName}</p>
@@ -700,7 +707,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
                         <TableCell className="pl-6">
                           <div className="flex items-center gap-3">
                             <div className={`flex h-10 w-10 items-center justify-center rounded-2xl ${tone.iconBgClass}`}>
-                              <Target className={`h-4 w-4 ${tone.textClass}`} />
+                              <b.icon className={`h-4 w-4 ${tone.textClass}`} />
                             </div>
                             <div>
                               <div className="font-medium">{b.scopeName}</div>

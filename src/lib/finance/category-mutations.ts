@@ -7,6 +7,7 @@ import { newId } from "@/shared/ids";
 const createCategoryInputSchema = z.object({
   kind: z.enum(["income", "expense"]),
   name: z.string().min(1).max(48),
+  icon: z.string().max(32).optional(),
 });
 
 export async function createCategory(
@@ -24,6 +25,7 @@ export async function createCategory(
       id,
       kind: values.kind,
       name: values.name,
+      ...(values.icon ? { icon: values.icon } : {}),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
@@ -35,6 +37,9 @@ export async function createCategory(
 const renameCategoryInputSchema = z.object({
   categoryId: z.string().min(1),
   name: z.string().min(1).max(48),
+  // Present only when the caller means to change it — omitted, an existing
+  // icon is left alone; this is distinct from "" which would mean "clear it".
+  icon: z.string().max(32).optional(),
 });
 
 export async function renameCategory(
@@ -50,6 +55,7 @@ export async function renameCategory(
     if (!snap.exists()) throw new Error("Category not found");
     tx.update(ref, {
       name: values.name,
+      ...(values.icon !== undefined ? { icon: values.icon } : {}),
       updatedAt: serverTimestamp(),
     });
   });

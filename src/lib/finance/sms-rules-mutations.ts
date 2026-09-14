@@ -4,19 +4,33 @@ import { getFirebaseDb } from "@/lib/firebase/client";
 import { accountDoc, smsRuleDoc } from "@/lib/firestore/refs";
 import { newId } from "@/shared/ids";
 
-const smsRuleInputSchema = z.object({
-  label: z.string().min(1).max(64),
-  senderMatch: z.string().min(1).max(32),
-  accountId: z.string().min(1),
-  kind: z.enum(["income", "expense"]),
-  pattern: z.string().min(1).max(500),
-  noteTemplate: z.string().max(200).optional(),
-});
+const smsRuleInputSchema = z
+  .object({
+    label: z.string().min(1).max(64),
+    senderMatch: z.string().min(1).max(32),
+    // For income/expense: the affected account. For transfer: the "from" account.
+    accountId: z.string().min(1),
+    kind: z.enum(["income", "expense", "transfer"]),
+    // Required (and must differ from accountId) when kind === "transfer".
+    toAccountId: z.string().min(1).optional(),
+    pattern: z.string().min(1).max(500),
+    noteTemplate: z.string().max(200).optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.kind !== "transfer") return;
+    if (!v.toAccountId) {
+      ctx.addIssue({ code: "custom", path: ["toAccountId"], message: "Pick a destination account" });
+    } else if (v.toAccountId === v.accountId) {
+      ctx.addIssue({ code: "custom", path: ["toAccountId"], message: "Must differ from the from-account" });
+    }
+  });
 
-const updateSmsRuleInputSchema = smsRuleInputSchema.extend({
-  ruleId: z.string().min(1),
-  enabled: z.boolean(),
-});
+const updateSmsRuleInputSchema = smsRuleInputSchema.and(
+  z.object({
+    ruleId: z.string().min(1),
+    enabled: z.boolean(),
+  }),
+);
 
 export async function createSmsRule(
   uid: string,
@@ -30,6 +44,10 @@ export async function createSmsRule(
   await runTransaction(db, async (tx) => {
     const aSnap = await tx.get(accountDoc(uid, values.accountId));
     if (!aSnap.exists()) throw new Error("Account not found");
+    if (values.kind === "transfer") {
+      const toSnap = await tx.get(accountDoc(uid, values.toAccountId!));
+      if (!toSnap.exists()) throw new Error("Destination account not found");
+    }
 
     tx.set(ref, {
       schemaVersion: 1,
@@ -38,6 +56,7 @@ export async function createSmsRule(
       senderMatch: values.senderMatch,
       accountId: values.accountId,
       kind: values.kind,
+      ...(values.kind === "transfer" ? { toAccountId: values.toAccountId } : {}),
       pattern: values.pattern,
       ...(values.noteTemplate ? { noteTemplate: values.noteTemplate } : {}),
       enabled: true,
@@ -62,12 +81,17 @@ export async function updateSmsRule(
     if (!snap.exists()) throw new Error("Rule not found");
     const aSnap = await tx.get(accountDoc(uid, values.accountId));
     if (!aSnap.exists()) throw new Error("Account not found");
+    if (values.kind === "transfer") {
+      const toSnap = await tx.get(accountDoc(uid, values.toAccountId!));
+      if (!toSnap.exists()) throw new Error("Destination account not found");
+    }
 
     tx.update(ref, {
       label: values.label,
       senderMatch: values.senderMatch,
       accountId: values.accountId,
       kind: values.kind,
+      toAccountId: values.kind === "transfer" ? values.toAccountId : null,
       pattern: values.pattern,
       noteTemplate: values.noteTemplate ?? "",
       enabled: values.enabled,

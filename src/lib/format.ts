@@ -13,6 +13,17 @@ export function formatCurrencyCode(code: string | undefined) {
   return (code ?? DEFAULT_CURRENCY).toUpperCase();
 }
 
+// "LKR 1.2M" instead of "LKR 1,234,567" — used once an amount gets long enough
+// that showing every digit would force the text to shrink or clip instead.
+export function formatMoneyCompact(amount: number, currency: string = DEFAULT_CURRENCY) {
+  return new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency,
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(amount);
+}
+
 export function getCurrencySymbol(currency: string = DEFAULT_CURRENCY) {
   try {
     const part = new Intl.NumberFormat(undefined, {

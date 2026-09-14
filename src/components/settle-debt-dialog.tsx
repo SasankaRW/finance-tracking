@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { useAccounts } from "@/lib/finance/hooks";
 import { settleDebt } from "@/lib/finance/debt-mutations";
+import { hapticError, hapticSuccess } from "@/lib/haptics";
 import { formatCurrencyCode, formatMoney } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import {
@@ -55,11 +56,13 @@ export function SettleDebtDialog({
     setSaving(true);
     try {
       await settleDebt(user.uid, debt.id, accountId);
+      void hapticSuccess();
       toast.success(
         isReceivable ? `Added to your balance` : `Marked as paid`,
       );
       onOpenChange(false);
     } catch (err) {
+      void hapticError();
       toast.error("Couldn't settle this tracker", {
         description: err instanceof Error ? err.message : undefined,
       });

@@ -155,7 +155,14 @@ export function resolveOccurredAt(fields: ParsedSmsFields, receivedAt: Date): Da
 }
 
 export function applyNoteTemplate(noteTemplate: string | undefined, fields: ParsedSmsFields, fallback: string) {
-  if (!noteTemplate) return fallback.slice(0, 280);
+  if (!noteTemplate) {
+    // No template configured for this rule: prefer the merchant/desc field the
+    // pattern already captured over dumping the entire raw SMS as the note —
+    // "POS/ATM Transaction Rs 498.00 From A/C ...1234 To XYZ MART Avl Bal ..."
+    // becomes "XYZ MART" whenever the rule's pattern captures it, and only
+    // falls back to the raw message when nothing was captured at all.
+    return (fields.merchant ?? fallback).slice(0, 280);
+  }
   const filled = noteTemplate
     .replace(/\{amount\}/gi, fields.amount != null ? String(fields.amount) : "")
     .replace(/\{balance\}/gi, fields.balance != null ? String(fields.balance) : "")

@@ -19,6 +19,7 @@ import { useAuth } from "@/lib/auth/auth-provider";
 import { useConfirm } from "@/components/confirm-dialog";
 import { RowActionsMenu } from "@/components/row-actions-menu";
 import { useAccounts } from "@/lib/finance/hooks";
+import { useScreenSecurity } from "@/lib/screen-security";
 import { createAccount } from "@/lib/finance/mutations";
 import { updateAccount, deleteAccount } from "@/lib/finance/account-mutations";
 import { formatCurrencyCode, formatMoney } from "@/lib/format";
@@ -183,6 +184,11 @@ const getAccountIcon = (type: string) => {
 };
 
 export function AccountsPanel() {
+  // Account balances are the most sensitive numbers in the app — block
+  // screenshots/recording and blank the recents thumbnail only while this
+  // panel is actually on screen.
+  useScreenSecurity(true);
+
   const { user } = useAuth();
   const confirm = useConfirm();
   const { accounts, loading } = useAccounts();

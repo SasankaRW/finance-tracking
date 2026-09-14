@@ -4,6 +4,7 @@ import * as React from "react";
 import { toast } from "sonner";
 import {
   ArrowDownRight,
+  ArrowLeftRight,
   ArrowUpRight,
   CheckCircle2,
   MessageSquareText,
@@ -66,6 +67,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 
 const TOKEN_BUTTONS = [
@@ -87,10 +89,17 @@ const PRESETS = [
   },
   {
     key: "pos-atm",
-    label: "Card / ATM withdrawal",
-    kind: "expense" as const,
+    label: "ATM cash withdrawal",
+    kind: "transfer" as const,
     pattern:
       "POS/ATM Transaction Rs {amount} From A/C No {account}. Balance available Rs {balance} - Thank you for banking with BOC",
+  },
+  {
+    key: "online-transfer-debit",
+    label: "Online transfer sent",
+    kind: "expense" as const,
+    pattern:
+      "Online Transfer Debit Rs {amount} From A/C No {account}. Balance available Rs {balance} - Thank you for banking with BOC",
   },
   {
     key: "transfer-out",
@@ -111,7 +120,8 @@ type RuleFormState = {
   label: string;
   senderMatch: string;
   accountId: string;
-  kind: "income" | "expense";
+  kind: "income" | "expense" | "transfer";
+  toAccountId: string;
   pattern: string;
   noteTemplate: string;
 };
@@ -121,6 +131,7 @@ const EMPTY_FORM: RuleFormState = {
   senderMatch: "",
   accountId: "",
   kind: "expense",
+  toAccountId: "",
   pattern: "",
   noteTemplate: "",
 };
@@ -187,20 +198,39 @@ function RuleFormFields({
         </div>
         <div className="space-y-2">
           <Label className="text-xs text-muted-foreground uppercase tracking-wider">
-            Account
+            {value.kind === "transfer" ? "From Account" : "Account"}
           </Label>
           <AccountSelect
             accounts={accounts}
             value={value.accountId}
             onChange={(id) => onChange({ accountId: id })}
             label="Account"
+            excludeId={value.kind === "transfer" ? value.toAccountId : undefined}
           />
         </div>
       </div>
 
+      {value.kind === "transfer" && (
+        <div className="space-y-2">
+          <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+            To Account
+          </Label>
+          <AccountSelect
+            accounts={accounts}
+            value={value.toAccountId}
+            onChange={(id) => onChange({ toAccountId: id })}
+            label="To Account"
+            excludeId={value.accountId}
+          />
+          <p className="text-xs text-muted-foreground">
+            Where the money ends up — e.g. Cash for an ATM withdrawal.
+          </p>
+        </div>
+      )}
+
       <div className="space-y-2">
         <Label className="text-xs text-muted-foreground uppercase tracking-wider">Type</Label>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => onChange({ kind: "expense" })}
@@ -220,6 +250,16 @@ function RuleFormFields({
           >
             <ArrowUpRight className="h-3.5 w-3.5" />
             Income
+          </button>
+          <button
+            type="button"
+            onClick={() => onChange({ kind: "transfer" })}
+            className={`motion-expressive press-expressive inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition-all ${
+              value.kind === "transfer" ? "bg-sky-200/90 text-sky-900" : "bg-muted text-muted-foreground"
+            }`}
+          >
+            <ArrowLeftRight className="h-3.5 w-3.5" />
+            Transfer
           </button>
         </div>
       </div>
@@ -388,6 +428,10 @@ export function SmsRulesPanel() {
       toast.error("Fill in label, sender, account, and pattern");
       return;
     }
+    if (createForm.kind === "transfer" && (!createForm.toAccountId || createForm.toAccountId === createForm.accountId)) {
+      toast.error("Pick a destination account", { description: "It must differ from the from-account." });
+      return;
+    }
     setSubmitting(true);
     try {
       await createSmsRule(user.uid, {
@@ -395,6 +439,7 @@ export function SmsRulesPanel() {
         senderMatch: createForm.senderMatch.trim(),
         accountId: createForm.accountId,
         kind: createForm.kind,
+        ...(createForm.kind === "transfer" ? { toAccountId: createForm.toAccountId } : {}),
         pattern: createForm.pattern.trim(),
         noteTemplate: createForm.noteTemplate.trim() || undefined,
       });
@@ -416,6 +461,10 @@ export function SmsRulesPanel() {
       toast.error("Fill in label, sender, account, and pattern");
       return;
     }
+    if (editForm.kind === "transfer" && (!editForm.toAccountId || editForm.toAccountId === editForm.accountId)) {
+      toast.error("Pick a destination account", { description: "It must differ from the from-account." });
+      return;
+    }
     setSubmitting(true);
     try {
       await updateSmsRule(user.uid, {
@@ -424,6 +473,7 @@ export function SmsRulesPanel() {
         senderMatch: editForm.senderMatch.trim(),
         accountId: editForm.accountId,
         kind: editForm.kind,
+        ...(editForm.kind === "transfer" ? { toAccountId: editForm.toAccountId } : {}),
         pattern: editForm.pattern.trim(),
         noteTemplate: editForm.noteTemplate.trim() || undefined,
         enabled: edit.enabled,
@@ -457,20 +507,32 @@ export function SmsRulesPanel() {
       });
       return;
     }
+    const cashAccountId = (accounts as any[]).find((a) => a.type === "cash")?.id;
+    const toCreate = missing.filter((preset) => preset.kind !== "transfer" || cashAccountId);
+    const skippedForCash = missing.length - toCreate.length;
+
     setAddingDefaults(true);
     try {
-      for (const preset of missing) {
+      for (const preset of toCreate) {
         await createSmsRule(user.uid, {
           label: preset.label,
           senderMatch: "BOC",
           accountId: defaultAccountId,
           kind: preset.kind,
+          ...(preset.kind === "transfer" ? { toAccountId: cashAccountId } : {}),
           pattern: preset.pattern,
         });
       }
-      toast.success(`Added ${missing.length} default rule${missing.length !== 1 ? "s" : ""}`, {
-        description: "Edit any rule to change its sender or account.",
-      });
+      if (toCreate.length > 0) {
+        toast.success(`Added ${toCreate.length} default rule${toCreate.length !== 1 ? "s" : ""}`, {
+          description: "Edit any rule to change its sender or account.",
+        });
+      }
+      if (skippedForCash > 0) {
+        toast.info(`Skipped ${skippedForCash} rule${skippedForCash !== 1 ? "s" : ""} needing a Cash account`, {
+          description: "Add a Cash account, then tap this again.",
+        });
+      }
     } catch (e) {
       toast.error("Failed to add default rules", {
         description: e instanceof Error ? e.message : undefined,
@@ -563,7 +625,11 @@ export function SmsRulesPanel() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="py-12 text-center text-sm text-muted-foreground">Loading rules...</div>
+            <div className="grid gap-3 lg:grid-cols-2">
+              {[1, 2].map((i) => (
+                <Skeleton key={i} className="h-24 w-full rounded-3xl" />
+              ))}
+            </div>
           ) : error ? (
             <div className="py-12 text-center text-sm text-destructive">
               Failed to load rules{error?.message ? `: ${error.message}` : ""}
@@ -572,31 +638,38 @@ export function SmsRulesPanel() {
             <div className="grid gap-3 lg:grid-cols-2">
               {(smsRules as any[]).map((rule) => {
                 const account = accountById.get(rule.accountId);
+                const toAccount = rule.toAccountId ? accountById.get(rule.toAccountId) : null;
                 const isIncome = rule.kind === "income";
-                const Icon = isIncome ? ArrowUpRight : ArrowDownRight;
+                const isTransfer = rule.kind === "transfer";
+                const Icon = isTransfer ? ArrowLeftRight : isIncome ? ArrowUpRight : ArrowDownRight;
                 const isDisabled = !rule.enabled;
 
                 return (
                   <div
                     key={rule.id}
-                    className={`motion-expressive press-expressive rounded-3xl border bg-card/80 p-4 shadow-sm ${isDisabled ? "opacity-70" : ""}`}
+                    className={`motion-expressive press-expressive elevation-1 min-w-0 rounded-3xl border bg-card/80 p-4 ${isDisabled ? "opacity-70" : ""}`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex min-w-0 items-start gap-3">
                         <div
                           className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
-                            isIncome ? "bg-emerald-500/10" : "bg-rose-500/10"
+                            isTransfer ? "bg-sky-500/10" : isIncome ? "bg-emerald-500/10" : "bg-rose-500/10"
                           }`}
                         >
-                          <Icon className={`h-5 w-5 ${isIncome ? "text-emerald-600" : "text-rose-600"}`} />
+                          <Icon
+                            className={`h-5 w-5 ${isTransfer ? "text-sky-600" : isIncome ? "text-emerald-600" : "text-rose-600"}`}
+                          />
                         </div>
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <h3 className="truncate font-semibold">{rule.label}</h3>
                             {isDisabled && <Badge variant="secondary">Disabled</Badge>}
                           </div>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            From &ldquo;{rule.senderMatch}&rdquo; · {account?.name ?? "No account"}
+                          <p className="mt-1 truncate text-xs text-muted-foreground">
+                            From &ldquo;{rule.senderMatch}&rdquo; ·{" "}
+                            {isTransfer
+                              ? `${account?.name ?? "No account"} → ${toAccount?.name ?? "No account"}`
+                              : (account?.name ?? "No account")}
                           </p>
                         </div>
                       </div>
@@ -615,7 +688,11 @@ export function SmsRulesPanel() {
                                 label: rule.label ?? "",
                                 senderMatch: rule.senderMatch ?? "",
                                 accountId: rule.accountId ?? "",
-                                kind: rule.kind === "income" ? "income" : "expense",
+                                kind:
+                                  rule.kind === "income" || rule.kind === "transfer"
+                                    ? rule.kind
+                                    : "expense",
+                                toAccountId: rule.toAccountId ?? "",
                                 pattern: rule.pattern ?? "",
                                 noteTemplate: rule.noteTemplate ?? "",
                               });

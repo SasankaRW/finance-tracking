@@ -56,6 +56,9 @@ export const categoryDocSchema = z.object({
   id: z.string().min(1),
   kind: categoryKindSchema,
   name: z.string().min(1).max(48),
+  // Key into CATEGORY_ICONS (src/lib/finance/category-icons.tsx). Optional —
+  // categories created before this existed fall back to a name-based default.
+  icon: z.string().max(32).optional(),
   createdAt: firestoreTimestampLikeSchema,
   updatedAt: firestoreTimestampLikeSchema,
 });
@@ -211,7 +214,11 @@ export const smsRuleDocSchema = z.object({
   label: z.string().min(1).max(64),
   senderMatch: z.string().min(1).max(32),
   accountId: z.string().min(1),
-  kind: z.enum(["income", "expense"]),
+  kind: z.enum(["income", "expense", "transfer"]),
+  // Only present when kind === "transfer": accountId is the "from" account,
+  // toAccountId the "to" account money lands in (e.g. an ATM withdrawal
+  // moving money from a bank account into Cash).
+  toAccountId: z.string().min(1).optional(),
   pattern: z.string().min(1).max(500),
   noteTemplate: z.string().max(200).optional(),
   enabled: z.boolean(),
@@ -232,7 +239,9 @@ export const pendingImportDocSchema = z.object({
   receivedAt: firestoreTimestampLikeSchema,
   matchedRuleId: z.string().min(1).optional(),
   accountId: z.string().min(1).optional(),
-  kind: z.enum(["income", "expense"]).optional(),
+  kind: z.enum(["income", "expense", "transfer"]).optional(),
+  // Only present when kind === "transfer" (see smsRuleDocSchema.toAccountId).
+  toAccountId: z.string().min(1).optional(),
   amount: z.number().positive().finite().optional(),
   occurredAt: firestoreTimestampLikeSchema.optional(),
   suggestedNote: z.string().max(280).optional(),

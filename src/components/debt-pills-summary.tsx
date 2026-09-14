@@ -7,7 +7,7 @@ import { ArrowDownLeft, ArrowUpRight, Check, HandCoins } from "lucide-react";
 import { useDebts } from "@/lib/finance/hooks";
 import { formatCurrencyCode, formatMoney } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CollapsiblePanel } from "@/components/collapsible-panel";
 import { SettleDebtDialog } from "@/components/settle-debt-dialog";
 
 function toDate(value: unknown) {
@@ -40,45 +40,29 @@ export function DebtPillsSummary() {
   if (loading || activeDebts.length === 0) return null;
 
   return (
-    <Card className="surface-tonal py-3 shadow-sm sm:py-4">
-      <CardHeader className="px-3 pb-2 sm:px-4">
-        <div className="flex items-center justify-between gap-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <HandCoins className="h-4 w-4 text-primary" />
-            Borrowed Money
-          </CardTitle>
-          <div className="hidden flex-wrap gap-2 sm:flex">
+    <>
+      <CollapsiblePanel
+        storageKey="cashly:borrowed-money-expanded:v1"
+        icon={<HandCoins className="h-4 w-4" />}
+        iconClassName="bg-primary/12 text-primary"
+        title="Borrowed"
+        summary={
+          <>
             {totals.owedToMe > 0 && (
-              <Badge variant="secondary" className="rounded-full">
-                <ArrowDownLeft className="h-3.5 w-3.5 mr-1 text-emerald-600" />
-                Owes me {formatMoney(totals.owedToMe)}
-              </Badge>
+              <span className="flex items-center gap-1 rounded-full bg-emerald-500/12 px-2 py-0.5 text-xs font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">
+                <ArrowDownLeft className="h-3 w-3" />
+                {formatMoney(totals.owedToMe)}
+              </span>
             )}
             {totals.iOwe > 0 && (
-              <Badge variant="outline" className="rounded-full">
-                <ArrowUpRight className="h-3.5 w-3.5 mr-1 text-rose-600" />
-                I owe {formatMoney(totals.iOwe)}
-              </Badge>
+              <span className="flex items-center gap-1 rounded-full bg-rose-500/12 px-2 py-0.5 text-xs font-semibold tabular-nums text-rose-700 dark:text-rose-300">
+                <ArrowUpRight className="h-3 w-3" />
+                {formatMoney(totals.iOwe)}
+              </span>
             )}
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3 px-3 sm:px-4">
-        <div className="flex flex-wrap gap-2 sm:hidden">
-          {totals.owedToMe > 0 && (
-            <Badge variant="secondary" className="rounded-full">
-              <ArrowDownLeft className="h-3.5 w-3.5 mr-1 text-emerald-600" />
-              Owes me {formatMoney(totals.owedToMe)}
-            </Badge>
-          )}
-          {totals.iOwe > 0 && (
-            <Badge variant="outline" className="rounded-full">
-              <ArrowUpRight className="h-3.5 w-3.5 mr-1 text-rose-600" />
-              I owe {formatMoney(totals.iOwe)}
-            </Badge>
-          )}
-        </div>
-
+          </>
+        }
+      >
         <div className="flex flex-wrap gap-2">
           {activeDebts.slice(0, 8).map((debt: any) => {
             const isReceivable = debt.direction === "owed_to_me";
@@ -88,7 +72,7 @@ export function DebtPillsSummary() {
             return (
               <div
                 key={debt.id}
-                className={`flex max-w-full items-center gap-2 rounded-full border py-2 pl-3 pr-2 text-sm shadow-sm ${
+                className={`flex max-w-full items-center gap-2 rounded-full border py-1.5 pl-3 pr-1.5 text-sm ${
                   isReceivable
                     ? "bg-emerald-500/10 border-emerald-500/20"
                     : "bg-rose-500/10 border-rose-500/20"
@@ -119,12 +103,12 @@ export function DebtPillsSummary() {
             );
           })}
           {activeDebts.length > 8 && (
-            <Badge variant="outline" className="rounded-full px-3 py-2">
+            <Badge variant="outline" className="rounded-full px-3 py-1.5">
               +{activeDebts.length - 8} more
             </Badge>
           )}
         </div>
-      </CardContent>
+      </CollapsiblePanel>
 
       <SettleDebtDialog
         debt={settlingDebt}
@@ -133,6 +117,6 @@ export function DebtPillsSummary() {
           if (!next) setSettlingDebt(null);
         }}
       />
-    </Card>
+    </>
   );
 }

@@ -14,6 +14,7 @@ import {
 import { useAuth } from "@/lib/auth/auth-provider";
 import { useAccounts, useCategories, useEvents } from "@/lib/finance/hooks";
 import { createIncomeOrExpense, createTransfer } from "@/lib/finance/mutations";
+import { hapticError, hapticSuccess } from "@/lib/haptics";
 import { transactionFormSchema, type TransactionFormValues } from "@/lib/finance/transaction-form-schema";
 import { getCurrencySymbol, formatMoney, formatCurrencyCode } from "@/lib/format";
 import {
@@ -200,6 +201,7 @@ export function CreateTransactionDialog({
           note: values.note?.trim() || undefined,
         });
       }
+      void hapticSuccess();
       toast.success("Transaction saved");
       setOpen(false);
       setAmountText("");
@@ -210,6 +212,7 @@ export function CreateTransactionDialog({
         eventId: defaultEventId ?? undefined,
       });
     } catch (e) {
+      void hapticError();
       toast.error("Failed to save transaction", {
         description: e instanceof Error ? e.message : undefined,
       });
@@ -230,10 +233,6 @@ export function CreateTransactionDialog({
         showCloseButton
         className="!flex max-h-[96dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-md"
       >
-        <div className="flex shrink-0 justify-center pt-3 pb-1">
-          <div className="h-1.5 w-10 rounded-full bg-muted-foreground/30" />
-        </div>
-
         <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-2">
           <div className="flex flex-wrap gap-2">
             {transactionTypes.map((type) => {

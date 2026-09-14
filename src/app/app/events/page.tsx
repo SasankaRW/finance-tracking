@@ -195,7 +195,7 @@ export default function EventsPage({ embedded = false }: { embedded?: boolean })
       </div>
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-2 divide-x divide-y divide-border/60 overflow-hidden rounded-[2rem] bg-card shadow-sm sm:grid-cols-4 sm:divide-y-0">
+      <div className="elevation-1 grid grid-cols-2 divide-x divide-y divide-border/60 overflow-hidden rounded-[2rem] bg-card sm:grid-cols-4 sm:divide-y-0">
         <div className="p-3 sm:p-4">
           <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
             <Calendar className="h-3.5 w-3.5 text-primary" />
@@ -244,7 +244,7 @@ export default function EventsPage({ embedded = false }: { embedded?: boolean })
       {/* Events Grid */}
       <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
         {eventsLoading ? (
-          <div className="rounded-[2rem] bg-card p-8 text-center text-sm text-muted-foreground shadow-sm md:col-span-2 lg:col-span-3">
+          <div className="elevation-1 rounded-[2rem] bg-card p-8 text-center text-sm text-muted-foreground md:col-span-2 lg:col-span-3">
             Loading events…
           </div>
         ) : events.length ? (
@@ -265,7 +265,7 @@ export default function EventsPage({ embedded = false }: { embedded?: boolean })
             return (
               <div
                 key={e.id}
-                className="motion-expressive rounded-[2rem] bg-card p-4 shadow-sm"
+                className="motion-expressive elevation-1 rounded-[2rem] bg-card p-4"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">

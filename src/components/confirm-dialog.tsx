@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { hapticLight, hapticMedium, hapticWarning } from "@/lib/haptics";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -38,9 +39,16 @@ export function ConfirmDialogProvider({ children }: { children: React.ReactNode 
   }, []);
 
   const settle = (confirmed: boolean) => {
+    void (confirmed ? (pending?.destructive ? hapticMedium() : hapticLight()) : hapticLight());
     pending?.resolve(confirmed);
     setPending(null);
   };
+
+  // A heads-up buzz the moment a destructive confirmation appears, matching
+  // the iOS pattern of a warning haptic on an action-sheet's destructive style.
+  React.useEffect(() => {
+    if (pending?.destructive) void hapticWarning();
+  }, [pending]);
 
   return (
     <ConfirmContext.Provider value={confirm}>

@@ -23,7 +23,7 @@ export function SettingsStatTile({
   return (
     <div
       className={cn(
-        "min-w-0 rounded-2xl border bg-card p-3 shadow-sm",
+        "min-w-0 elevation-1 rounded-2xl border bg-card p-3",
         highlighted && "border-primary/25 bg-primary/5",
       )}
     >

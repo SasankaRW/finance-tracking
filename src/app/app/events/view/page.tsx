@@ -125,7 +125,7 @@ export default function EventDetailPage() {
             </div>
 
             {/* Budget Overview */}
-            <div className="grid grid-cols-2 divide-x divide-y divide-border/60 overflow-hidden rounded-[2rem] bg-card shadow-sm sm:grid-cols-4 sm:divide-y-0">
+            <div className="elevation-1 grid grid-cols-2 divide-x divide-y divide-border/60 overflow-hidden rounded-[2rem] bg-card sm:grid-cols-4 sm:divide-y-0">
                 <div className="p-3 sm:p-4">
                     <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
                         <PiggyBank className="h-3.5 w-3.5 text-blue-600" />
@@ -222,7 +222,7 @@ export default function EventDetailPage() {
                     {eventTransactions.length > 0 ? (
                         <>
                             {/* Mobile list */}
-                            <ul className="mx-4 mb-4 overflow-hidden rounded-[2rem] bg-card shadow-sm md:hidden">
+                            <ul className="elevation-1 mx-4 mb-4 overflow-hidden rounded-[2rem] bg-card md:hidden">
                                 {eventTransactions.map((t: any, idx: number) => {
                                     const date = t.occurredAt instanceof Timestamp ? t.occurredAt.toDate() : new Date(t.occurredAt);
                                     const catName = expenseCategories.find((c: any) => c.id === t.categoryId)?.name ?? "Uncategorized";

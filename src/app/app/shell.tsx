@@ -1,14 +1,15 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Calendar, Layers, List, LogOut, Plus, Settings, Target } from "lucide-react";
+import { Calendar, Layers, List, LogOut, Settings, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { hapticLight } from "@/lib/haptics";
 import { CashlyLogo } from "@/components/cashly-logo";
 import { signOutEverywhere } from "@/lib/auth/auth-actions";
 import { useAuth } from "@/lib/auth/auth-provider";
-import { CreateTransactionDialog } from "@/app/app/transactions/create-transaction-dialog";
-import { Button } from "@/components/ui/button";
+import { SpeedDialFab } from "@/components/speed-dial-fab";
 
 const navItems = [
   { href: "/app", label: "Dashboard", icon: Layers },
@@ -28,8 +29,47 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? "";
   const { user } = useAuth();
 
+  // Below md there's no header to anchor scrolled content under the status
+  // bar (that's the "Transaction Trends" overlapping the clock bug) — this
+  // scrim keeps that strip opaque no matter how far the page scrolls.
+  //
+  // The floating nav + FAB hide on scroll-down and reappear on scroll-up (or
+  // near the top), the standard modern-app pattern for reclaiming space.
+  const [navHidden, setNavHidden] = React.useState(false);
+
+  React.useEffect(() => {
+    setNavHidden(false);
+  }, [pathname]);
+
+  React.useEffect(() => {
+    let lastY = window.scrollY;
+    let ticking = false;
+
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        const y = window.scrollY;
+        const delta = y - lastY;
+        if (y < 40) setNavHidden(false);
+        else if (delta > 8) setNavHidden(true);
+        else if (delta < -8) setNavHidden(false);
+        lastY = y;
+        ticking = false;
+      });
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   return (
-    <div className="min-h-dvh bg-background">
+    <div className="app-ambient-bg min-h-dvh">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-x-0 top-0 z-30 h-[env(safe-area-inset-top)] bg-background/85 backdrop-blur-md md:hidden"
+      />
+
       <header className="sticky top-0 z-20 hidden bg-background/90 backdrop-blur-xl supports-backdrop-filter:bg-background/75 pt-[env(safe-area-inset-top)] md:block">
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-3 px-3 sm:h-16 sm:px-6 lg:px-8">
           <div className="flex items-center gap-6 lg:gap-8">
@@ -85,12 +125,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-7xl px-3 sm:px-6 lg:px-8 pb-28 md:pb-8 pt-[calc(env(safe-area-inset-top)+1rem)] md:pt-8">
+      {/* Keyed on the route so each page cross-fades in like a tab switch. */}
+      <main
+        key={pathname}
+        className="animate-ios-fade mx-auto w-full max-w-7xl px-3 sm:px-6 lg:px-8 pb-28 md:pb-8 pt-[calc(env(safe-area-inset-top)+1rem)] md:pt-8"
+      >
         {children}
       </main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-20 bg-background/90 backdrop-blur-xl supports-backdrop-filter:bg-background/75 md:hidden pb-[env(safe-area-inset-bottom)]">
-        <div className="mx-auto flex max-w-7xl gap-1 px-2 pb-2 pt-2.5">
+      {/* Floating pill nav: inset from the edges and lifted off the bottom so it
+          reads as a control sitting over the content rather than a bar cut into it. */}
+      <nav
+        className={cn(
+          "motion-expressive fixed inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-20 md:hidden",
+          navHidden ? "pointer-events-none translate-y-24 opacity-0" : "translate-y-0 opacity-100",
+        )}
+      >
+        <div className="elevation-2 flex gap-1 rounded-full bg-card/85 px-2 py-1.5 ring-1 ring-border/60 backdrop-blur-xl supports-backdrop-filter:bg-card/75">
           {mobileNavItems.map((item) => {
             const active =
               pathname === item.href ||
@@ -100,7 +151,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className="group flex flex-1 flex-col items-center gap-1 py-1 text-[11px]"
+                onClick={() => void hapticLight()}
+                className="group flex flex-1 flex-col items-center gap-0.5 py-1 text-[11px]"
               >
                 <span
                   className={cn(
@@ -126,19 +178,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </nav>
 
-      <div className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-4 z-30 md:hidden">
-        <CreateTransactionDialog
-          trigger={
-            <Button
-              size="icon-lg"
-              className="motion-expressive h-16 w-16 rounded-[1.4rem] shadow-xl active:scale-90 active:rounded-full"
-              aria-label="Add transaction"
-            >
-              <Plus className="h-7 w-7" />
-            </Button>
-          }
-        />
-      </div>
+      <SpeedDialFab hidden={navHidden} />
     </div>
   );
 }

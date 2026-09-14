@@ -22,15 +22,16 @@ export default function PlanningPage() {
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
                 <div className="sticky top-3 z-10 -mx-1 px-1 sm:static sm:mx-0 sm:px-0">
                     <TabsList className="grid w-full grid-cols-3 shadow-sm sm:max-w-lg">
-                        <TabsTrigger value="subscriptions" className="gap-2">
+                        <TabsTrigger value="subscriptions" className="gap-1.5 px-2 text-xs sm:gap-2 sm:px-4 sm:text-sm">
                             <Repeat className="h-4 w-4" />
-                            Bills & Loans
+                            <span className="sm:hidden">Bills</span>
+                            <span className="hidden sm:inline">Bills & Loans</span>
                         </TabsTrigger>
-                        <TabsTrigger value="budgets" className="gap-2">
+                        <TabsTrigger value="budgets" className="gap-1.5 px-2 text-xs sm:gap-2 sm:px-4 sm:text-sm">
                             <Target className="h-4 w-4" />
                             Budgets
                         </TabsTrigger>
-                        <TabsTrigger value="events" className="gap-2">
+                        <TabsTrigger value="events" className="gap-1.5 px-2 text-xs sm:gap-2 sm:px-4 sm:text-sm">
                             <Calendar className="h-4 w-4" />
                             Events
                         </TabsTrigger>

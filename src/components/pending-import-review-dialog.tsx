@@ -4,11 +4,16 @@ import * as React from "react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { Timestamp } from "firebase/firestore";
-import { CalendarIcon, ChevronDown, MessageSquareText } from "lucide-react";
+import { CalendarIcon, ChevronDown, MessageSquareText, Sparkles } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useAccounts, useCategories } from "@/lib/finance/hooks";
-import { approvePendingImport, dismissPendingImport } from "@/lib/finance/sms-import-mutations";
+import {
+  approvePendingImport,
+  approvePendingImportAsTransfer,
+  dismissPendingImport,
+  retryMatchPendingImport,
+} from "@/lib/finance/sms-import-mutations";
 import { formatCurrencyCode } from "@/lib/format";
 import {
   AccountSelect,
@@ -46,22 +51,29 @@ export function PendingImportReviewDialog({
   const { user } = useAuth();
   const confirm = useConfirm();
   const { accounts } = useAccounts();
-  const [kind, setKind] = React.useState<"income" | "expense">("expense");
+  const [kind, setKind] = React.useState<"income" | "expense" | "transfer">("expense");
   const [accountId, setAccountId] = React.useState("");
+  const [toAccountId, setToAccountId] = React.useState("");
   const [categoryId, setCategoryId] = React.useState("");
   const [amountText, setAmountText] = React.useState("");
   const [occurredAt, setOccurredAt] = React.useState(new Date());
   const [note, setNote] = React.useState("");
   const [showRaw, setShowRaw] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
+  const [retrying, setRetrying] = React.useState(false);
 
-  const { categories } = useCategories(kind);
+  const { categories } = useCategories(kind === "transfer" ? undefined : kind);
 
   React.useEffect(() => {
     if (!pendingImport) return;
     const receivedAt = toDate(pendingImport.receivedAt, new Date());
-    setKind(pendingImport.kind === "income" ? "income" : "expense");
+    setKind(
+      pendingImport.kind === "income" || pendingImport.kind === "transfer"
+        ? pendingImport.kind
+        : "expense",
+    );
     setAccountId(pendingImport.accountId ?? "");
+    setToAccountId(pendingImport.toAccountId ?? "");
     setCategoryId("");
     setAmountText(typeof pendingImport.amount === "number" ? String(pendingImport.amount) : "");
     setOccurredAt(toDate(pendingImport.occurredAt, receivedAt));
@@ -73,20 +85,33 @@ export function PendingImportReviewDialog({
   const currency = formatCurrencyCode(account?.currency);
   const parsedAmount = amountText ? Number.parseFloat(amountText) : 0;
   const canApprove =
-    Number.isFinite(parsedAmount) && parsedAmount > 0 && Boolean(accountId) && Boolean(categoryId);
+    Number.isFinite(parsedAmount) &&
+    parsedAmount > 0 &&
+    Boolean(accountId) &&
+    (kind === "transfer" ? Boolean(toAccountId) && toAccountId !== accountId : Boolean(categoryId));
 
   const handleApprove = async () => {
     if (!user || !pendingImport || !canApprove) return;
     setSubmitting(true);
     try {
-      await approvePendingImport(user.uid, pendingImport.id, {
-        kind,
-        amount: parsedAmount,
-        accountId,
-        categoryId,
-        occurredAt,
-        note: note.trim() || undefined,
-      });
+      if (kind === "transfer") {
+        await approvePendingImportAsTransfer(user.uid, pendingImport.id, {
+          amount: parsedAmount,
+          fromAccountId: accountId,
+          toAccountId,
+          occurredAt,
+          note: note.trim() || undefined,
+        });
+      } else {
+        await approvePendingImport(user.uid, pendingImport.id, {
+          kind,
+          amount: parsedAmount,
+          accountId,
+          categoryId,
+          occurredAt,
+          note: note.trim() || undefined,
+        });
+      }
       toast.success("Transaction added");
       onClose();
     } catch (e) {
@@ -95,6 +120,27 @@ export function PendingImportReviewDialog({
       });
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleRetryMatch = async () => {
+    if (!user || !pendingImport) return;
+    setRetrying(true);
+    try {
+      const matched = await retryMatchPendingImport(user.uid, pendingImport.id);
+      if (matched) {
+        toast.success("Matched a rule", { description: "Details filled in below." });
+      } else {
+        toast.info("No matching rule yet", {
+          description: "Add or fix a message rule in Settings, then try again.",
+        });
+      }
+    } catch (e) {
+      toast.error("Failed to check rules", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
+      setRetrying(false);
     }
   };
 
@@ -128,29 +174,46 @@ export function PendingImportReviewDialog({
           </DialogDescription>
         </DialogHeader>
         <DialogBody className="space-y-4">
+          {!pendingImport?.accountId && (
+            <div className="flex items-center justify-between gap-3 rounded-2xl border bg-muted/30 px-3 py-2.5">
+              <p className="text-xs text-muted-foreground">
+                No message rule matched this one — the fields below are blank.
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="shrink-0 gap-1.5"
+                disabled={retrying}
+                onClick={() => void handleRetryMatch()}
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                {retrying ? "Checking…" : "Try again"}
+              </Button>
+            </div>
+          )}
+
           <div className="flex flex-wrap gap-2">
-            {transactionTypes
-              .filter((t) => t.value !== "transfer")
-              .map((type) => {
-                const Icon = type.icon;
-                const selected = kind === type.value;
-                return (
-                  <button
-                    key={type.value}
-                    type="button"
-                    onClick={() => {
-                      setKind(type.value as "income" | "expense");
-                      setCategoryId("");
-                    }}
-                    className={`motion-expressive press-expressive inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition-all ${
-                      selected ? type.pill : "bg-muted text-muted-foreground"
-                    }`}
-                  >
-                    <Icon className="h-3.5 w-3.5" />
-                    {type.label}
-                  </button>
-                );
-              })}
+            {transactionTypes.map((type) => {
+              const Icon = type.icon;
+              const selected = kind === type.value;
+              return (
+                <button
+                  key={type.value}
+                  type="button"
+                  onClick={() => {
+                    setKind(type.value as "income" | "expense" | "transfer");
+                    setCategoryId("");
+                  }}
+                  className={`motion-expressive press-expressive inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition-all ${
+                    selected ? type.pill : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {type.label}
+                </button>
+              );
+            })}
           </div>
 
           <div className="space-y-2">
@@ -169,23 +232,54 @@ export function PendingImportReviewDialog({
           </div>
 
           <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground uppercase tracking-wider">
-                Account
-              </Label>
-              <AccountSelect
-                accounts={accounts as any[]}
-                value={accountId}
-                onChange={setAccountId}
-                label="Account"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground uppercase tracking-wider">
-                Category
-              </Label>
-              <CategorySelect categories={categories} value={categoryId} onChange={setCategoryId} />
-            </div>
+            {kind === "transfer" ? (
+              <>
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                    From Account
+                  </Label>
+                  <AccountSelect
+                    accounts={accounts as any[]}
+                    value={accountId}
+                    onChange={setAccountId}
+                    label="From"
+                    excludeId={toAccountId}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                    To Account
+                  </Label>
+                  <AccountSelect
+                    accounts={accounts as any[]}
+                    value={toAccountId}
+                    onChange={setToAccountId}
+                    label="To"
+                    excludeId={accountId}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                    Account
+                  </Label>
+                  <AccountSelect
+                    accounts={accounts as any[]}
+                    value={accountId}
+                    onChange={setAccountId}
+                    label="Account"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                    Category
+                  </Label>
+                  <CategorySelect categories={categories} value={categoryId} onChange={setCategoryId} />
+                </div>
+              </>
+            )}
           </div>
 
           <div className="space-y-2">
