@@ -25,6 +25,7 @@ import { updateAccount, deleteAccount } from "@/lib/finance/account-mutations";
 import { formatCurrencyCode, formatMoney } from "@/lib/format";
 import { COMMON_CURRENCIES, DEFAULT_CURRENCY, HOME_CURRENCY } from "@/shared/currency";
 import { useFxRates } from "@/lib/fx/use-fx-rates";
+import { useStaggerReveal } from "@/lib/motion/use-stagger-reveal";
 import { SettingsStatTile } from "@/app/app/settings/settings-stat-tile";
 import { Button } from "@/components/ui/button";
 import {
@@ -194,6 +195,7 @@ export function AccountsPanel() {
   const { accounts, loading } = useAccounts();
   const { data: fxUsd, isLoading: fxLoading } = useFxRates("USD", [HOME_CURRENCY]);
   const usdToLkr = fxUsd?.rates?.[HOME_CURRENCY] ?? null;
+  const mobileListRef = useStaggerReveal<HTMLDivElement>("[data-stagger-item]", [accounts.length, loading]);
 
   const { totalBalanceLkr, hasUnsupportedCurrency, missingUsdRate } =
     React.useMemo(() => {
@@ -575,7 +577,7 @@ export function AccountsPanel() {
       </Card>
 
       {/* Mobile Card List */}
-      <div className="grid gap-4 md:hidden">
+      <div ref={mobileListRef} className="grid gap-4 md:hidden">
         {loading ? (
           <>
             {Array.from({ length: 3 }).map((_, i) => (
@@ -590,7 +592,7 @@ export function AccountsPanel() {
           accounts.map((a: any) => {
             const isExcluded = a.includeInTotals === false;
             return (
-              <Card key={a.id} className={isExcluded ? "opacity-70" : ""}>
+              <Card key={a.id} data-stagger-item className={isExcluded ? "opacity-70" : ""}>
                 <CardContent className="p-4 flex items-center gap-4">
                   <div
                     className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border ${a.type === "cash"

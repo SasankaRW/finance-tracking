@@ -33,6 +33,9 @@ import {
 import { useFxRates } from "@/lib/fx/use-fx-rates";
 import { formatCurrencyCode, formatMoney } from "@/lib/format";
 import { getCategoryIcon } from "@/lib/finance/category-icons";
+import { AnimatedNumber } from "@/components/animated-number";
+import { AnimatePresence, motion } from "motion/react";
+import { iosIn } from "@/lib/motion/variants";
 import { COMMON_CURRENCIES, HOME_CURRENCY } from "@/shared/currency";
 import { Badge } from "@/components/ui/badge";
 import { SettingsStatTile } from "@/app/app/settings/settings-stat-tile";
@@ -345,7 +348,8 @@ function SalaryFormFields({
           )}
           {depositMode === "keep_salary_currency" && salaryCurrency !== HOME_CURRENCY && currentHomeValue !== null && (
             <p className="font-medium text-foreground">
-              Current LKR value: {formatMoney(amount, salaryCurrency)} = {formatMoney(currentHomeValue, HOME_CURRENCY)}
+              Current LKR value: <AnimatedNumber value={amount} formatFn={(v) => formatMoney(v, salaryCurrency)} /> ={" "}
+              <AnimatedNumber value={currentHomeValue} formatFn={(v) => formatMoney(v, HOME_CURRENCY)} />
               {salaryCurrency === "USD" && usdToLkr
                 ? ` at 1 USD = ${usdToLkr.toFixed(2)} ${HOME_CURRENCY}`
                 : ""}
@@ -353,7 +357,8 @@ function SalaryFormFields({
           )}
           {depositMode === "convert_to_account_currency" && salaryCurrency !== accountCurrency && estimatedDeposit !== null && (
             <p className="font-medium text-foreground">
-              Payday estimate: {formatMoney(amount, salaryCurrency)} = {formatMoney(estimatedDeposit, accountCurrency)}
+              Payday estimate: <AnimatedNumber value={amount} formatFn={(v) => formatMoney(v, salaryCurrency)} /> ={" "}
+              <AnimatedNumber value={estimatedDeposit} formatFn={(v) => formatMoney(v, accountCurrency)} />
               {salaryCurrency === "USD" && accountCurrency === HOME_CURRENCY && usdToLkr
                 ? ` at 1 USD = ${usdToLkr.toFixed(2)} ${HOME_CURRENCY}`
                 : ""}
@@ -366,7 +371,9 @@ function SalaryFormFields({
           )}
           {taxRateFraction > 0 && estimatedDepositGross !== null && estimatedDeposit !== null && (
             <p className="font-medium text-foreground">
-              After {taxRatePercent}% deduction: {formatMoney(estimatedDepositGross ?? 0, accountCurrency)} → {formatMoney(estimatedDeposit, accountCurrency)}
+              After {taxRatePercent}% deduction:{" "}
+              <AnimatedNumber value={estimatedDepositGross ?? 0} formatFn={(v) => formatMoney(v, accountCurrency)} /> →{" "}
+              <AnimatedNumber value={estimatedDeposit} formatFn={(v) => formatMoney(v, accountCurrency)} />
             </p>
           )}
         </div>
@@ -663,6 +670,9 @@ export function SalaryPanel() {
       : (recordTarget.amount ?? 0)
     : null;
   const recordHasTax = typeof recordTarget?.taxRate === "number" && recordTarget.taxRate > 0;
+  const recordDefaultAmount = recordTarget
+    ? computeDefaultRecordAmount(recordTarget, recordSalaryCurrency, recordAccountCurrency, usdToLkr)
+    : null;
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -708,7 +718,7 @@ export function SalaryPanel() {
           icon={Banknote}
           iconWrapClassName="bg-primary/10"
           iconClassName="text-primary"
-          value={formatMoney(stats.monthly, HOME_CURRENCY)}
+          value={<AnimatedNumber value={stats.monthly} formatFn={(v) => formatMoney(v, HOME_CURRENCY)} />}
           sub={`using today's USD rate${stats.unsupportedConversions ? " where available" : ""}`}
         />
         <SettingsStatTile
@@ -716,7 +726,7 @@ export function SalaryPanel() {
           icon={CheckCircle2}
           iconWrapClassName="bg-emerald-500/10"
           iconClassName="text-emerald-600"
-          value={stats.active}
+          value={<AnimatedNumber value={stats.active} />}
           sub="salary sources"
         />
         <SettingsStatTile
@@ -724,7 +734,7 @@ export function SalaryPanel() {
           icon={Clock}
           iconWrapClassName="bg-amber-500/10"
           iconClassName="text-amber-600"
-          value={stats.dueSoon}
+          value={<AnimatedNumber value={stats.dueSoon} />}
           sub="within 7 days or overdue"
         />
         <SettingsStatTile
@@ -732,7 +742,7 @@ export function SalaryPanel() {
           icon={Pause}
           iconWrapClassName="bg-muted"
           iconClassName="text-muted-foreground"
-          value={stats.paused}
+          value={<AnimatedNumber value={stats.paused} />}
           sub="not counted in monthly salary"
         />
       </div>
@@ -898,7 +908,7 @@ export function SalaryPanel() {
                       <div className="rounded-2xl bg-muted/50 p-3">
                         <p className="text-xs text-muted-foreground">Amount</p>
                         <p className="mt-1 text-lg font-bold tabular-nums">
-                          {formatMoney(salary.amount ?? 0, currency)}
+                          <AnimatedNumber value={salary.amount ?? 0} formatFn={(v) => formatMoney(v, currency)} />
                         </p>
                       </div>
                       {depositMode === "convert_to_account_currency" && currency !== accountCurrency && (
@@ -907,9 +917,11 @@ export function SalaryPanel() {
                             Today&apos;s Deposit{hasTaxRate ? " (after tax)" : ""}
                           </p>
                           <p className="mt-1 text-sm font-semibold text-emerald-700 dark:text-emerald-400">
-                            {estimatedDeposit !== null
-                              ? formatMoney(estimatedDeposit, accountCurrency)
-                              : "Rate unavailable"}
+                            {estimatedDeposit !== null ? (
+                              <AnimatedNumber value={estimatedDeposit} formatFn={(v) => formatMoney(v, accountCurrency)} />
+                            ) : (
+                              "Rate unavailable"
+                            )}
                           </p>
                           {currency === "USD" && accountCurrency === HOME_CURRENCY && usdToLkr && (
                             <p className="mt-1 text-[11px] text-muted-foreground">
@@ -925,9 +937,11 @@ export function SalaryPanel() {
                             Current LKR Value{hasTaxRate ? " (after tax)" : ""}
                           </p>
                           <p className="mt-1 text-sm font-semibold text-blue-700 dark:text-blue-400">
-                            {currentHomeValue !== null
-                              ? formatMoney(currentHomeValue, HOME_CURRENCY)
-                              : "Rate unavailable"}
+                            {currentHomeValue !== null ? (
+                              <AnimatedNumber value={currentHomeValue} formatFn={(v) => formatMoney(v, HOME_CURRENCY)} />
+                            ) : (
+                              "Rate unavailable"
+                            )}
                           </p>
                           {currency === "USD" && usdToLkr && (
                             <p className="mt-1 text-[11px] text-muted-foreground">
@@ -1058,8 +1072,8 @@ export function SalaryPanel() {
           <DialogBody className="space-y-3">
             {recordGross !== null && recordHasTax && (
               <p className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
-                Estimated gross: {formatMoney(recordGross, recordAccountCurrency)} · current deduction rate{" "}
-                {(recordTarget!.taxRate * 100).toFixed(2)}%
+                Estimated gross: <AnimatedNumber value={recordGross} formatFn={(v) => formatMoney(v, recordAccountCurrency)} /> · current
+                deduction rate {(recordTarget!.taxRate * 100).toFixed(2)}%
               </p>
             )}
             <div className="space-y-2">
@@ -1074,6 +1088,41 @@ export function SalaryPanel() {
                 value={recordAmount}
                 onChange={(e) => setRecordAmount(e.target.value)}
               />
+              {/* AnimatePresence itself must stay mounted unconditionally — if it
+                  were only rendered inside the validity check below, clearing
+                  the field would unmount AnimatePresence and this message in
+                  the same commit, skipping the exit transition entirely. */}
+              <AnimatePresence mode="wait">
+                {recordDefaultAmount !== null &&
+                  recordAmount !== "" &&
+                  !Number.isNaN(Number(recordAmount)) &&
+                  (() => {
+                    const diff = Number(recordAmount) - recordDefaultAmount;
+                    const matches = Math.abs(diff) < 0.005;
+                    return (
+                      <motion.p
+                        key={matches ? "match" : diff > 0 ? "above" : "below"}
+                        variants={iosIn}
+                        initial="initial"
+                        animate="animate"
+                        exit="exit"
+                        className={`text-xs font-medium ${
+                          matches
+                            ? "text-muted-foreground"
+                            : diff > 0
+                              ? "text-emerald-600 dark:text-emerald-400"
+                              : "text-amber-600 dark:text-amber-400"
+                        }`}
+                      >
+                        {matches
+                          ? "Matches estimate"
+                          : `${diff > 0 ? "+" : "-"}${formatMoney(Math.abs(diff), recordAccountCurrency)} ${
+                              diff > 0 ? "above" : "below"
+                            } estimate`}
+                      </motion.p>
+                    );
+                  })()}
+              </AnimatePresence>
             </div>
           </DialogBody>
           <DialogFooter>

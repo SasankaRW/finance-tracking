@@ -9,6 +9,7 @@ import { formatCurrencyCode, formatMoney } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { CollapsiblePanel } from "@/components/collapsible-panel";
 import { SettleDebtDialog } from "@/components/settle-debt-dialog";
+import { useStaggerReveal } from "@/lib/motion/use-stagger-reveal";
 
 function toDate(value: unknown) {
   if (value instanceof Timestamp) return value.toDate();
@@ -19,6 +20,7 @@ function toDate(value: unknown) {
 export function DebtPillsSummary() {
   const { debts, loading } = useDebts();
   const [settlingDebt, setSettlingDebt] = React.useState<any | null>(null);
+  const [panelExpanded, setPanelExpanded] = React.useState(false);
 
   const activeDebts = React.useMemo(
     () => (debts as any[]).filter((debt) => debt.status !== "settled"),
@@ -37,6 +39,8 @@ export function DebtPillsSummary() {
     return { owedToMe, iOwe };
   }, [activeDebts]);
 
+  const pillsRef = useStaggerReveal<HTMLDivElement>("[data-stagger-item]", [activeDebts.length, panelExpanded]);
+
   if (loading || activeDebts.length === 0) return null;
 
   return (
@@ -46,6 +50,7 @@ export function DebtPillsSummary() {
         icon={<HandCoins className="h-4 w-4" />}
         iconClassName="bg-primary/12 text-primary"
         title="Borrowed"
+        onExpandedChange={setPanelExpanded}
         summary={
           <>
             {totals.owedToMe > 0 && (
@@ -63,7 +68,7 @@ export function DebtPillsSummary() {
           </>
         }
       >
-        <div className="flex flex-wrap gap-2">
+        <div ref={pillsRef} className="flex flex-wrap gap-2">
           {activeDebts.slice(0, 8).map((debt: any) => {
             const isReceivable = debt.direction === "owed_to_me";
             const due = toDate(debt.dueAt);
@@ -72,6 +77,7 @@ export function DebtPillsSummary() {
             return (
               <div
                 key={debt.id}
+                data-stagger-item
                 className={`flex max-w-full items-center gap-2 rounded-full border py-1.5 pl-3 pr-1.5 text-sm ${
                   isReceivable
                     ? "bg-emerald-500/10 border-emerald-500/20"

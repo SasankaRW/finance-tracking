@@ -16,6 +16,7 @@ export function CollapsiblePanel({
   title,
   summary,
   defaultExpanded = false,
+  onExpandedChange,
   children,
 }: {
   storageKey: string;
@@ -24,10 +25,19 @@ export function CollapsiblePanel({
   title: string;
   summary?: React.ReactNode;
   defaultExpanded?: boolean;
+  onExpandedChange?: (expanded: boolean) => void;
   children: React.ReactNode;
 }) {
   const [expanded, setExpanded] = React.useState(defaultExpanded);
   const bodyRef = React.useRef<HTMLDivElement>(null);
+
+  // Content stays mounted while collapsed (see below), so a caller that wants
+  // to animate that content in on reveal — not just on page mount — needs to
+  // know when `expanded` actually flips, including the localStorage hydration
+  // below, not just direct toggle clicks.
+  React.useEffect(() => {
+    onExpandedChange?.(expanded);
+  }, [expanded, onExpandedChange]);
 
   React.useEffect(() => {
     try {

@@ -1,71 +1,66 @@
 "use client";
 
 import * as React from "react";
+import { motion, useMotionValue, animate, type PanInfo } from "motion/react";
 import { Pencil, Trash2 } from "lucide-react";
 import { hapticLight } from "@/lib/haptics";
+import { EASE_IOS } from "@/lib/motion/easings";
+import { getReducedMotion } from "@/lib/motion/reduced-motion";
 
 const ACTION_WIDTH = 72;
+const SNAP_SPRING = { type: "spring", stiffness: 420, damping: 38 } as const;
+const SWIPE_HINT_KEY = "cashly:swipe-hint-seen:v1";
 
-// Swipe-left-to-reveal actions (iOS Mail style), built on Pointer Events + a
-// CSS transform rather than a gesture library. `touch-action: pan-y` on the
-// draggable layer is what actually prevents the vertical-scroll conflict —
-// the browser decides at the OS level whether a touch is a vertical scroll or
-// something JS should handle, so there's no preventDefault()/passive-listener
-// fight to get wrong. The axis is also locked from the first ~6px of movement
-// so a wobbly vertical scroll never gets mistaken for a swipe.
+// Swipe-left-to-reveal actions (iOS Mail style), driven by Motion's drag
+// gesture instead of hand-rolled Pointer Events. `touch-action: pan-y` on the
+// draggable layer is still what actually prevents the vertical-scroll
+// conflict — the browser decides at the OS level whether a touch is a
+// vertical scroll or a horizontal drag, so there's no preventDefault()/
+// passive-listener fight to get wrong (same reasoning as before, now backed
+// by Motion's gesture engine instead of a manual pointer-move axis check).
 export function SwipeableRow({
   children,
   onEdit,
   onDelete,
   className,
+  hint = false,
 }: {
   children: React.ReactNode;
   onEdit?: () => void;
   onDelete: () => void;
   className?: string;
+  // One-time "this row swipes" nudge: slides open just enough to reveal the
+  // actions, then springs back. Shown once per device, never under reduced motion.
+  hint?: boolean;
 }) {
   const actionsWidth = onEdit ? ACTION_WIDTH * 2 : ACTION_WIDTH;
-  const [translateX, setTranslateX] = React.useState(0);
-  const drag = React.useRef<{
-    startX: number;
-    startY: number;
-    startTranslate: number;
-    axis: "none" | "x" | "y";
-  } | null>(null);
+  const x = useMotionValue(0);
 
-  const close = () => setTranslateX(0);
-
-  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    drag.current = { startX: e.clientX, startY: e.clientY, startTranslate: translateX, axis: "none" };
-  };
-
-  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    const state = drag.current;
-    if (!state) return;
-    const dx = e.clientX - state.startX;
-    const dy = e.clientY - state.startY;
-
-    if (state.axis === "none") {
-      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
-      state.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
-      if (state.axis === "x") {
-        e.currentTarget.setPointerCapture?.(e.pointerId);
-      } else {
-        drag.current = null; // hand the gesture back to the page's own scroll
-        return;
-      }
+  React.useEffect(() => {
+    if (!hint || getReducedMotion()) return;
+    try {
+      if (window.localStorage.getItem(SWIPE_HINT_KEY) === "1") return;
+    } catch {
+      return;
     }
+    const id = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem(SWIPE_HINT_KEY, "1");
+      } catch {
+        // storage unavailable — worst case the hint shows again next time
+      }
+      animate(x, -Math.min(actionsWidth, 96), { duration: 0.4, ease: EASE_IOS }).then(() => {
+        animate(x, 0, { ...SNAP_SPRING, delay: 0.35 });
+      });
+    }, 900);
+    return () => window.clearTimeout(id);
+  }, [hint, actionsWidth, x]);
 
-    if (state.axis !== "x") return;
-    const next = Math.min(0, Math.max(-actionsWidth - 24, state.startTranslate + dx));
-    setTranslateX(next);
-  };
+  const close = () => animate(x, 0, SNAP_SPRING);
 
-  const endDrag = () => {
-    const state = drag.current;
-    drag.current = null;
-    if (!state || state.axis !== "x") return;
-    setTranslateX((current) => (current < -actionsWidth / 2 ? -actionsWidth : 0));
+  const onDragEnd = (_event: PointerEvent | MouseEvent | TouchEvent, info: PanInfo) => {
+    const shouldOpen = x.get() < -actionsWidth / 2 || info.velocity.x < -500;
+    animate(x, shouldOpen ? -actionsWidth : 0, SNAP_SPRING);
   };
 
   return (
@@ -100,16 +95,16 @@ export function SwipeableRow({
         </button>
       </div>
 
-      <div
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
-        style={{ transform: `translateX(${translateX}px)`, touchAction: "pan-y" }}
-        className="motion-expressive relative bg-card"
+      <motion.div
+        drag="x"
+        dragConstraints={{ left: -actionsWidth - 24, right: 0 }}
+        dragElastic={0.15}
+        onDragEnd={onDragEnd}
+        style={{ x, touchAction: "pan-y" }}
+        className="relative bg-card"
       >
         {children}
-      </div>
+      </motion.div>
     </div>
   );
 }

@@ -12,6 +12,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const schema = z.object({
   email: z.string().email(),
@@ -126,7 +135,11 @@ export function LoginClient() {
                     type="button"
                     variant="link"
                     className="h-auto p-0 text-xs text-muted-foreground"
-                    onClick={() => setForgotPasswordOpen(true)}
+                    onClick={() => {
+                      // Carry over whatever was already typed on the login form.
+                      setResetEmail((current) => current || form.getValues("email"));
+                      setForgotPasswordOpen(true);
+                    }}
                   >
                     Forgot password?
                   </Button>
@@ -157,38 +170,42 @@ export function LoginClient() {
           </CardContent>
         </Card>
 
-        {/* Forgot Password Dialog */}
-        {forgotPasswordOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-            <div className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 sm:rounded-lg">
-              <div className="flex flex-col space-y-1.5 text-center sm:text-left">
-                <h2 className="text-lg font-semibold leading-none tracking-tight">Reset Password</h2>
-                <p className="text-sm text-muted-foreground">Enter your email address and we&apos;ll send you a link to reset your password.</p>
-              </div>
-              <form onSubmit={handleResetPassword}>
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="reset-email">Email</Label>
-                    <Input
-                      id="reset-email"
-                      type="email"
-                      value={resetEmail}
-                      onChange={(e) => setResetEmail(e.target.value)}
-                      placeholder="name@example.com"
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2">
-                  <Button type="button" variant="outline" onClick={() => setForgotPasswordOpen(false)}>Cancel</Button>
-                  <Button type="submit" disabled={resetLoading}>
-                    {resetLoading ? "Sending..." : "Send Reset Link"}
-                  </Button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
+        {/* Forgot Password — the shared Dialog (bottom sheet on phones,
+            Escape/tap-outside to close, focus trap), not a one-off overlay. */}
+        <Dialog open={forgotPasswordOpen} onOpenChange={setForgotPasswordOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Reset password</DialogTitle>
+              <DialogDescription>
+                Enter your email and we&apos;ll send you a link to reset your password.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleResetPassword}>
+              <DialogBody className="space-y-2">
+                <Label htmlFor="reset-email">Email</Label>
+                <Input
+                  id="reset-email"
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  className="h-11"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  placeholder="name@example.com"
+                  required
+                />
+              </DialogBody>
+              <DialogFooter>
+                <Button type="button" variant="ghost" onClick={() => setForgotPasswordOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={resetLoading} className="min-w-32">
+                  {resetLoading ? "Sending…" : "Send reset link"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

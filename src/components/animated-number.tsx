@@ -1,59 +1,30 @@
 "use client";
 
 import * as React from "react";
+import { useSpring, animated } from "@react-spring/web";
+import { SPRING_IOS, easeIos } from "@/lib/motion/easings";
+import { getReducedMotion } from "@/lib/motion/reduced-motion";
 
 interface AnimatedNumberProps {
-    value: number;
-    duration?: number;
-    formatFn?: (value: number) => string;
-    className?: string;
+  value: number;
+  duration?: number;
+  formatFn?: (value: number) => string;
+  className?: string;
 }
 
-export function AnimatedNumber({
+// Spring-driven count-up: re-animates from whatever the previous value was on
+// every change (not just once on mount), so a live balance refetch counts up
+// or down from where it last landed instead of snapping.
+export function AnimatedNumber({ value, duration, formatFn, className = "" }: AnimatedNumberProps) {
+  const { value: animatedValue } = useSpring({
     value,
-    duration = 1000,
-    formatFn,
-    className = "",
-}: AnimatedNumberProps) {
-    const [displayValue, setDisplayValue] = React.useState(0);
-    const [hasAnimated, setHasAnimated] = React.useState(false);
+    config: duration ? { duration, easing: easeIos } : SPRING_IOS,
+    immediate: getReducedMotion(),
+  });
 
-    React.useEffect(() => {
-        if (hasAnimated) {
-            setDisplayValue(value);
-            return;
-        }
-
-        const startTime = Date.now();
-        const startValue = 0;
-        const endValue = value;
-
-        const animate = () => {
-            const now = Date.now();
-            const elapsed = now - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-
-            // Easing function (ease-out cubic)
-            const easeOutCubic = 1 - Math.pow(1 - progress, 3);
-            const current = startValue + (endValue - startValue) * easeOutCubic;
-
-            setDisplayValue(current);
-
-            if (progress < 1) {
-                requestAnimationFrame(animate);
-            } else {
-                setHasAnimated(true);
-            }
-        };
-
-        const timeoutId = setTimeout(() => {
-            requestAnimationFrame(animate);
-        }, 100); // Small delay for better effect
-
-        return () => clearTimeout(timeoutId);
-    }, [value, duration, hasAnimated]);
-
-    const formattedValue = formatFn ? formatFn(displayValue) : Math.round(displayValue).toLocaleString();
-
-    return <span className={className}>{formattedValue}</span>;
+  return (
+    <animated.span className={className}>
+      {animatedValue.to((v) => (formatFn ? formatFn(v) : Math.round(v).toLocaleString()))}
+    </animated.span>
+  );
 }

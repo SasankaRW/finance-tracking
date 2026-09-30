@@ -32,6 +32,7 @@ import {
 } from "@/lib/finance/subscription-mutations";
 import { getBillKindIcon, getBillKindLabel, getDueDateInfo } from "@/lib/finance/bill-status";
 import { formatCurrencyCode, formatMoney } from "@/lib/format";
+import { useStaggerReveal } from "@/lib/motion/use-stagger-reveal";
 import { COMMON_CURRENCIES } from "@/shared/currency";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -229,6 +230,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
   const { accounts } = useAccounts();
   const { categories: expenseCats } = useCategories("expense");
   const { subscriptions, loading, error } = useSubscriptions();
+  const mobileListRef = useStaggerReveal<HTMLDivElement>("[data-stagger-item]", [subscriptions.length, loading]);
 
   const [createOpen, setCreateOpen] = React.useState(false);
   const [edit, setEdit] = React.useState<any | null>(null);
@@ -681,7 +683,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
           <CardDescription>Manage subscriptions and loan payments</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="grid gap-3 p-4 md:hidden">
+          <div ref={mobileListRef} className="grid gap-3 p-4 md:hidden">
             {loading ? (
               <div className="rounded-3xl border p-6 text-center text-sm text-muted-foreground">
                 Loading monthly bills...
@@ -693,7 +695,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
             ) : subscriptions.length ? (
               billRows.map(({ s, nextDue, acct, cat, cur, dueInfo, isPaused, isLoan, isCompleted, loanProgress, KindIcon }) => {
                 return (
-                  <Card key={s.id} className={`surface-container-high py-0 ${isPaused ? "opacity-70" : ""}`}>
+                  <Card key={s.id} data-stagger-item className={`surface-container-high py-0 ${isPaused ? "opacity-70" : ""}`}>
                     <CardContent className="space-y-4 p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex min-w-0 items-start gap-3">

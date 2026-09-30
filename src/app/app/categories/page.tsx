@@ -25,7 +25,6 @@ import {
 import { CategoryIconPicker, getCategoryIcon, getCategoryIconKey } from "@/lib/finance/category-icons";
 import { SettingsStatTile } from "@/app/app/settings/settings-stat-tile";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Dialog,
@@ -39,14 +38,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 
@@ -217,105 +208,94 @@ function CategoryTable({ kind }: { kind: "income" | "expense" }) {
         </Dialog>
       </div>
 
-      {/* Categories List */}
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/50 hover:bg-muted/50">
-                <TableHead className="pl-4 sm:pl-6">Category</TableHead>
-                <TableHead className="w-[60px] pr-4 sm:pr-6" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={2} className="h-32 text-center text-muted-foreground">
-                    Loading categories…
-                  </TableCell>
-                </TableRow>
-              ) : error ? (
-                <TableRow>
-                  <TableCell colSpan={2} className="h-32 text-center text-destructive">
-                    Failed to load categories{error?.message ? `: ${error.message}` : ""}
-                  </TableCell>
-                </TableRow>
-              ) : categories.length ? (
-                categories.map((c: any) => {
-                  const RowIcon = getCategoryIcon(c);
-                  return (
-                  <TableRow key={c.id} className="group">
-                    <TableCell className="pl-4 sm:pl-6">
-                      <div className="flex min-w-0 items-center gap-3">
-                        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl ${
-                          isIncome ? "bg-emerald-500/10" : "bg-rose-500/10"
-                        }`}>
-                          <RowIcon className={`h-4 w-4 ${isIncome ? "text-emerald-600" : "text-rose-600"}`} />
-                        </div>
-                        <span className="truncate font-medium">{c.name}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right pr-4 sm:pr-6">
-                      <RowActionsMenu
-                        ariaLabel={`${c.name} actions`}
-                        triggerClassName="p-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 focus:opacity-100"
-                        actions={[
-                          {
-                            label: "Edit",
-                            icon: Pencil,
-                            onClick: () => {
-                              setEdit(c);
-                              editForm.reset({ categoryId: c.id, name: c.name, icon: c.icon ?? "" });
-                            },
-                          },
-                          {
-                            label: "Delete",
-                            icon: Trash2,
-                            destructive: true,
-                            onClick: async () => {
-                              if (!user) return;
-                              if (!(await confirm({ title: "Delete this category?", destructive: true }))) return;
-                              try {
-                                await deleteCategory(user.uid, c.id);
-                                toast.success("Category deleted");
-                              } catch (e) {
-                                toast.error("Failed to delete category", {
-                                  description: e instanceof Error ? e.message : undefined,
-                                });
-                              }
-                            },
-                          },
-                        ]}
-                      />
-                    </TableCell>
-                  </TableRow>
-                  );
-                })
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={2} className="h-32 text-center">
-                    <div className="flex flex-col items-center gap-2">
-                      <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                        isIncome ? "bg-emerald-500/10" : "bg-rose-500/10"
-                      }`}>
-                        <Tag className={`h-5 w-5 ${isIncome ? "text-emerald-600" : "text-rose-600"}`} />
-                      </div>
-                      <p className="font-medium">No categories yet</p>
-                      <p className="text-sm text-muted-foreground">
-                        Add a category to organize your {kind}
-                      </p>
-                      <Button variant="outline" size="sm" onClick={() => setCreateOpen(true)}>
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add Category
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      {/* Categories — a tile grid rather than a table: one markup at every
+          width, tap a tile to edit (a bigger target than the ⋯ menu), and the
+          menu stays for delete. */}
+      {loading ? (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-[4.25rem] animate-pulse rounded-2xl bg-muted/60" />
+          ))}
+        </div>
+      ) : error ? (
+        <div className="rounded-3xl border border-destructive/30 bg-destructive/5 p-6 text-center text-sm text-destructive">
+          Failed to load categories{error?.message ? `: ${error.message}` : ""}
+        </div>
+      ) : categories.length ? (
+        <div className="animate-ios-in grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">
+          {categories.map((c: any) => {
+            const RowIcon = getCategoryIcon(c);
+            const openEdit = () => {
+              setEdit(c);
+              editForm.reset({ categoryId: c.id, name: c.name, icon: c.icon ?? "" });
+            };
+            return (
+              <div
+                key={c.id}
+                className="elevation-1 flex min-w-0 items-center gap-2 rounded-2xl bg-card py-2 pl-2 pr-1"
+              >
+                <button
+                  type="button"
+                  onClick={openEdit}
+                  aria-label={`Edit ${c.name}`}
+                  className="motion-expressive press-expressive flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-xl px-1 text-left"
+                >
+                  <span
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                      isIncome ? "bg-emerald-500/10" : "bg-rose-500/10"
+                    }`}
+                  >
+                    <RowIcon className={`h-4 w-4 ${isIncome ? "text-emerald-600" : "text-rose-600"}`} />
+                  </span>
+                  <span className="truncate text-sm font-semibold">{c.name}</span>
+                </button>
+                <RowActionsMenu
+                  ariaLabel={`${c.name} actions`}
+                  triggerClassName="h-9 w-9 shrink-0 rounded-full p-0 text-muted-foreground"
+                  actions={[
+                    { label: "Edit", icon: Pencil, onClick: openEdit },
+                    {
+                      label: "Delete",
+                      icon: Trash2,
+                      destructive: true,
+                      onClick: async () => {
+                        if (!user) return;
+                        if (!(await confirm({ title: "Delete this category?", destructive: true }))) return;
+                        try {
+                          await deleteCategory(user.uid, c.id);
+                          toast.success("Category deleted");
+                        } catch (e) {
+                          toast.error("Failed to delete category", {
+                            description: e instanceof Error ? e.message : undefined,
+                          });
+                        }
+                      },
+                    },
+                  ]}
+                />
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="rounded-3xl border border-dashed p-8 text-center">
+          <div className="flex flex-col items-center gap-2">
+            <div
+              className={`flex h-10 w-10 items-center justify-center rounded-full ${
+                isIncome ? "bg-emerald-500/10" : "bg-rose-500/10"
+              }`}
+            >
+              <Tag className={`h-5 w-5 ${isIncome ? "text-emerald-600" : "text-rose-600"}`} />
+            </div>
+            <p className="font-medium">No categories yet</p>
+            <p className="text-sm text-muted-foreground">Add a category to organize your {kind}</p>
+            <Button variant="outline" size="sm" onClick={() => setCreateOpen(true)}>
+              <Plus className="mr-1 h-4 w-4" />
+              Add Category
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Edit Dialog */}
       <Dialog open={Boolean(edit)} onOpenChange={(v) => (!v ? setEdit(null) : v)}>

@@ -5,6 +5,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { AnimatePresence, motion } from "motion/react";
+import { iosIn } from "@/lib/motion/variants";
 import {
   CalendarIcon,
   Plus,
@@ -294,15 +296,24 @@ export function CreateTransactionDialog({
               </div>
             )}
 
-            {needsConversion && parsedAmount > 0 && (
-              <p className="mt-1 text-sm text-muted-foreground">
-                {typeof convertedAmount === "number"
-                  ? `= ${formatMoney(convertedAmount, targetCurrency)}`
-                  : fxFetching
-                    ? "Fetching rate…"
-                    : "Rate unavailable"}
-              </p>
-            )}
+            <AnimatePresence>
+              {needsConversion && parsedAmount > 0 && (
+                <motion.p
+                  key="conversion"
+                  variants={iosIn}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  className="mt-1 text-sm text-muted-foreground"
+                >
+                  {typeof convertedAmount === "number"
+                    ? `= ${formatMoney(convertedAmount, targetCurrency)}`
+                    : fxFetching
+                      ? "Fetching rate…"
+                      : "Rate unavailable"}
+                </motion.p>
+              )}
+            </AnimatePresence>
           </div>
 
           <div className="mt-3 grid grid-cols-2 gap-2">

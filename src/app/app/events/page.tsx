@@ -13,6 +13,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { useEvents, useTransactions } from "@/lib/finance/hooks";
 import { createEvent, deleteEvent } from "@/lib/finance/event-mutations";
 import { formatMoney } from "@/lib/format";
+import { useStaggerReveal } from "@/lib/motion/use-stagger-reveal";
 import { COMMON_CURRENCIES, DEFAULT_CURRENCY } from "@/shared/currency";
 import { Button } from "@/components/ui/button";
 import {
@@ -55,6 +56,7 @@ export default function EventsPage({ embedded = false }: { embedded?: boolean })
   const confirm = useConfirm();
   const { events, loading: eventsLoading } = useEvents();
   const { transactions } = useTransactions();
+  const eventsGridRef = useStaggerReveal<HTMLDivElement>("[data-stagger-item]", [events.length, eventsLoading]);
 
   const spentByEvent = React.useMemo(() => {
     const map = new Map<string, number>();
@@ -242,7 +244,7 @@ export default function EventsPage({ embedded = false }: { embedded?: boolean })
       </div>
 
       {/* Events Grid */}
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+      <div ref={eventsGridRef} className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
         {eventsLoading ? (
           <div className="elevation-1 rounded-[2rem] bg-card p-8 text-center text-sm text-muted-foreground md:col-span-2 lg:col-span-3">
             Loading events…
@@ -265,6 +267,7 @@ export default function EventsPage({ embedded = false }: { embedded?: boolean })
             return (
               <div
                 key={e.id}
+                data-stagger-item
                 className="motion-expressive elevation-1 rounded-[2rem] bg-card p-4"
               >
                 <div className="flex items-start justify-between gap-3">

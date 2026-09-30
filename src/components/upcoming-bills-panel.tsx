@@ -14,6 +14,7 @@ import { formatCurrencyCode, formatMoney } from "@/lib/format";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Badge } from "@/components/ui/badge";
 import { CollapsiblePanel } from "@/components/collapsible-panel";
+import { useStaggerReveal } from "@/lib/motion/use-stagger-reveal";
 
 function toDate(value: unknown) {
   if (value instanceof Timestamp) return value.toDate();
@@ -27,6 +28,7 @@ export function UpcomingBillsPanel() {
   const { subscriptions, loading } = useSubscriptions();
   const { accounts } = useAccounts();
   const [payingId, setPayingId] = React.useState<string | null>(null);
+  const [panelExpanded, setPanelExpanded] = React.useState(false);
 
   const accountById = React.useMemo(
     () => new Map((accounts as any[]).map((a) => [a.id, a])),
@@ -83,6 +85,8 @@ export function UpcomingBillsPanel() {
     }
   };
 
+  const pillsRef = useStaggerReveal<HTMLDivElement>("[data-stagger-item]", [dueBills.length, panelExpanded]);
+
   if (loading || dueBills.length === 0) return null;
 
   return (
@@ -95,6 +99,7 @@ export function UpcomingBillsPanel() {
           : "bg-amber-500/12 text-amber-600 dark:text-amber-400"
       }
       title="Bills Due"
+      onExpandedChange={setPanelExpanded}
       summary={
         overdueCount > 0 ? (
           <span className="rounded-full bg-rose-500/12 px-2 py-0.5 text-xs font-semibold text-rose-700 dark:text-rose-300">
@@ -111,7 +116,7 @@ export function UpcomingBillsPanel() {
         )
       }
     >
-      <div className="flex flex-wrap gap-2">
+      <div ref={pillsRef} className="flex flex-wrap gap-2">
         {dueBills.slice(0, 8).map(({ s, nextDue }) => {
           const acct = accountById.get(s.accountId);
           const cur = formatCurrencyCode(s.currency ?? acct?.currency);
@@ -123,6 +128,7 @@ export function UpcomingBillsPanel() {
           return (
             <div
               key={s.id}
+              data-stagger-item
               className={`flex max-w-full items-center gap-2 rounded-full border py-1.5 pl-3 pr-1.5 text-sm ${
                 isOverdue
                   ? "bg-rose-500/10 border-rose-500/20"

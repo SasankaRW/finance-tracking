@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CollapsiblePanel } from "@/components/collapsible-panel";
 import { PendingImportReviewDialog } from "@/components/pending-import-review-dialog";
+import { useStaggerReveal } from "@/lib/motion/use-stagger-reveal";
 
 function toDate(value: unknown) {
   if (value instanceof Timestamp) return value.toDate();
@@ -25,6 +26,7 @@ export function PendingImportsPanel() {
   const { accounts } = useAccounts();
   const [selected, setSelected] = React.useState<any | null>(null);
   const [recheckingAll, setRecheckingAll] = React.useState(false);
+  const [panelExpanded, setPanelExpanded] = React.useState(false);
 
   const accountById = React.useMemo(
     () => new Map((accounts as any[]).map((a) => [a.id, a])),
@@ -57,6 +59,11 @@ export function PendingImportsPanel() {
     }
   };
 
+  const pillsRef = useStaggerReveal<HTMLDivElement>("[data-stagger-item]", [
+    (pendingImports as any[]).length,
+    panelExpanded,
+  ]);
+
   if (loading || (pendingImports as any[]).length === 0) return null;
 
   return (
@@ -66,6 +73,7 @@ export function PendingImportsPanel() {
         icon={<MessageSquareText className="h-4 w-4" />}
         iconClassName="bg-sky-500/12 text-sky-600 dark:text-sky-400"
         title="Messages"
+        onExpandedChange={setPanelExpanded}
         summary={
           unmatched.length > 0 ? (
             <span className="rounded-full bg-sky-500/12 px-2 py-0.5 text-xs font-semibold text-sky-700 dark:text-sky-300">
@@ -95,7 +103,7 @@ export function PendingImportsPanel() {
             </div>
           )}
 
-          <div className="flex flex-wrap gap-2">
+          <div ref={pillsRef} className="flex flex-wrap gap-2">
             {(pendingImports as any[]).slice(0, 8).map((item) => {
               const account = item.accountId ? accountById.get(item.accountId) : null;
               const toAccount = item.toAccountId ? accountById.get(item.toAccountId) : null;
@@ -109,6 +117,7 @@ export function PendingImportsPanel() {
                 <button
                   key={item.id}
                   type="button"
+                  data-stagger-item
                   onClick={() => setSelected(item)}
                   className={`motion-expressive press-expressive flex max-w-full items-center gap-2 rounded-full border py-1.5 pl-3 pr-3 text-left text-sm ${
                     matched

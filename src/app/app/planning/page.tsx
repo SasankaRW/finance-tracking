@@ -1,11 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AnimatePresence, motion } from "motion/react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar, Repeat, Target } from "lucide-react";
 import BudgetsPage from "@/app/app/budgets/page";
 import SubscriptionsPage from "@/app/app/subscriptions/page";
 import EventsPage from "@/app/app/events/page";
+import { iosIn } from "@/lib/motion/variants";
 
 export default function PlanningPage() {
     const [activeTab, setActiveTab] = React.useState("subscriptions");
@@ -38,17 +40,53 @@ export default function PlanningPage() {
                     </TabsList>
                 </div>
 
-                <TabsContent value="subscriptions" className="mt-0 space-y-4 sm:space-y-6">
-                    {activeTab === "subscriptions" && <SubscriptionsPage embedded />}
-                </TabsContent>
-
-                <TabsContent value="budgets" className="mt-0 space-y-4 sm:space-y-6">
-                    {activeTab === "budgets" && <BudgetsPage embedded />}
-                </TabsContent>
-
-                <TabsContent value="events" className="mt-0 space-y-4 sm:space-y-6">
-                    {activeTab === "events" && <EventsPage embedded />}
-                </TabsContent>
+                {/* Deliberately not Radix TabsContent here: it unmounts inactive
+                    panels itself (Presence present={isSelected}, no CSS animation
+                    on that node for it to wait on), so a nested AnimatePresence
+                    never gets a chance to run its exit — the whole subtree is
+                    yanked in the same commit the tab changes. Driving the swap
+                    directly off activeTab is what actually lets exit play. */}
+                <AnimatePresence mode="wait">
+                    {activeTab === "subscriptions" && (
+                        <motion.div
+                            key="subscriptions"
+                            role="tabpanel"
+                            variants={iosIn}
+                            initial="initial"
+                            animate="animate"
+                            exit="exit"
+                            className="space-y-4 sm:space-y-6"
+                        >
+                            <SubscriptionsPage embedded />
+                        </motion.div>
+                    )}
+                    {activeTab === "budgets" && (
+                        <motion.div
+                            key="budgets"
+                            role="tabpanel"
+                            variants={iosIn}
+                            initial="initial"
+                            animate="animate"
+                            exit="exit"
+                            className="space-y-4 sm:space-y-6"
+                        >
+                            <BudgetsPage embedded />
+                        </motion.div>
+                    )}
+                    {activeTab === "events" && (
+                        <motion.div
+                            key="events"
+                            role="tabpanel"
+                            variants={iosIn}
+                            initial="initial"
+                            animate="animate"
+                            exit="exit"
+                            className="space-y-4 sm:space-y-6"
+                        >
+                            <EventsPage embedded />
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </Tabs>
         </div>
     );

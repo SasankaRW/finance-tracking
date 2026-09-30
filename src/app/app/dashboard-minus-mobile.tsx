@@ -26,6 +26,7 @@ import { useBalanceVisibility } from "@/lib/hooks/use-balance-visibility";
 import { getCategoryIcon } from "@/lib/finance/category-icons";
 import { useDeleteTransactionWithUndo } from "@/lib/finance/use-delete-transaction";
 import { SwipeableRow } from "@/components/swipeable-row";
+import { AnimatedNumber } from "@/components/animated-number";
 import { CreateTransactionDialog } from "@/app/app/transactions/create-transaction-dialog";
 import { DebtPillsSummary } from "@/components/debt-pills-summary";
 import { UpcomingBillsPanel } from "@/components/upcoming-bills-panel";
@@ -347,9 +348,37 @@ export function DashboardMinusMobile({
       </div>
 
       {isLoading ? (
-        <div className="space-y-3">
-          <Skeleton className="h-40 w-full rounded-[2rem]" />
-          <Skeleton className="h-24 w-full rounded-[1.75rem]" />
+        // Shaped like the real hero card + tile grid (same gradient, radius,
+        // padding and line positions) so content lands where the placeholder
+        // was instead of jumping. Opacity pulse only — no animated backgrounds.
+        <div className="space-y-3" aria-hidden="true">
+          <div className="px-1.5">
+            <div className="hero-card relative overflow-hidden rounded-[2.25rem] p-5">
+              <div className="animate-pulse">
+                <div className="h-3.5 w-16 rounded-full bg-white/20" />
+                <div className="mt-3 h-9 w-44 rounded-xl bg-white/25" />
+                <div className="mt-2.5 h-3 w-36 rounded-full bg-white/15" />
+                <div className="mt-4 flex items-center justify-between border-t border-white/15 pt-3">
+                  <div className="h-7 w-28 rounded-full bg-white/15" />
+                  <div className="h-7 w-20 rounded-full bg-white/20" />
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {[0, 1].map((i) => (
+              <div
+                key={i}
+                className={`elevation-1 animate-pulse rounded-[1.75rem] bg-card px-3.5 py-4 ${
+                  i === 0 ? "rounded-br-lg" : "rounded-bl-lg"
+                }`}
+              >
+                <div className="h-3 w-20 rounded-full bg-muted" />
+                <div className="mt-3 h-6 w-24 rounded-lg bg-muted" />
+                <div className="mt-3 h-2.5 w-12 rounded-full bg-muted/70" />
+              </div>
+            ))}
+          </div>
         </div>
       ) : (
         <>
@@ -396,7 +425,14 @@ export function DashboardMinusMobile({
                     balanceHidden && "select-none blur-md",
                   )}
                 >
-                  {balanceText}
+                  {balanceMissingRate ? (
+                    "—"
+                  ) : (
+                    <AnimatedNumber
+                      value={totalBalance}
+                      formatFn={(v) => smartMoney(v, balanceCurrency, HERO_COMPACT_THRESHOLD)}
+                    />
+                  )}
                 </p>
                 <p className="mt-1 text-xs text-white/70">
                   {balanceMissingRate
@@ -430,7 +466,14 @@ export function DashboardMinusMobile({
                     balanceHidden && "select-none blur-sm",
                   )}
                 >
-                  {cashText}
+                  {cashMissingRate ? (
+                    "—"
+                  ) : (
+                    <AnimatedNumber
+                      value={cashInHand ?? 0}
+                      formatFn={(v) => smartMoney(v, balanceCurrency, TILE_COMPACT_THRESHOLD)}
+                    />
+                  )}
                 </span>
               </span>
               <span className="shrink-0 rounded-full bg-white/20 px-3.5 py-1.5 font-display text-xs font-bold text-white">
@@ -485,7 +528,7 @@ export function DashboardMinusMobile({
                   tileTextSize(dailyText),
                 )}
               >
-                {dailyText}
+                <AnimatedNumber value={todayTotal} formatFn={(v) => smartMoney(v, undefined, TILE_COMPACT_THRESHOLD)} />
               </p>
               <p className="mt-auto pt-1 text-[11px] opacity-65">{format(new Date(), "MMM d")}</p>
             </div>
@@ -511,7 +554,10 @@ export function DashboardMinusMobile({
                       tileTextSize(monthlyText),
                     )}
                   >
-                    {monthlyText}
+                    <AnimatedNumber
+                      value={budgetStatus.totalSpent}
+                      formatFn={(v) => smartMoney(v, undefined, TILE_COMPACT_THRESHOLD)}
+                    />
                   </p>
                   <p className="mt-auto pt-1 text-[11px] opacity-65">tap for breakdown</p>
                 </button>
@@ -618,11 +664,21 @@ export function DashboardMinusMobile({
 
         <div className="overflow-hidden rounded-[1.75rem] bg-card elevation-1">
           {isLoading ? (
-            <div className="space-y-0 p-4">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="mb-3 h-10 w-full rounded-xl" />
+            <ul className="animate-pulse" aria-hidden="true">
+              {[0, 1, 2].map((i) => (
+                <li
+                  key={i}
+                  className={`flex items-center gap-3 px-4 py-2.5 ${i > 0 ? "border-t border-border/50" : ""}`}
+                >
+                  <span className="h-8 w-8 shrink-0 rounded-xl bg-muted" />
+                  <div className="min-w-0 flex-1">
+                    <div className="h-3.5 w-28 rounded-full bg-muted" />
+                    <div className="mt-1.5 h-2.5 w-16 rounded-full bg-muted/70" />
+                  </div>
+                  <div className="h-3.5 w-14 shrink-0 rounded-full bg-muted" />
+                </li>
               ))}
-            </div>
+            </ul>
           ) : todayTx.length ? (
             <ul>
               {todayTx.map((t, idx) => {

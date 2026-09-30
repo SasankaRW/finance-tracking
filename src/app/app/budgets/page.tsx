@@ -35,6 +35,7 @@ import { createBudget, deleteBudget } from "@/lib/finance/budget-mutations";
 import { COMMON_CURRENCIES, DEFAULT_CURRENCY, HOME_CURRENCY } from "@/shared/currency";
 import { useFxRates } from "@/lib/fx/use-fx-rates";
 import { formatCurrencyCode, formatMoney } from "@/lib/format";
+import { useStaggerReveal } from "@/lib/motion/use-stagger-reveal";
 import { getCategoryIcon } from "@/lib/finance/category-icons";
 import { Button } from "@/components/ui/button";
 import {
@@ -255,6 +256,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
       };
     });
   }, [mode, budgets, expenseCategories, transactions, convert]);
+  const mobileListRef = useStaggerReveal<HTMLDivElement>("[data-stagger-item]", [budgetRows.length, loading]);
 
   const navigateMonth = (direction: "prev" | "next") => {
     const [year, monthNum] = month.split("-");
@@ -573,7 +575,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="grid gap-3 p-4 md:hidden">
+            <div ref={mobileListRef} className="grid gap-3 p-4 md:hidden">
               {loading ? (
                 <div className="rounded-3xl border p-6 text-center text-sm text-muted-foreground">
                   Loading budgets...
@@ -587,7 +589,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
                   const tone = budgetTone(b);
 
                   return (
-                    <Card key={b.id} className="surface-container-high py-0">
+                    <Card key={b.id} data-stagger-item className="surface-container-high py-0">
                       <CardContent className="space-y-4 p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">

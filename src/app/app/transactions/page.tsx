@@ -42,6 +42,7 @@ import { downloadTextFile, toCsv } from "@/lib/export/csv";
 import { transactionFormSchema, type TransactionFormValues } from "@/lib/finance/transaction-form-schema";
 import { COMMON_CURRENCIES, HOME_CURRENCY } from "@/shared/currency";
 import { useFxRates } from "@/lib/fx/use-fx-rates";
+import { useMediaQuery } from "@/lib/hooks/use-media-query";
 import { CreateTransactionDialog } from "@/app/app/transactions/create-transaction-dialog";
 import { PendingImportsPanel } from "@/components/pending-imports-panel";
 import { PasteMessageDialog } from "@/components/paste-message-dialog";
@@ -81,6 +82,166 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { TransactionTrendChart } from "@/components/transaction-trend-chart";
+
+const MOBILE_PAGE_SIZE = 40;
+
+// Uses the category's own icon for income/expense rows when one is set —
+// falls back to the plain directional arrow for transfers (no category) and
+// for anything left uncategorized.
+function transactionIcon(t: any, category: any) {
+  if (t.kind === "transfer") return <ArrowLeftRight className="h-4 w-4 text-blue-600" />;
+  const colorClass = t.kind === "income" ? "text-emerald-600" : "text-rose-600";
+  if (category) {
+    const Icon = getCategoryIcon(category);
+    return <Icon className={`h-4 w-4 ${colorClass}`} />;
+  }
+  return t.kind === "income" ? (
+    <ArrowUpRight className={`h-4 w-4 ${colorClass}`} />
+  ) : (
+    <ArrowDownRight className={`h-4 w-4 ${colorClass}`} />
+  );
+}
+
+// One date group's header + row list. Memoized so appending more groups as the
+// list scrolls doesn't re-render the ones already on screen — callers must
+// pass stable (memoized) maps and callbacks for that to hold.
+const TransactionDateGroup = React.memo(function TransactionDateGroup({
+  group,
+  index,
+  accountNameById,
+  categoryById,
+  eventById,
+  onEdit,
+  onDelete,
+}: {
+  group: { key: string; label: string; net: number; items: any[] };
+  index: number;
+  accountNameById: Map<string, string>;
+  categoryById: Map<string, any>;
+  eventById: Map<string, string>;
+  onEdit: (t: any) => void;
+  onDelete: (t: any) => void;
+}) {
+  // No per-row mount animation here (deliberately): GSAP-driven row staggers
+  // were real, measurable added load on mount for the app's heaviest page.
+  // The group header's own CSS fade below is enough reveal for this list.
+  return (
+    <div className="animate-ios-in" style={{ animationDelay: `${Math.min(index, 5) * 50}ms` }}>
+      <div className="flex items-baseline justify-between gap-3 px-3 pb-1.5">
+        <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+          {group.label}
+        </span>
+        {group.net !== 0 && (
+          <span
+            className={`text-[11px] font-semibold tabular-nums ${
+              group.net > 0
+                ? "text-emerald-600 dark:text-emerald-400"
+                : "text-muted-foreground"
+            }`}
+          >
+            {group.net > 0 ? "+" : "-"}
+            {formatMoney(Math.abs(group.net))}
+          </span>
+        )}
+      </div>
+
+      <ul className="elevation-1 overflow-hidden rounded-[1.5rem] bg-card">
+        {group.items.map((t: any, idx: number) => {
+          const occurredAt =
+            t.occurredAt instanceof Timestamp ? t.occurredAt.toDate() : new Date();
+          const accountName = t.accountId ? accountNameById.get(t.accountId) : null;
+          const category = t.categoryId ? categoryById.get(t.categoryId) : null;
+          const categoryName = category?.name ?? null;
+          const eventName = t.eventId ? eventById.get(t.eventId) ?? null : null;
+          const fromAccountName = t.fromAccountId ? accountNameById.get(t.fromAccountId) : null;
+          const toAccountName = t.toAccountId ? accountNameById.get(t.toAccountId) : null;
+
+          const title = t.note?.trim() || categoryName || t.kind;
+          const meta = [
+            format(occurredAt, "HH:mm"),
+            t.kind === "transfer"
+              ? `${fromAccountName ?? "—"} → ${toAccountName ?? "—"}`
+              : accountName,
+            categoryName && categoryName !== title ? categoryName : null,
+            eventName,
+          ]
+            .filter(Boolean)
+            .join(" · ");
+
+          return (
+            <li key={t.id} className={idx > 0 ? "border-t border-border/50" : ""}>
+              <SwipeableRow
+                onEdit={() => onEdit(t)}
+                onDelete={() => onDelete(t)}
+                hint={index === 0 && idx === 0}
+              >
+                <div className="motion-expressive flex items-center gap-2.5 px-3 py-2.5 transition-colors active:bg-muted/50">
+                  <div
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
+                      t.kind === "income"
+                        ? "bg-emerald-500/10"
+                        : t.kind === "expense"
+                          ? "bg-rose-500/10"
+                          : "bg-blue-500/10"
+                    }`}
+                  >
+                    {transactionIcon(t, category)}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className={`truncate text-sm font-semibold leading-tight ${
+                        t.note?.trim() || categoryName ? "" : "capitalize text-muted-foreground"
+                      }`}
+                    >
+                      {title}
+                    </p>
+                    <p className="mt-0.5 truncate text-[11px] leading-tight text-muted-foreground">
+                      {meta}
+                    </p>
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-0.5">
+                    <span
+                      className={`whitespace-nowrap text-sm font-bold tabular-nums ${
+                        t.kind === "income"
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : t.kind === "expense"
+                            ? "text-rose-600 dark:text-rose-400"
+                            : ""
+                      }`}
+                    >
+                      {t.kind === "expense" ? "-" : t.kind === "income" ? "+" : ""}
+                      {formatMoney(t.amount ?? 0)}
+                    </span>
+
+                    <RowActionsMenu
+                      ariaLabel={`${t.note || t.kind} actions`}
+                      triggerClassName="-mr-1 h-9 w-9 shrink-0 rounded-full p-0 text-muted-foreground"
+                      actions={[
+                        {
+                          label: "Edit",
+                          icon: Pencil,
+                          onClick: () => onEdit(t),
+                        },
+                        {
+                          label: "Delete",
+                          icon: Trash2,
+                          destructive: true,
+                          onClick: () => onDelete(t),
+                        },
+                      ]}
+                    />
+                  </div>
+                </div>
+              </SwipeableRow>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+});
 
 export default function TransactionsPage() {
   const searchParams = useSearchParams();
@@ -203,6 +364,19 @@ export default function TransactionsPage() {
     () => new Map((events as any[]).map((e: any) => [e.id, e.name])),
     [events],
   );
+  const accountNameById = React.useMemo(
+    () => new Map<string, string>((accounts as any[]).map((a: any) => [a.id, a.name])),
+    [accounts],
+  );
+  const categoryById = React.useMemo(
+    () => new Map<string, any>(allCategories.map((c: any) => [c.id, c])),
+    [allCategories],
+  );
+
+  // Only build the layout that's actually on screen — `hidden md:block` only
+  // hides with CSS, so without this a phone was rendering the full desktop
+  // table for every transaction as well as the mobile list.
+  const isDesktop = useMediaQuery("(min-width: 768px)");
 
   const handleCreateCategory = async () => {
     if (!user || !newCategoryName.trim()) return;
@@ -260,6 +434,34 @@ export default function TransactionsPage() {
     return a ? formatCurrencyCode(a.currency) : "";
   }, [accounts, form]);
 
+  // Shared with the mobile TransactionDateGroup rows below — the desktop
+  // table still inlines its own copy of this (pre-existing duplication, not
+  // introduced here).
+  const handleEditTransaction = React.useCallback(
+    (t: any) => {
+      const occurredAt = t.occurredAt instanceof Timestamp ? t.occurredAt.toDate() : new Date();
+      setEdit(t);
+      form.reset({
+        kind: t.kind,
+        amount: t.amount ?? 0,
+        occurredAt,
+        note: t.note ?? "",
+        accountId: t.accountId,
+        categoryId: t.categoryId,
+        eventId: t.eventId,
+        fromAccountId: t.fromAccountId,
+        toAccountId: t.toAccountId,
+      });
+    },
+    [form],
+  );
+
+  // useDeleteTransactionWithUndo returns a new function every render; route it
+  // through a ref so the memoized mobile rows get a stable callback.
+  const deleteRef = React.useRef(handleDeleteTransaction);
+  deleteRef.current = handleDeleteTransaction;
+  const handleDeleteRow = React.useCallback((t: any) => void deleteRef.current(t), []);
+
   async function submitEdit(values: TransactionFormValues) {
     if (!user || !edit) return;
     try {
@@ -286,23 +488,8 @@ export default function TransactionsPage() {
     }
   }
 
-  // Uses the category's own icon for income/expense rows when one is set —
-  // falls back to the plain directional arrow for transfers (no category) and
-  // for anything left uncategorized.
-  const getTransactionIcon = (t: any) => {
-    if (t.kind === "transfer") return <ArrowLeftRight className="h-4 w-4 text-blue-600" />;
-    const colorClass = t.kind === "income" ? "text-emerald-600" : "text-rose-600";
-    const category = t.categoryId ? allCategories.find((c: any) => c.id === t.categoryId) : null;
-    if (category) {
-      const Icon = getCategoryIcon(category);
-      return <Icon className={`h-4 w-4 ${colorClass}`} />;
-    }
-    return t.kind === "income" ? (
-      <ArrowUpRight className={`h-4 w-4 ${colorClass}`} />
-    ) : (
-      <ArrowDownRight className={`h-4 w-4 ${colorClass}`} />
-    );
-  };
+  const getTransactionIcon = (t: any) =>
+    transactionIcon(t, t.categoryId ? categoryById.get(t.categoryId) : null);
 
   // Apply client-side filtering for date range and search
   const filteredTransactions = React.useMemo(() => {
@@ -413,12 +600,301 @@ export default function TransactionsPage() {
     return groups;
   }, [filteredTransactions]);
 
+  // Mobile renders whole day-groups incrementally rather than the entire
+  // (unpaginated) history at once. Grouping still runs over the full list so
+  // every visible day's net total stays correct.
+  const [mobileVisibleCount, setMobileVisibleCount] = React.useState(MOBILE_PAGE_SIZE);
+  React.useEffect(() => {
+    // Reset only on an actual filter change — not on every realtime snapshot,
+    // which would collapse a scrolled-down list back to the top after e.g. a delete.
+    setMobileVisibleCount(MOBILE_PAGE_SIZE);
+  }, [filters, debouncedSearch, dateRange]);
+
+  const visibleGroups = React.useMemo(() => {
+    const out: typeof groupedTransactions = [];
+    let count = 0;
+    for (const g of groupedTransactions) {
+      if (count >= mobileVisibleCount) break;
+      out.push(g);
+      count += g.items.length;
+    }
+    return out;
+  }, [groupedTransactions, mobileVisibleCount]);
+  const hasMoreMobile = visibleGroups.length < groupedTransactions.length;
+
+  const loadMoreRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    const el = loadMoreRef.current;
+    if (!el || !hasMoreMobile) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) setMobileVisibleCount((c) => c + MOBILE_PAGE_SIZE);
+      },
+      { rootMargin: "600px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+    // visibleGroups.length: re-observe after each load so a still-visible
+    // sentinel (short screen) keeps loading instead of stalling.
+  }, [hasMoreMobile, visibleGroups.length]);
+
   const hasFilters = filters.accountId || filters.categoryId || filters.eventId || filters.noEvent || debouncedSearch.trim() || dateRangePreset !== "month";
   const clearAllFilters = () => {
     setFilters({});
     setSearchQuery("");
     setDateRangePreset("month");
   };
+
+
+  // Shared by the desktop inline row and the mobile filter sheet; only one of
+  // them is ever mounted (gated on isDesktop), so the nested Manage Categories
+  // dialog inside is never duplicated.
+  const filterFields = (
+    <>
+      <div className="space-y-1.5">
+        <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+          Account
+        </Label>
+        <Select
+          value={filters.accountId ?? "all"}
+          onValueChange={(v) => setFilters((f) => ({ ...f, accountId: v === "all" ? undefined : v }))}
+        >
+          <SelectTrigger className="h-10 rounded-xl px-3">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Accounts</SelectItem>
+            {accounts.map((a: any) => (
+              <SelectItem key={a.id} value={a.id}>
+                {a.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+          Trip
+        </Label>
+        <Select
+          value={filters.noEvent ? "none" : (filters.eventId ?? "all")}
+          onValueChange={(v) =>
+            setFilters((f) => ({
+              ...f,
+              eventId: v === "all" || v === "none" ? undefined : v,
+              noEvent: v === "none" ? true : undefined,
+            }))
+          }
+        >
+          <SelectTrigger className="h-10 rounded-xl px-3">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Trips</SelectItem>
+            <SelectItem value="none">No Trip</SelectItem>
+            {(events as any[])
+              .filter((e: any) => e?.status !== "archived")
+              .map((e: any) => (
+                <SelectItem key={e.id} value={e.id}>
+                  {e.name}
+                </SelectItem>
+              ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="col-span-2 space-y-1.5 sm:col-span-1">
+        <div className="flex items-center justify-between">
+          <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+            Category
+          </Label>
+          <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-6 gap-1 px-2 text-xs">
+                <Settings2 className="h-3 w-3" />
+                Manage
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Manage Categories</DialogTitle>
+                <DialogDescription>
+                  Add or remove categories for your transactions
+                </DialogDescription>
+              </DialogHeader>
+              <DialogBody className="space-y-4">
+                {/* Add new category */}
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <Popover open={iconPickerOpen} onOpenChange={setIconPickerOpen}>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          aria-label="Choose icon"
+                          className="motion-expressive press-expressive flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground"
+                        >
+                          {React.createElement(
+                            getCategoryIcon({
+                              name: newCategoryName,
+                              kind: newCategoryKind,
+                              icon: newCategoryIcon,
+                            }),
+                            { className: "h-4.5 w-4.5" },
+                          )}
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-3" align="start">
+                        <CategoryIconPicker
+                          value={newCategoryIcon}
+                          onChange={(key) => {
+                            setNewCategoryIcon(key);
+                            setIconPickerOpen(false);
+                          }}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <Input
+                      placeholder="Category name..."
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      className="h-10 flex-1"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleCreateCategory();
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Select
+                      value={newCategoryKind}
+                      onValueChange={(v) => setNewCategoryKind(v as "expense" | "income")}
+                    >
+                      <SelectTrigger className="h-10 flex-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="expense">Expense</SelectItem>
+                        <SelectItem value="income">Income</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      onClick={handleCreateCategory}
+                      disabled={isCreatingCategory || !newCategoryName.trim()}
+                      className="h-10"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Category Lists */}
+                <div className="space-y-3 max-h-[300px] overflow-y-auto">
+                  {/* Expense Categories */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <TrendingDown className="h-4 w-4 text-rose-600" />
+                      <span className="text-sm font-medium">Expenses</span>
+                      <Badge variant="secondary" className="text-xs">{expenseCats.length}</Badge>
+                    </div>
+                    <div className="space-y-1">
+                      {expenseCats.length ? (
+                        expenseCats.map((c: any) => {
+                          const RowIcon = getCategoryIcon(c);
+                          return (
+                          <div
+                            key={c.id}
+                            className="flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-muted group"
+                          >
+                            <div className="flex items-center gap-2">
+                              <RowIcon className="h-3.5 w-3.5 text-rose-600" />
+                              <span className="text-sm">{c.name}</span>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive"
+                              onClick={() => handleDeleteCategory(c.id)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                          );
+                        })
+                      ) : (
+                        <p className="text-xs text-muted-foreground py-2">No expense categories</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Income Categories */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <TrendingUp className="h-4 w-4 text-emerald-600" />
+                      <span className="text-sm font-medium">Income</span>
+                      <Badge variant="secondary" className="text-xs">{incomeCats.length}</Badge>
+                    </div>
+                    <div className="space-y-1">
+                      {incomeCats.length ? (
+                        incomeCats.map((c: any) => {
+                          const RowIcon = getCategoryIcon(c);
+                          return (
+                          <div
+                            key={c.id}
+                            className="flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-muted group"
+                          >
+                            <div className="flex items-center gap-2">
+                              <RowIcon className="h-3.5 w-3.5 text-emerald-600" />
+                              <span className="text-sm">{c.name}</span>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive"
+                              onClick={() => handleDeleteCategory(c.id)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                          );
+                        })
+                      ) : (
+                        <p className="text-xs text-muted-foreground py-2">No income categories</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </DialogBody>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setCategoryDialogOpen(false)}>
+                  Done
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+        <Select
+          value={filters.categoryId ?? "all"}
+          onValueChange={(v) => setFilters((f) => ({ ...f, categoryId: v === "all" ? undefined : v }))}
+        >
+          <SelectTrigger className="h-10 rounded-xl px-3">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            {allCategories.map((c: any) => (
+              <SelectItem key={c.id} value={c.id}>
+                {c.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </>
+  );
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -753,8 +1229,8 @@ export default function TransactionsPage() {
                 type="button"
                 variant={activeFilterCount > 0 ? "default" : "outline"}
                 size="sm"
-                onClick={() => setMobileFiltersOpen((open) => !open)}
-                aria-expanded={mobileFiltersOpen}
+                onClick={() => setMobileFiltersOpen(true)}
+                aria-haspopup="dialog"
                 className="h-8 shrink-0 rounded-full px-3 text-xs md:hidden"
               >
                 <Filter className="h-3.5 w-3.5 mr-1" />
@@ -763,259 +1239,16 @@ export default function TransactionsPage() {
             </div>
           </div>
         </CardHeader>
+        {isDesktop && (
         <CardContent className="space-y-3 p-4 pt-0 max-md:px-0 sm:space-y-4 sm:p-6 sm:pt-0">
-          {/* Filters */}
-          <div
-            className={`grid-cols-2 gap-2 max-md:elevation-1 max-md:rounded-[1.5rem] max-md:bg-card max-md:p-3 sm:grid-cols-3 sm:gap-3 ${
-              mobileFiltersOpen ? "grid" : "hidden md:grid"
-            }`}
-          >
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground uppercase tracking-wider">
-                Account
-              </Label>
-              <Select
-                value={filters.accountId ?? "all"}
-                onValueChange={(v) => setFilters((f) => ({ ...f, accountId: v === "all" ? undefined : v }))}
-              >
-                <SelectTrigger className="h-10 rounded-xl px-3">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Accounts</SelectItem>
-                  {accounts.map((a: any) => (
-                    <SelectItem key={a.id} value={a.id}>
-                      {a.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground uppercase tracking-wider">
-                Trip
-              </Label>
-              <Select
-                value={filters.noEvent ? "none" : (filters.eventId ?? "all")}
-                onValueChange={(v) =>
-                  setFilters((f) => ({
-                    ...f,
-                    eventId: v === "all" || v === "none" ? undefined : v,
-                    noEvent: v === "none" ? true : undefined,
-                  }))
-                }
-              >
-                <SelectTrigger className="h-10 rounded-xl px-3">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Trips</SelectItem>
-                  <SelectItem value="none">No Trip</SelectItem>
-                  {(events as any[])
-                    .filter((e: any) => e?.status !== "archived")
-                    .map((e: any) => (
-                      <SelectItem key={e.id} value={e.id}>
-                        {e.name}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="col-span-2 space-y-1.5 sm:col-span-1">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs text-muted-foreground uppercase tracking-wider">
-                  Category
-                </Label>
-                <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-6 gap-1 px-2 text-xs">
-                      <Settings2 className="h-3 w-3" />
-                      Manage
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>Manage Categories</DialogTitle>
-                      <DialogDescription>
-                        Add or remove categories for your transactions
-                      </DialogDescription>
-                    </DialogHeader>
-                    <DialogBody className="space-y-4">
-                      {/* Add new category */}
-                      <div className="space-y-2">
-                        <div className="flex gap-2">
-                          <Popover open={iconPickerOpen} onOpenChange={setIconPickerOpen}>
-                            <PopoverTrigger asChild>
-                              <button
-                                type="button"
-                                aria-label="Choose icon"
-                                className="motion-expressive press-expressive flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground"
-                              >
-                                {React.createElement(
-                                  getCategoryIcon({
-                                    name: newCategoryName,
-                                    kind: newCategoryKind,
-                                    icon: newCategoryIcon,
-                                  }),
-                                  { className: "h-4.5 w-4.5" },
-                                )}
-                              </button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-3" align="start">
-                              <CategoryIconPicker
-                                value={newCategoryIcon}
-                                onChange={(key) => {
-                                  setNewCategoryIcon(key);
-                                  setIconPickerOpen(false);
-                                }}
-                              />
-                            </PopoverContent>
-                          </Popover>
-                          <Input
-                            placeholder="Category name..."
-                            value={newCategoryName}
-                            onChange={(e) => setNewCategoryName(e.target.value)}
-                            className="h-10 flex-1"
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                handleCreateCategory();
-                              }
-                            }}
-                          />
-                        </div>
-                        <div className="flex gap-2">
-                          <Select
-                            value={newCategoryKind}
-                            onValueChange={(v) => setNewCategoryKind(v as "expense" | "income")}
-                          >
-                            <SelectTrigger className="h-10 flex-1">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="expense">Expense</SelectItem>
-                              <SelectItem value="income">Income</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Button
-                            onClick={handleCreateCategory}
-                            disabled={isCreatingCategory || !newCategoryName.trim()}
-                            className="h-10"
-                          >
-                            <Plus className="h-4 w-4 mr-1" />
-                            Add
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* Category Lists */}
-                      <div className="space-y-3 max-h-[300px] overflow-y-auto">
-                        {/* Expense Categories */}
-                        <div>
-                          <div className="flex items-center gap-2 mb-2">
-                            <TrendingDown className="h-4 w-4 text-rose-600" />
-                            <span className="text-sm font-medium">Expenses</span>
-                            <Badge variant="secondary" className="text-xs">{expenseCats.length}</Badge>
-                          </div>
-                          <div className="space-y-1">
-                            {expenseCats.length ? (
-                              expenseCats.map((c: any) => {
-                                const RowIcon = getCategoryIcon(c);
-                                return (
-                                <div
-                                  key={c.id}
-                                  className="flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-muted group"
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <RowIcon className="h-3.5 w-3.5 text-rose-600" />
-                                    <span className="text-sm">{c.name}</span>
-                                  </div>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive"
-                                    onClick={() => handleDeleteCategory(c.id)}
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </Button>
-                                </div>
-                                );
-                              })
-                            ) : (
-                              <p className="text-xs text-muted-foreground py-2">No expense categories</p>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Income Categories */}
-                        <div>
-                          <div className="flex items-center gap-2 mb-2">
-                            <TrendingUp className="h-4 w-4 text-emerald-600" />
-                            <span className="text-sm font-medium">Income</span>
-                            <Badge variant="secondary" className="text-xs">{incomeCats.length}</Badge>
-                          </div>
-                          <div className="space-y-1">
-                            {incomeCats.length ? (
-                              incomeCats.map((c: any) => {
-                                const RowIcon = getCategoryIcon(c);
-                                return (
-                                <div
-                                  key={c.id}
-                                  className="flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-muted group"
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <RowIcon className="h-3.5 w-3.5 text-emerald-600" />
-                                    <span className="text-sm">{c.name}</span>
-                                  </div>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive"
-                                    onClick={() => handleDeleteCategory(c.id)}
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </Button>
-                                </div>
-                                );
-                              })
-                            ) : (
-                              <p className="text-xs text-muted-foreground py-2">No income categories</p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </DialogBody>
-                    <DialogFooter>
-                      <Button variant="ghost" onClick={() => setCategoryDialogOpen(false)}>
-                        Done
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              </div>
-              <Select
-                value={filters.categoryId ?? "all"}
-                onValueChange={(v) => setFilters((f) => ({ ...f, categoryId: v === "all" ? undefined : v }))}
-              >
-                <SelectTrigger className="h-10 rounded-xl px-3">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  {allCategories.map((c: any) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          {/* Filters — inline on desktop; on mobile they live in a bottom
+              sheet (below) so they never push the list down the page. */}
+          <div className="grid grid-cols-3 gap-3">{filterFields}</div>
         </CardContent>
+        )}
 
-        {/* Desktop Table View */}
+        {/* Desktop Table View — only built on desktop (see isDesktop). */}
+        {isDesktop && (
         <div className="border-t hidden md:block">
           <Table>
             <TableHeader>
@@ -1107,20 +1340,7 @@ export default function TransactionsPage() {
                             {
                               label: "Edit",
                               icon: Pencil,
-                              onClick: () => {
-                                setEdit(t);
-                                form.reset({
-                                  kind: t.kind,
-                                  amount: t.amount ?? 0,
-                                  occurredAt,
-                                  note: t.note ?? "",
-                                  accountId: t.accountId,
-                                  categoryId: t.categoryId,
-                                  eventId: t.eventId,
-                                  fromAccountId: t.fromAccountId,
-                                  toAccountId: t.toAccountId,
-                                });
-                              },
+                              onClick: () => handleEditTransaction(t),
                             },
                             {
                               label: "Delete",
@@ -1169,9 +1389,39 @@ export default function TransactionsPage() {
             </TableBody>
           </Table>
         </div>
+        )}
       </Card>
 
+      {!isDesktop && (
+        <Dialog open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Filters</DialogTitle>
+              <DialogDescription>Changes apply as you pick.</DialogDescription>
+            </DialogHeader>
+            <DialogBody className="grid grid-cols-2 gap-3">{filterFields}</DialogBody>
+            <DialogFooter>
+              {activeFilterCount > 0 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setFilters((f) => ({ ...f, accountId: undefined, categoryId: undefined, eventId: undefined, noEvent: undefined }))}
+                >
+                  Reset
+                </Button>
+              )}
+              <Button type="button" onClick={() => setMobileFiltersOpen(false)}>
+                {loading
+                  ? "Show transactions"
+                  : `Show ${summaryStats.total} transaction${summaryStats.total !== 1 ? "s" : ""}`}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
       {/* Mobile Card View - grouped by day, two lines per row */}
+      {!isDesktop && (
       <div className="md:hidden">
         {loading ? (
           <div className="rounded-2xl border border-dashed p-6 text-center text-muted-foreground">
@@ -1179,140 +1429,23 @@ export default function TransactionsPage() {
           </div>
         ) : groupedTransactions.length ? (
           <div className="space-y-3">
-            {groupedTransactions.map((group, gi) => (
-              <div key={group.key} className="animate-ios-in" style={{ animationDelay: `${Math.min(gi, 5) * 50}ms` }}>
-                <div className="flex items-baseline justify-between gap-3 px-3 pb-1.5">
-                  <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-                    {group.label}
-                  </span>
-                  {group.net !== 0 && (
-                    <span
-                      className={`text-[11px] font-semibold tabular-nums ${
-                        group.net > 0
-                          ? "text-emerald-600 dark:text-emerald-400"
-                          : "text-muted-foreground"
-                      }`}
-                    >
-                      {group.net > 0 ? "+" : "-"}
-                      {formatMoney(Math.abs(group.net))}
-                    </span>
-                  )}
-                </div>
-
-                <ul className="elevation-1 overflow-hidden rounded-[1.5rem] bg-card">
-                  {group.items.map((t: any, idx: number) => {
-                    const occurredAt =
-                      t.occurredAt instanceof Timestamp ? t.occurredAt.toDate() : new Date();
-                    const accountName = t.accountId
-                      ? accounts.find((a: any) => a.id === t.accountId)?.name
-                      : null;
-                    const categoryName = t.categoryId
-                      ? allCategories.find((c: any) => c.id === t.categoryId)?.name
-                      : null;
-                    const eventName = t.eventId ? eventById.get(t.eventId) ?? null : null;
-                    const fromAccountName = t.fromAccountId
-                      ? accounts.find((a: any) => a.id === t.fromAccountId)?.name
-                      : null;
-                    const toAccountName = t.toAccountId
-                      ? accounts.find((a: any) => a.id === t.toAccountId)?.name
-                      : null;
-
-                    const title = t.note?.trim() || categoryName || t.kind;
-                    const meta = [
-                      format(occurredAt, "HH:mm"),
-                      t.kind === "transfer"
-                        ? `${fromAccountName ?? "—"} → ${toAccountName ?? "—"}`
-                        : accountName,
-                      categoryName && categoryName !== title ? categoryName : null,
-                      eventName,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ");
-
-                    const startEdit = () => {
-                      setEdit(t);
-                      form.reset({
-                        kind: t.kind,
-                        amount: t.amount ?? 0,
-                        occurredAt,
-                        note: t.note ?? "",
-                        accountId: t.accountId,
-                        categoryId: t.categoryId,
-                        eventId: t.eventId,
-                        fromAccountId: t.fromAccountId,
-                        toAccountId: t.toAccountId,
-                      });
-                    };
-
-                    return (
-                      <li key={t.id} className={idx > 0 ? "border-t border-border/50" : ""}>
-                        <SwipeableRow onEdit={startEdit} onDelete={() => void handleDeleteTransaction(t)}>
-                          <div className="motion-expressive flex items-center gap-2.5 px-3 py-2.5 transition-colors active:bg-muted/50">
-                            <div
-                              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
-                                t.kind === "income"
-                                  ? "bg-emerald-500/10"
-                                  : t.kind === "expense"
-                                    ? "bg-rose-500/10"
-                                    : "bg-blue-500/10"
-                              }`}
-                            >
-                              {getTransactionIcon(t)}
-                            </div>
-
-                            <div className="min-w-0 flex-1">
-                              <p
-                                className={`truncate text-sm font-semibold leading-tight ${
-                                  t.note?.trim() || categoryName ? "" : "capitalize text-muted-foreground"
-                                }`}
-                              >
-                                {title}
-                              </p>
-                              <p className="mt-0.5 truncate text-[11px] leading-tight text-muted-foreground">
-                                {meta}
-                              </p>
-                            </div>
-
-                            <div className="flex shrink-0 items-center gap-0.5">
-                              <span
-                                className={`whitespace-nowrap text-sm font-bold tabular-nums ${
-                                  t.kind === "income"
-                                    ? "text-emerald-600 dark:text-emerald-400"
-                                    : t.kind === "expense"
-                                      ? "text-rose-600 dark:text-rose-400"
-                                      : ""
-                                }`}
-                              >
-                                {t.kind === "expense" ? "-" : t.kind === "income" ? "+" : ""}
-                                {formatMoney(t.amount ?? 0)}
-                              </span>
-
-                              <RowActionsMenu
-                                ariaLabel={`${t.note || t.kind} actions`}
-                                triggerClassName="-mr-1 h-9 w-9 shrink-0 rounded-full p-0 text-muted-foreground"
-                                actions={[
-                                  {
-                                    label: "Edit",
-                                    icon: Pencil,
-                                    onClick: startEdit,
-                                  },
-                                  {
-                                    label: "Delete",
-                                    icon: Trash2,
-                                    destructive: true,
-                                    onClick: () => void handleDeleteTransaction(t),
-                                  },
-                                ]}
-                              />
-                            </div>
-                          </div>
-                        </SwipeableRow>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
+            {visibleGroups.map((group, gi) => (
+              <TransactionDateGroup
+                key={group.key}
+                group={group}
+                index={gi}
+                accountNameById={accountNameById}
+                categoryById={categoryById}
+                eventById={eventById}
+                onEdit={handleEditTransaction}
+                onDelete={handleDeleteRow}
+              />
             ))}
+            {hasMoreMobile && (
+              <div ref={loadMoreRef} className="flex justify-center py-4" aria-hidden="true">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-muted-foreground/40" />
+              </div>
+            )}
           </div>
         ) : (
           <div className="rounded-[2rem] border border-dashed px-4 py-12">
@@ -1345,6 +1478,7 @@ export default function TransactionsPage() {
           </div>
         )}
       </div>
+      )}
 
       {/* Edit Dialog */}
       <Dialog open={Boolean(edit)} onOpenChange={(v) => (!v ? setEdit(null) : v)}>

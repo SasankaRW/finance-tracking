@@ -125,7 +125,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      {/* Keyed on the route so each page cross-fades in like a tab switch. */}
+      {/* Keyed on the route so each page cross-fades in like a tab switch.
+          Plain CSS, not Motion: an AnimatePresence exit here previously
+          animated transform/opacity across the *entire* page subtree (every
+          child layer needs recompositing) and its "wait" mode delayed the
+          next page's mount until the old one finished exiting — a real,
+          felt latency hit on every navigation, worst on heavy pages like
+          transactions. A GPU-composited CSS fade has none of that cost. */}
       <main
         key={pathname}
         className="animate-ios-fade mx-auto w-full max-w-7xl px-3 sm:px-6 lg:px-8 pb-28 md:pb-8 pt-[calc(env(safe-area-inset-top)+1rem)] md:pt-8"
@@ -154,9 +160,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 onClick={() => void hapticLight()}
                 className="group flex flex-1 flex-col items-center gap-0.5 py-1 text-[11px]"
               >
+                {/* Plain class swap, not a layoutId shared-layout slide: this
+                    pill sits inside the nav's backdrop-blur-xl surface, and
+                    animating anything near a backdrop-filter forces the
+                    browser to re-sample the blur every frame — the exact
+                    mobile WebView jank dialog.tsx's own comments warn about,
+                    here firing on every navigation instead of just a dialog
+                    open. Not worth it for a tab indicator. */}
                 <span
                   className={cn(
-                    "motion-expressive flex h-8 w-14 items-center justify-center rounded-full transition-colors group-active:scale-90",
+                    "motion-expressive flex h-8 w-14 items-center justify-center rounded-full group-active:scale-90",
                     active
                       ? "bg-secondary text-secondary-foreground"
                       : "text-muted-foreground group-hover:bg-muted/60",

@@ -5,6 +5,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { XIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { EASE_IOS_SPRING } from "@/lib/motion/easings"
 
 function Dialog({
   ...props
@@ -55,6 +56,8 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 const DRAG_DISMISS_PX = 110
 const DRAG_DISMISS_VELOCITY = 0.6 // px/ms
 const DRAG_FLING_MS = 220
+const DRAG_SNAP_BACK_MS = 220
+const SNAP_BACK_EASE = `cubic-bezier(${EASE_IOS_SPRING.join(", ")})`
 
 function DialogContent({
   className,
@@ -68,10 +71,17 @@ function DialogContent({
   const dragStateRef = React.useRef<{ startY: number; startTime: number } | null>(null)
   const [dragY, setDragY] = React.useState(0)
   const [flinging, setFlinging] = React.useState(false)
+  const [snappingBack, setSnappingBack] = React.useState(false)
+  const snapBackTimerRef = React.useRef<number | null>(null)
 
   const onGrabberPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     dragStateRef.current = { startY: e.clientY, startTime: performance.now() }
     setFlinging(false)
+    if (snapBackTimerRef.current !== null) {
+      window.clearTimeout(snapBackTimerRef.current)
+      snapBackTimerRef.current = null
+    }
+    setSnappingBack(false)
     e.currentTarget.setPointerCapture?.(e.pointerId)
   }
 
@@ -97,9 +107,22 @@ function DialogContent({
       setDragY(1200)
       window.setTimeout(() => hiddenCloseRef.current?.click(), DRAG_FLING_MS)
     } else {
+      // Released short of the dismiss threshold — spring back instead of
+      // snapping instantly. Same inline-transition-then-clear technique as
+      // the fling above (no persistent transition class, no will-change), so
+      // it can't reintroduce the corner-clip bug documented below.
+      setSnappingBack(true)
       setDragY(0)
+      if (snapBackTimerRef.current !== null) window.clearTimeout(snapBackTimerRef.current)
+      snapBackTimerRef.current = window.setTimeout(() => setSnappingBack(false), DRAG_SNAP_BACK_MS)
     }
   }
+
+  React.useEffect(() => {
+    return () => {
+      if (snapBackTimerRef.current !== null) window.clearTimeout(snapBackTimerRef.current)
+    }
+  }, [])
 
   return (
     <DialogPortal data-slot="dialog-portal">
@@ -116,12 +139,14 @@ function DialogContent({
           className
         )}
         style={
-          dragY > 0
+          dragY > 0 || snappingBack
             ? {
                 transform: `translate(-50%, ${dragY}px)`,
                 transition: flinging
                   ? `transform ${DRAG_FLING_MS}ms cubic-bezier(0.32, 0.72, 0, 1)`
-                  : "none",
+                  : snappingBack
+                    ? `transform ${DRAG_SNAP_BACK_MS}ms ${SNAP_BACK_EASE}`
+                    : "none",
               }
             : undefined
         }

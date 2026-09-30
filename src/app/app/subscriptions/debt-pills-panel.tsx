@@ -10,6 +10,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { createDebt, deleteDebt } from "@/lib/finance/debt-mutations";
 import { useDebts } from "@/lib/finance/hooks";
 import { formatCurrencyCode, formatMoney } from "@/lib/format";
+import { useStaggerReveal } from "@/lib/motion/use-stagger-reveal";
 import { COMMON_CURRENCIES } from "@/shared/currency";
 import { SettleDebtDialog } from "@/components/settle-debt-dialog";
 import { RowActionsMenu } from "@/components/row-actions-menu";
@@ -66,6 +67,7 @@ export function DebtPillsPanel() {
     () => (debts as any[]).filter((debt) => debt.status !== "settled"),
     [debts],
   );
+  const pillsRef = useStaggerReveal<HTMLDivElement>("[data-stagger-item]", [activeDebts.length, loading]);
 
   const totals = React.useMemo(() => {
     let owedToMe = 0;
@@ -247,7 +249,7 @@ export function DebtPillsPanel() {
         {loading ? (
           <div className="text-sm text-muted-foreground">Loading borrowed money...</div>
         ) : activeDebts.length ? (
-          <div className="flex flex-wrap gap-2">
+          <div ref={pillsRef} className="flex flex-wrap gap-2">
             {activeDebts.map((debt: any) => {
               const isReceivable = debt.direction === "owed_to_me";
               const due = toDate(debt.dueAt);
@@ -256,6 +258,7 @@ export function DebtPillsPanel() {
               return (
                 <div
                   key={debt.id}
+                  data-stagger-item
                   className={`flex max-w-full items-center gap-2 rounded-full border px-3 py-2 text-sm shadow-sm ${
                     isReceivable
                       ? "bg-emerald-500/10 border-emerald-500/20"
