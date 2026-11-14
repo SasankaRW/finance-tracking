@@ -606,7 +606,7 @@ export default function AccountsPage() {
       </Card>
 
       {/* Mobile Card List */}
-      <div className="grid gap-4 md:hidden">
+      <div className="grid grid-cols-1 gap-4 md:hidden">
         {loading ? (
           <Card>
             <CardContent className="py-10 text-center text-muted-foreground">

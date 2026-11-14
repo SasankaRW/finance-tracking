@@ -87,7 +87,6 @@ import {
   setAppLockPin,
 } from "@/lib/app-lock";
 import { SalaryPanel } from "@/app/app/settings/salary-panel";
-import { AppearancePanel } from "@/app/app/settings/appearance-panel";
 import { SettingsStatTile } from "@/app/app/settings/settings-stat-tile";
 
 const createSchema = z.object({
@@ -745,7 +744,7 @@ export default function AccountsPage() {
           </Card>
 
           {/* Mobile Card List */}
-          <div className="grid gap-4 md:hidden">
+          <div className="grid grid-cols-1 gap-4 md:hidden">
             {loading ? (
               <Card>
                 <CardContent className="py-10 text-center text-muted-foreground">
@@ -860,7 +859,12 @@ export default function AccountsPage() {
         </TabsContent>
 
         <TabsContent value="appearance">
-          <AppearancePanel />
+          <Card>
+            <CardHeader>
+              <CardTitle>Appearance</CardTitle>
+              <CardDescription>Cashly uses the Sonoma look: dark, with one blue accent.</CardDescription>
+            </CardHeader>
+          </Card>
         </TabsContent>
 
         <TabsContent value="salary">

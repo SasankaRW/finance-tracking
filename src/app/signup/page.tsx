@@ -50,7 +50,8 @@ export default function SignupPage() {
       <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-6 py-10">
         <Card>
           <CardHeader>
-            <CardTitle className="text-2xl">Create your account</CardTitle>
+            <p className="sn-eye">Cashly</p>
+            <CardTitle className="sn-head mt-1.5 !text-[28px] !leading-tight !font-semibold !text-white">Create your account<span className="sn-dot">.</span></CardTitle>
           </CardHeader>
           <CardContent>
             <Button
