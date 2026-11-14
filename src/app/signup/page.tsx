@@ -51,7 +51,7 @@ export default function SignupPage() {
         <Card>
           <CardHeader>
             <p className="sn-eye">Cashly</p>
-            <CardTitle className="sn-head mt-1.5 !text-[28px] !leading-tight !font-semibold !text-white">Create your account<span className="sn-dot">.</span></CardTitle>
+            <CardTitle className="sn-head mt-1.5 !text-[28px] !leading-tight !font-semibold !text-white">Create your account</CardTitle>
           </CardHeader>
           <CardContent>
             <Button

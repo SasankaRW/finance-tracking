@@ -397,7 +397,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
         {!embedded && (
           <div className="space-y-1">
             <p className="sn-eye">{"Monthly"}</p>
-              <h1 className="sn-head mt-1.5">Bills & Loans<span className="sn-dot">.</span></h1>
+              <h1 className="sn-head mt-1.5">Bills & Loans</h1>
             <p className="hidden text-sm text-muted-foreground sm:block">
               Track subscriptions, monthly loan payments, and borrowed money
             </p>
@@ -460,7 +460,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                 {/* Amount & Currency */}
                 <div className="grid grid-cols-3 gap-3">
                   <div className="col-span-2 space-y-2">
-                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                    <Label className="text-[13px] font-medium text-muted-foreground">
                       {createKind === "loan" ? "Monthly Payment" : createKind === "rent" ? "Monthly Rent" : "Amount"}
                     </Label>
                     <Input
@@ -972,7 +972,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
               {/* Amount & Currency & Status */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                  <Label className="text-[13px] font-medium text-muted-foreground">
                     {editKind === "loan" ? "Monthly Payment" : editKind === "rent" ? "Monthly Rent" : "Amount"}
                   </Label>
                   <Input

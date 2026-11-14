@@ -94,7 +94,7 @@ const accountTypes = [
 function AccountTypeSelector({ form }: { form: any }) {
   return (
     <div className="space-y-2">
-      <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+      <Label className="text-[13px] font-medium text-muted-foreground">
         Account Type
       </Label>
       <div className="flex flex-wrap gap-2">
@@ -311,7 +311,7 @@ export function AccountsPanel() {
 
                 {/* Account Name */}
                 <div className="space-y-2">
-                  <Label htmlFor="name" className="text-xs text-muted-foreground uppercase tracking-wider">
+                  <Label htmlFor="name" className="text-[13px] font-medium text-muted-foreground">
                     Account Name
                   </Label>
                   <Input
@@ -325,7 +325,7 @@ export function AccountsPanel() {
                 {/* Currency & Initial Balance */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                    <Label className="text-[13px] font-medium text-muted-foreground">
                       Currency
                     </Label>
                     <Select
@@ -350,7 +350,7 @@ export function AccountsPanel() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="initialBalance" className="text-xs text-muted-foreground uppercase tracking-wider">
+                    <Label htmlFor="initialBalance" className="text-[13px] font-medium text-muted-foreground">
                       Initial Balance
                     </Label>
                     <Input
@@ -704,7 +704,7 @@ export function AccountsPanel() {
 
               {/* Account Name */}
               <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                <Label className="text-[13px] font-medium text-muted-foreground">
                   Account Name
                 </Label>
                 <Input
@@ -716,7 +716,7 @@ export function AccountsPanel() {
               {/* Currency & Balance */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                  <Label className="text-[13px] font-medium text-muted-foreground">
                     Currency
                   </Label>
                   <Select
@@ -741,7 +741,7 @@ export function AccountsPanel() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="balance" className="text-xs text-muted-foreground uppercase tracking-wider">
+                  <Label htmlFor="balance" className="text-[13px] font-medium text-muted-foreground">
                     Balance
                   </Label>
                   <Input

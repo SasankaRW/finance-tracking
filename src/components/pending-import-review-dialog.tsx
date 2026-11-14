@@ -217,7 +217,7 @@ export function PendingImportReviewDialog({
           </div>
 
           <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+            <Label className="text-[13px] font-medium text-muted-foreground">
               Amount {currency ? `(${currency})` : ""}
             </Label>
             <Input
@@ -235,7 +235,7 @@ export function PendingImportReviewDialog({
             {kind === "transfer" ? (
               <>
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                  <Label className="text-[13px] font-medium text-muted-foreground">
                     From Account
                   </Label>
                   <AccountSelect
@@ -247,7 +247,7 @@ export function PendingImportReviewDialog({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                  <Label className="text-[13px] font-medium text-muted-foreground">
                     To Account
                   </Label>
                   <AccountSelect
@@ -262,7 +262,7 @@ export function PendingImportReviewDialog({
             ) : (
               <>
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                  <Label className="text-[13px] font-medium text-muted-foreground">
                     Account
                   </Label>
                   <AccountSelect
@@ -273,7 +273,7 @@ export function PendingImportReviewDialog({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                  <Label className="text-[13px] font-medium text-muted-foreground">
                     Category
                   </Label>
                   <CategorySelect categories={categories} value={categoryId} onChange={setCategoryId} />
@@ -283,7 +283,7 @@ export function PendingImportReviewDialog({
           </div>
 
           <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground uppercase tracking-wider">Date</Label>
+            <Label className="text-[13px] font-medium text-muted-foreground">Date</Label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
@@ -302,7 +302,7 @@ export function PendingImportReviewDialog({
           </div>
 
           <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+            <Label className="text-[13px] font-medium text-muted-foreground">
               Note (optional)
             </Label>
             <Input value={note} onChange={(e) => setNote(e.target.value)} className="h-11" />

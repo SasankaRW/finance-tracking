@@ -260,13 +260,13 @@ export default function DashboardPage() {
 
   const chartData = React.useMemo(
     () => [
-      { name: "Income", value: monthTotals.income, fill: "#22c55e" },
-      { name: "Expenses", value: monthTotals.expense, fill: "#ef4444" },
+      { name: "Income", value: monthTotals.income, fill: "#9bd5a8" },
+      { name: "Expenses", value: monthTotals.expense, fill: "#ffb4ab" },
     ],
     [monthTotals],
   );
 
-  const pieColors = ["#8fe3ad", "#a6c8ff", "#ffc58f", "#d3b6ff", "#ff9d94", "#c7ced6"];
+  const pieColors = ["#9bd5a8", "#a8c8ff", "#f2c46d", "#dbbce1", "#ffb4ab", "#a9abb6"];
 
   // Covers both kinds so an income-categorized transaction (e.g. "Salary") in
   // the Today list resolves to its real name/icon instead of falling back to
@@ -363,7 +363,7 @@ export default function DashboardPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
           <p className="sn-eye">{monthName}</p>
-          <h1 className="sn-head mt-1.5">Overview<span className="sn-dot">.</span></h1>
+          <h1 className="sn-head mt-1.5">Overview</h1>
           <p className="hidden text-sm text-muted-foreground sm:block">
             A clear snapshot of balances, cash flow, and spending for this month.
           </p>
@@ -436,21 +436,21 @@ export default function DashboardPage() {
 
           <div className="grid grid-cols-3 gap-2">
             <div className="rounded-xl bg-white/12 p-2.5 sm:p-3">
-              <p className="text-[10px] font-medium uppercase tracking-wide text-white/75 sm:text-[11px]">In</p>
+              <p className="text-[10px] font-medium text-white/75 sm:text-[11px]">In</p>
               <p className="mt-1 truncate text-sm font-bold text-white sm:text-base">
                 +{formatMoney(monthTotals.income)}
               </p>
               <p className="mt-0.5 text-[10px] text-white/70 sm:mt-1 sm:text-[11px]">{txCounts.income} entries</p>
             </div>
             <div className="rounded-xl bg-white/12 p-2.5 sm:p-3">
-              <p className="text-[10px] font-medium uppercase tracking-wide text-white/75 sm:text-[11px]">Out</p>
+              <p className="text-[10px] font-medium text-white/75 sm:text-[11px]">Out</p>
               <p className="mt-1 truncate text-sm font-bold text-white sm:text-base">
                 -{formatMoney(monthTotals.expense)}
               </p>
               <p className="mt-0.5 text-[10px] text-white/70 sm:mt-1 sm:text-[11px]">{txCounts.expense} entries</p>
             </div>
             <div className="rounded-xl bg-white/12 p-2.5 sm:p-3">
-              <p className="text-[10px] font-medium uppercase tracking-wide text-white/75 sm:text-[11px]">Net</p>
+              <p className="text-[10px] font-medium text-white/75 sm:text-[11px]">Net</p>
               <p className="mt-1 truncate text-sm font-bold text-white sm:text-base">
                 {monthTotals.net >= 0 ? "+" : ""}{formatMoney(monthTotals.net)}
               </p>

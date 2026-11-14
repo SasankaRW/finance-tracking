@@ -34,7 +34,7 @@ export function MoneyFlowChart({
         <YAxis type="category" dataKey="name" tick={{ fill: "rgba(255,255,255,0.68)", fontSize: 12 }} axisLine={false} tickLine={false} width={68} />
         <Tooltip
           contentStyle={{
-            backgroundColor: "#222228",
+            backgroundColor: "#26262c",
             border: "0",
             borderRadius: "16px",
             color: "#fff",
@@ -73,7 +73,7 @@ export function TopSpendingPie({
         </Pie>
         <Tooltip
           contentStyle={{
-            backgroundColor: "#222228",
+            backgroundColor: "#26262c",
             border: "0",
             borderRadius: "16px",
             color: "#fff",

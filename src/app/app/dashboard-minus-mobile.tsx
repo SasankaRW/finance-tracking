@@ -43,7 +43,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
-const PIE_COLORS = ["#8fe3ad", "#a6c8ff", "#ffc58f", "#d3b6ff", "#ff9d94", "#c7ced6"];
+const PIE_COLORS = ["#9bd5a8", "#a8c8ff", "#f2c46d", "#dbbce1", "#ffb4ab", "#a9abb6"];
 
 // Above these magnitudes, showing every digit would force text to shrink or
 // clip — compact notation ("LKR 1.2M") keeps the string short at any size
@@ -156,7 +156,7 @@ function BudgetRing({
   const circumference = 2 * Math.PI * radius;
   const clamped = Math.min(Math.max(percent, 0), 100);
   const offset = circumference * (1 - clamped / 100);
-  const color = tone === "over" ? "#e11d48" : tone === "warning" ? "#d97706" : "#059669";
+  const color = tone === "over" ? "#ffb4ab" : tone === "warning" ? "#f2c46d" : "#9bd5a8";
 
   return (
     <svg
@@ -518,7 +518,7 @@ export function DashboardMinusMobile({
             <div className="motion-expressive  flex min-w-0 flex-col rounded-[1.75rem] rounded-br-lg bg-secondary px-3.5 py-4 text-secondary-foreground">
               <div className="flex h-5 items-center gap-1.5">
                 <CalendarDays className="h-3 w-3 shrink-0 opacity-60" />
-                <p className="truncate text-[11px] font-semibold uppercase tracking-wide opacity-70">
+                <p className="truncate text-[11px] font-semibold opacity-70">
                   Daily spend
                 </p>
               </div>
@@ -542,7 +542,7 @@ export function DashboardMinusMobile({
                   <div className="flex h-5 items-center justify-between gap-2">
                     <span className="flex min-w-0 items-center gap-1.5">
                       <PieChart className="h-3 w-3 shrink-0 opacity-60" />
-                      <p className="truncate text-[11px] font-semibold uppercase tracking-wide opacity-70">
+                      <p className="truncate text-[11px] font-semibold opacity-70">
                         Monthly spend
                       </p>
                     </span>

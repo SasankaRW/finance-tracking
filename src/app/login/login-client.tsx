@@ -84,7 +84,7 @@ export function LoginClient() {
         <Card>
           <CardHeader>
             <p className="sn-eye">Cashly</p>
-            <CardTitle className="sn-head mt-1.5 !text-[28px] !leading-tight !font-semibold !text-white">Welcome back<span className="sn-dot">.</span></CardTitle>
+            <CardTitle className="sn-head mt-1.5 !text-[28px] !leading-tight !font-semibold !text-white">Welcome back</CardTitle>
           </CardHeader>
           <CardContent>
             <Button

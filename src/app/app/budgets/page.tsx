@@ -317,7 +317,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
         {!embedded && (
           <div className="space-y-1">
             <p className="sn-eye">{monthName}</p>
-              <h1 className="sn-head mt-1.5">Budgets<span className="sn-dot">.</span></h1>
+              <h1 className="sn-head mt-1.5">Budgets</h1>
             <p className="hidden text-sm text-muted-foreground sm:block">
               Track your spending and manage budget limits
             </p>
@@ -632,7 +632,6 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
 
                         <div className="flex items-center justify-between rounded-2xl bg-coral/10 px-3 py-1.5 text-sm text-coral"><span>Delete budget</span><HoldButton small label="Delete" icon={<Trash2 className="h-4 w-4" />} onConfirm={async () => {
                             if (!user) return;
-                            if (!(await confirm({ title: "Delete this budget?", destructive: true }))) return;
                             try {
                               await deleteBudget(user.uid, b.id);
                               toast.success("Budget deleted");

@@ -152,7 +152,7 @@ export default function SettingsPage() {
 
   const handleClearAppLock = async () => {
     if (!user) return;
-    if (!(await confirm({ title: "Turn off Cashly app lock on this device?", destructive: true }))) return;
+    if (!(await confirm({ title: "Turn off Cashly app lock on this device?", confirmLabel: "Turn off", destructive: true }))) return;
 
     clearAppLock(user.uid);
     refreshAppLockSettings();
@@ -171,7 +171,7 @@ export default function SettingsPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="sn-eye">Cashly</p>
-          <h1 className="sn-head mt-1.5">Settings<span className="sn-dot">.</span></h1>
+          <h1 className="sn-head mt-1.5">Settings</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Manage appearance, salary, and security
           </p>

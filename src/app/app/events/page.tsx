@@ -101,7 +101,7 @@ export default function EventsPage({ embedded = false }: { embedded?: boolean })
         {!embedded && (
           <div>
             <p className="sn-eye">Trips and plans</p>
-            <h1 className="sn-head mt-1.5">Events<span className="sn-dot">.</span></h1>
+            <h1 className="sn-head mt-1.5">Events</h1>
             <p className="mt-1 hidden text-sm text-muted-foreground sm:block">
               Track event budgets separately while still deducting from real accounts
             </p>

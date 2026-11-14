@@ -3,6 +3,7 @@
 import * as React from "react";
 import { hapticLight, hapticMedium, hapticWarning } from "@/lib/haptics";
 import { Button } from "@/components/ui/button";
+import { HoldPill } from "@/components/sonoma";
 import {
   Dialog,
   DialogBody,
@@ -66,13 +67,16 @@ export function ConfirmDialogProvider({ children }: { children: React.ReactNode 
             <Button type="button" variant="ghost" onClick={() => settle(false)}>
               {pending?.cancelLabel ?? "Cancel"}
             </Button>
-            <Button
-              type="button"
-              variant={pending?.destructive ? "destructive" : "default"}
-              onClick={() => settle(true)}
-            >
-              {pending?.confirmLabel ?? "Confirm"}
-            </Button>
+            {pending?.destructive ? (
+              <HoldPill
+                label={pending?.confirmLabel ?? "Delete"}
+                onConfirm={() => settle(true)}
+              />
+            ) : (
+              <Button type="button" onClick={() => settle(true)}>
+                {pending?.confirmLabel ?? "Confirm"}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

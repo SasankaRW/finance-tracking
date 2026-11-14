@@ -62,26 +62,26 @@ interface ChartTheme {
 function readChartTheme(): ChartTheme {
   if (typeof window === "undefined") {
     return {
-      income: "#8fe3ad",
-      expense: "#ff9d94",
+      income: "#9bd5a8",
+      expense: "#ffb4ab",
       muted: "rgba(255,255,255,0.68)",
       border: "rgba(255,255,255,0.08)",
-      card: "#222228",
+      card: "#26262c",
       foreground: "#ffffff",
-      primary: "#a6c8ff",
+      primary: "#a8c8ff",
     };
   }
   const style = getComputedStyle(document.documentElement);
   const read = (name: string, fallback: string) =>
     style.getPropertyValue(name).trim() || fallback;
   return {
-    income: read("--chart-1", "#8fe3ad"),
-    expense: read("--chart-2", "#ff9d94"),
+    income: read("--chart-1", "#9bd5a8"),
+    expense: read("--chart-2", "#ffb4ab"),
     muted: read("--muted-foreground", "rgba(255,255,255,0.68)"),
     border: read("--border", "rgba(255,255,255,0.08)"),
-    card: read("--popover", "#222228"),
+    card: read("--popover", "#26262c"),
     foreground: read("--foreground", "#ffffff"),
-    primary: read("--primary", "#a6c8ff"),
+    primary: read("--primary", "#a8c8ff"),
   };
 }
 

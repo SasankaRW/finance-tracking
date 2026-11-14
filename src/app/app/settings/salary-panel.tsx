@@ -382,7 +382,7 @@ function SalaryFormFields({
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+          <Label className="text-[13px] font-medium text-muted-foreground">
             Tax / Deduction %
           </Label>
           <button
@@ -461,7 +461,7 @@ function SalaryFormFields({
       </div>
 
       <div className="space-y-2">
-        <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+        <Label className="text-[13px] font-medium text-muted-foreground">
           Next Payday
         </Label>
         <Popover>
@@ -885,7 +885,6 @@ export function SalaryPanel() {
                           </DropdownMenuItem>
                           <div className="flex items-center justify-between gap-6 px-2 py-1 text-sm text-coral" onPointerDown={(e) => e.stopPropagation()}><span>Delete</span><HoldButton small label="Delete" icon={<Trash2 className="h-4 w-4" />} onConfirm={async () => {
                               if (!user) return;
-                              if (!(await confirm({ title: "Delete this salary source?", destructive: true }))) return;
                               try {
                                 await deleteSalaryProfile(user.uid, salary.id);
                                 toast.success("Salary deleted");
@@ -1072,7 +1071,7 @@ export function SalaryPanel() {
               </p>
             )}
             <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+              <Label className="text-[13px] font-medium text-muted-foreground">
                 Amount received ({recordAccountCurrency})
               </Label>
               <Input

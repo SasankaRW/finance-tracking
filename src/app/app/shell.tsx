@@ -58,8 +58,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     className={cn(
                       "sn-btn flex h-9 items-center gap-2 rounded-full px-4 text-[13.5px] font-medium",
                       active
-                        ? "bg-primary/16 font-semibold text-primary"
-                        : "bg-white/7 text-white/85",
+                        ? "bg-[#34405a] font-semibold text-[#d9e3f8]"
+                        : "text-[#c4c6d0]",
                     )}
                   >
                     <Icon className="h-4 w-4" filled={active} />
@@ -89,7 +89,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-7xl px-4 pt-[calc(env(safe-area-inset-top)+1.25rem)] pb-[calc(8.5rem+env(safe-area-inset-bottom))] sm:px-6 md:pt-8 md:pb-10 lg:px-8">
+      <main className="mx-auto w-full max-w-7xl px-4 pt-[calc(env(safe-area-inset-top)+1.25rem)] pb-[calc(11rem+env(safe-area-inset-bottom))] sm:px-6 md:pt-8 md:pb-10 lg:px-8">
         {children}
       </main>
 
@@ -106,7 +106,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               className={cn("sn-tab", active && "on")}
             >
               <span className="sn-ind">
-                <Icon className="h-[22px] w-[22px]" filled={active} />
+                <Icon className="h-6 w-6" filled={active} />
               </span>
               <span className="max-w-full truncate">{item.short}</span>
             </Link>

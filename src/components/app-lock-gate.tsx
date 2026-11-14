@@ -186,7 +186,7 @@ export function AppLockGate({
   const shouldShowPinEntry = pinReady && (!biometricReady || showPinEntry);
 
   return (
-    <main className="relative flex min-h-dvh overflow-hidden bg-[radial-gradient(circle_at_50%_-10%,var(--hero-glow)_0%,transparent_32%),linear-gradient(180deg,var(--background),var(--muted))] px-6 py-8 text-foreground">
+    <main className="relative flex min-h-dvh overflow-hidden bg-background px-6 py-8 text-foreground">
       <div className="pointer-events-none absolute -right-20 top-12 h-56 w-56 rounded-full bg-primary/10 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-24 -left-20 h-64 w-64 rounded-full bg-primary/15 blur-3xl" />
 

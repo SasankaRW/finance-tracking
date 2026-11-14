@@ -172,7 +172,7 @@ function RuleFormFields({
   return (
     <DialogBody className="space-y-4">
       <div className="space-y-2">
-        <Label className="text-xs text-muted-foreground uppercase tracking-wider">Label</Label>
+        <Label className="text-[13px] font-medium text-muted-foreground">Label</Label>
         <Input
           placeholder="e.g. BOC - Transfer In"
           className="h-11"
@@ -183,7 +183,7 @@ function RuleFormFields({
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+          <Label className="text-[13px] font-medium text-muted-foreground">
             Sender ID
           </Label>
           <Input
@@ -197,7 +197,7 @@ function RuleFormFields({
           </p>
         </div>
         <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+          <Label className="text-[13px] font-medium text-muted-foreground">
             {value.kind === "transfer" ? "From Account" : "Account"}
           </Label>
           <AccountSelect
@@ -212,7 +212,7 @@ function RuleFormFields({
 
       {value.kind === "transfer" && (
         <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+          <Label className="text-[13px] font-medium text-muted-foreground">
             To Account
           </Label>
           <AccountSelect
@@ -229,7 +229,7 @@ function RuleFormFields({
       )}
 
       <div className="space-y-2">
-        <Label className="text-xs text-muted-foreground uppercase tracking-wider">Type</Label>
+        <Label className="text-[13px] font-medium text-muted-foreground">Type</Label>
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -266,7 +266,7 @@ function RuleFormFields({
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+          <Label className="text-[13px] font-medium text-muted-foreground">
             Message Pattern
           </Label>
           <Select
@@ -315,7 +315,7 @@ function RuleFormFields({
       </div>
 
       <div className="space-y-2">
-        <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+        <Label className="text-[13px] font-medium text-muted-foreground">
           Note Template (optional)
         </Label>
         <Input

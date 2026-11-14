@@ -3,7 +3,7 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-/** Sonoma's five tones (meaning, never decoration) plus a neutral. */
+/** The five tones (meaning, never decoration) plus a neutral. */
 export type Tone = "green" | "amber" | "blue" | "violet" | "coral" | "neutral";
 
 /** Meaning to tone: expense, bills and debt coral; income green; transfers, accounts and info blue; labels violet; warnings amber. */
@@ -23,7 +23,7 @@ export const SPLIT_TONES = [
   "var(--color-green)",
 ] as const;
 
-/** Leading list-row tile: 36x36, radius 12, tone at 16 %, filled glyph. */
+/** Leading list-row avatar: 36x36 round, tonal container, filled glyph. */
 export function Tile({
   tone,
   children,
@@ -36,7 +36,7 @@ export function Tile({
   return <span className={cn("sn-tile", `c-${tone}`, className)}>{children}</span>;
 }
 
-/** Pill / status tag: height 22, tonal. */
+/** Chip / status tag: height 24, radius 8, tonal. */
 export function Pill({
   tone = "neutral",
   children,
@@ -58,7 +58,7 @@ export function Dot({ tone, live, className }: { tone: Exclude<Tone, "neutral">;
   );
 }
 
-/** One eyebrow per page, a headline that ends in the accent full stop, and room for page actions. */
+/** One dim sentence-case caption per page, the headline, and room for page actions. */
 export function PageHeader({
   eyebrow,
   title,
@@ -76,7 +76,6 @@ export function PageHeader({
         <div className="sn-eye">{eyebrow}</div>
         <h1 className="sn-head mt-1.5">
           {title}
-          <span className="dot">.</span>
         </h1>
       </div>
       {children}
@@ -113,7 +112,7 @@ export function SplitMeter({
   const cap = max ?? total;
   const over = cap > 0 && total > cap;
   const scale = Math.max(cap, total, 1);
-  const colour = (i: number) => (over ? "var(--color-coral)" : SPLIT_TONES[i] ?? "rgba(255,255,255,.35)");
+  const colour = (i: number) => (over ? "var(--color-coral)" : SPLIT_TONES[i] ?? "#a9abb6");
   const shown = parts.filter((p) => p.value > 0);
   return (
     <div className={className}>
@@ -167,26 +166,7 @@ export function Meter({ value, max, className }: { value: number; max: number; c
   );
 }
 
-/**
- * Destructive action: a round coral button you hold for 1.2 s (an accent ring fills). A tap only says to hold.
- * The mutation, toast and error handling stay with the caller's `onConfirm`.
- */
-export function HoldButton({
-  onConfirm,
-  label,
-  icon,
-  small,
-  disabled,
-  className,
-}: {
-  onConfirm: () => void;
-  /** e.g. "Delete" ("Hold to delete") */
-  label: string;
-  icon: React.ReactNode;
-  small?: boolean;
-  disabled?: boolean;
-  className?: string;
-}) {
+function useHold(onConfirm: () => void, disabled?: boolean) {
   const [holding, setHolding] = React.useState(false);
   const [hint, setHint] = React.useState(false);
   const timer = React.useRef<number | null>(null);
@@ -221,6 +201,54 @@ export function HoldButton({
       window.setTimeout(() => setHint(false), 1600);
     }
   };
+  const handlers = {
+    onPointerDown: (e: React.PointerEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      start();
+    },
+    onPointerUp: stop,
+    onPointerLeave: stop,
+    onPointerCancel: stop,
+    onContextMenu: (e: React.SyntheticEvent) => e.preventDefault(),
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if ((e.key === "Enter" || e.key === " ") && !e.repeat) {
+        e.preventDefault();
+        start();
+      }
+    },
+    onKeyUp: (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") stop();
+    },
+    onClick: (e: React.SyntheticEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+    },
+  };
+  return { holding, hint, handlers };
+}
+
+/**
+ * Destructive action: a round error-container button you hold for 1.2 s (a ring fills). A tap only says to hold.
+ * The mutation, toast and error handling stay with the caller's `onConfirm`. Used for every delete.
+ */
+export function HoldButton({
+  onConfirm,
+  label,
+  icon,
+  small,
+  disabled,
+  className,
+}: {
+  onConfirm: () => void;
+  /** e.g. "Delete" ("Hold to delete") */
+  label: string;
+  icon: React.ReactNode;
+  small?: boolean;
+  disabled?: boolean;
+  className?: string;
+}) {
+  const { holding, hint, handlers } = useHold(onConfirm, disabled);
   const box = small ? 36 : 44;
   const r = box / 2 - 1.5;
   const text = `Hold to ${label.toLowerCase()}`;
@@ -233,39 +261,18 @@ export function HoldButton({
         disabled={disabled}
         data-compact
         className={cn("sn-hold", small && "sm", holding && "holding", className)}
-        onPointerDown={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          start();
-        }}
-        onPointerUp={stop}
-        onPointerLeave={stop}
-        onPointerCancel={stop}
-        onContextMenu={(e) => e.preventDefault()}
-        onKeyDown={(e) => {
-          if ((e.key === "Enter" || e.key === " ") && !e.repeat) {
-            e.preventDefault();
-            start();
-          }
-        }}
-        onKeyUp={(e) => {
-          if (e.key === "Enter" || e.key === " ") stop();
-        }}
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-        }}
+        {...handlers}
       >
         {icon}
         <svg aria-hidden="true" viewBox={`0 0 ${box} ${box}`}>
-          <circle cx={box / 2} cy={box / 2} r={r} fill="none" stroke="rgba(255,255,255,.12)" strokeWidth="2" />
+          <circle cx={box / 2} cy={box / 2} r={r} fill="none" stroke="rgba(255,180,171,.2)" strokeWidth="2" />
           <circle
             className="sn-ring"
             cx={box / 2}
             cy={box / 2}
             r={r}
             fill="none"
-            stroke="var(--primary)"
+            stroke="#ffb4ab"
             strokeWidth="2"
             strokeLinecap="round"
             transform={`rotate(-90 ${box / 2} ${box / 2})`}
@@ -274,10 +281,35 @@ export function HoldButton({
         </svg>
       </button>
       {hint && (
-        <span className="sn-popin text-[13px] whitespace-nowrap text-[var(--primary)]" role="status">
+        <span className="sn-popin text-[13px] whitespace-nowrap text-[#ffb4ab]" role="status">
           {text}
         </span>
       )}
     </span>
+  );
+}
+
+/** The same hold-to-confirm as a full-round labelled button (used in the destructive confirm dialog). */
+export function HoldPill({
+  onConfirm,
+  label,
+  className,
+}: {
+  onConfirm: () => void;
+  label: string;
+  className?: string;
+}) {
+  const { holding, hint, handlers } = useHold(onConfirm);
+  return (
+    <button
+      type="button"
+      data-compact
+      aria-label={`Hold to ${label.toLowerCase()}`}
+      className={cn("sn-hold-wide", holding && "holding", className)}
+      {...handlers}
+    >
+      <span className="sn-fill" aria-hidden="true" />
+      <span role={hint ? "status" : undefined}>{hint ? `Hold to ${label.toLowerCase()}` : label}</span>
+    </button>
   );
 }

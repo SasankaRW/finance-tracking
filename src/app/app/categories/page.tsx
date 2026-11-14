@@ -347,7 +347,7 @@ export default function CategoriesPage() {
       {/* Header */}
       <div>
         <p className="sn-eye">Organize</p>
-          <h1 className="sn-head mt-1.5">Categories<span className="sn-dot">.</span></h1>
+          <h1 className="sn-head mt-1.5">Categories</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Organize your transactions with custom categories
         </p>

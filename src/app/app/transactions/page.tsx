@@ -129,7 +129,7 @@ const TransactionDateGroup = React.memo(function TransactionDateGroup({
   return (
     <div className="animate-ios-in" style={{ animationDelay: `${Math.min(index, 5) * 50}ms` }}>
       <div className="flex items-baseline justify-between gap-3 px-3 pb-1.5">
-        <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+        <span className="text-[11px] font-bold text-muted-foreground">
           {group.label}
         </span>
         {group.net !== 0 && (
@@ -653,7 +653,7 @@ export default function TransactionsPage() {
   const filterFields = (
     <>
       <div className="space-y-1.5">
-        <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+        <Label className="text-[13px] font-medium text-muted-foreground">
           Account
         </Label>
         <Select
@@ -675,7 +675,7 @@ export default function TransactionsPage() {
       </div>
 
       <div className="space-y-1.5">
-        <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+        <Label className="text-[13px] font-medium text-muted-foreground">
           Trip
         </Label>
         <Select
@@ -707,7 +707,7 @@ export default function TransactionsPage() {
 
       <div className="col-span-2 space-y-1.5 sm:col-span-1">
         <div className="flex items-center justify-between">
-          <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+          <Label className="text-[13px] font-medium text-muted-foreground">
             Category
           </Label>
           <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
@@ -903,7 +903,7 @@ export default function TransactionsPage() {
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="sn-eye">Activity</p>
-          <h1 className="sn-head mt-1.5">Transactions<span className="sn-dot">.</span></h1>
+          <h1 className="sn-head mt-1.5">Transactions</h1>
           <p className="mt-1 hidden text-sm text-muted-foreground sm:block">
             Track and manage your financial activity
           </p>

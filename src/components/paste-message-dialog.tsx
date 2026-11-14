@@ -86,7 +86,7 @@ export function PasteMessageDialog({
         </DialogHeader>
         <DialogBody className="space-y-3">
           <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+            <Label className="text-[13px] font-medium text-muted-foreground">
               Sender (optional)
             </Label>
             <Input
@@ -97,7 +97,7 @@ export function PasteMessageDialog({
             />
           </div>
           <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+            <Label className="text-[13px] font-medium text-muted-foreground">
               Message text
             </Label>
             <Textarea

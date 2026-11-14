@@ -16,7 +16,7 @@ export default function PlanningPage() {
         <div className="space-y-4 sm:space-y-6">
             <div>
                 <p className="sn-eye">Budgets and bills</p>
-          <h1 className="sn-head mt-1.5">Planning<span className="sn-dot">.</span></h1>
+          <h1 className="sn-head mt-1.5">Planning</h1>
                 <p className="mt-1 hidden text-sm text-muted-foreground sm:block">
                     Plan spending, monthly bills, loan payments, borrowed money, and event budgets in one place.
                 </p>
