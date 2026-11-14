@@ -616,7 +616,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
                           </div>
                           <div className="h-2.5 overflow-hidden rounded-full bg-muted">
                             <div
-                              className={`h-full rounded-full transition-all ${tone.barClass}`}
+                              className={`meter-fill h-full rounded-full ${tone.barClass}`}
                               style={{ width: `${b.percent}%` }}
                             />
                           </div>
@@ -730,7 +730,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
                             </div>
                             <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
                               <div
-                                className={`h-full rounded-full transition-all ${tone.barClass}`}
+                                className={`meter-fill h-full rounded-full ${tone.barClass}`}
                                 style={{ width: `${b.percent}%` }}
                               />
                             </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { hapticTick } from "@/lib/haptics";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -138,18 +139,19 @@ function IncludeInTotalsToggle({ form }: { form: any }) {
         role="switch"
         aria-checked={checked}
         aria-label="Include in total balance"
-        onClick={() =>
+        onClick={() => {
+          hapticTick(10);
           form.setValue("includeInTotals", !checked, {
             shouldDirty: true,
             shouldValidate: true,
-          })
-        }
-        className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
+          });
+        }}
+        className={`relative h-7 w-12 shrink-0 rounded-full transition-colors duration-200 ${
           checked ? "bg-primary" : "bg-muted"
         }`}
       >
         <span
-          className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
+          className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform duration-300 ease-[cubic-bezier(0.34,1.3,0.64,1)] ${
             checked ? "translate-x-5" : "translate-x-0"
           }`}
         />

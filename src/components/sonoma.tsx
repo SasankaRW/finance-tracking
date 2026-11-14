@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import { hapticTick } from "@/lib/haptics";
 
 /** The five tones (meaning, never decoration) plus a neutral. */
 export type Tone = "green" | "amber" | "blue" | "violet" | "coral" | "neutral";
@@ -55,6 +56,30 @@ export function Dot({ tone, live, className }: { tone: Exclude<Tone, "neutral">;
       className={cn("sn-sdot", live && "sn-ping", className)}
       style={{ background: TONE_VAR[tone], color: TONE_VAR[tone] }}
     />
+  );
+}
+
+/** Live/synced state: a slowly pinging dot, and text that cross-fades when it changes. Data is realtime, so this reflects connectivity and first load. */
+export function SyncStatus({ loading, className }: { loading?: boolean; className?: string }) {
+  const [online, setOnline] = React.useState(true);
+  React.useEffect(() => {
+    const update = () => setOnline(navigator.onLine !== false);
+    update();
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
+  const text = !online ? "Offline" : loading ? "Syncing" : "Synced";
+  return (
+    <span className={cn("inline-flex items-center gap-2 text-xs text-white/70", className)} role="status">
+      <Dot tone={online ? "green" : "amber"} live={online && !loading} />
+      <span key={text} className="sn-sync-text">
+        {text}
+      </span>
+    </span>
   );
 }
 
@@ -183,11 +208,13 @@ function useHold(onConfirm: () => void, disabled?: boolean) {
   const start = () => {
     if (timer.current || disabled) return;
     done.current = false;
+    hapticTick(8);
     setHolding(true);
     timer.current = window.setTimeout(() => {
       timer.current = null;
       done.current = true;
       setHolding(false);
+      hapticTick(20);
       confirmRef.current();
     }, 1200);
   };

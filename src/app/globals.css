@@ -426,9 +426,8 @@ a[href],
 }
 .sn-tab .ms { font-size: 24px; }
 .sn-tab.on { color: #e2e2e9; font-weight: 600; }
-.sn-tab.on .sn-ind { background: #34405a; color: #d9e3f8; }
+.sn-tab.on .sn-ind { color: #d9e3f8; }
 .sn-tab:hover .sn-ind { background: rgba(226, 226, 233, 0.08); }
-.sn-tab.on:hover .sn-ind { background: #34405a; }
 .sn-fab-float {
   position: fixed;
   right: 16px;
@@ -563,11 +562,10 @@ main :is(ul, ol) > li:nth-child(4), main [data-row]:nth-child(4) { animation-del
 main :is(ul, ol) > li:nth-child(5), main [data-row]:nth-child(5) { animation-delay: 200ms; }
 main :is(ul, ol) > li:nth-child(n + 6), main [data-row]:nth-child(n + 6) { animation-delay: 250ms; }
 /* a new row at the top of a list drops in (rows are keyed, so only inserted ones mount) */
-main :is(ul, ol) > li:first-child:not(:only-child) { animation-name: sn-drop-in; }
-.sn-fab-float { animation: sn-fab-pop 520ms cubic-bezier(0.34, 1.56, 0.64, 1) 400ms backwards; }
-.sn-tab.on .sn-ind { animation: sn-ind-in 320ms var(--out-cubic); }
+.sn-fab-float, .sn-fab-wrap .sn-fab { animation: sn-fab-pop 520ms cubic-bezier(0.34, 1.56, 0.64, 1) 400ms backwards; }
 .sn-tab:active .sn-ind { transform: scale(0.94); }
-.sn-tab .sn-ind { transition: background-color 300ms var(--m3-std), transform 160ms var(--m3-std); }
+.sn-tab .sn-ind { position: relative; z-index: 1; transition: background-color 300ms var(--m3-std), transform 160ms var(--m3-std); }
+.sn-tab:active .sn-ind { transform: scale(0.94); }
 .sn-chip, .sn-btn, .sn-icon { transition: transform 160ms var(--m3-std), background-color 200ms var(--m3-std), box-shadow 200ms var(--m3-std); }
 
 .press-expressive:active::after {
@@ -582,6 +580,54 @@ main :is(ul, ol) > li:first-child:not(:only-child) { animation-name: sn-drop-in;
 [data-slot="sheet-overlay"][data-state="open"], [data-slot="dialog-overlay"][data-state="open"] { animation: fade-in 240ms linear both; }
 .meter-fill { transform-origin: left center; }
 @media (prefers-reduced-motion: reduce) {
-  main > div > *, main :is(ul, ol) > li, main [data-row], .sn-fab-float, .sn-tab.on .sn-ind, .sn-pulse-dot, .sn-live-dot, .sn-spinner { animation: none !important; }
+  main, main > div > *, main :is(ul, ol) > li, main [data-row], .sn-fab-float, .sn-fab-wrap .sn-fab, .sn-pulse-dot, .sn-live-dot, .sn-spinner, .sn-new, .sn-roll, .sn-tick, .sn-pulse-ring, .sn-bob, .sn-ring-sweep { animation: none !important; }
+  .sn-nav-pill { transition: none !important; }
   .press-expressive:active::after { animation: none; }
 }
+
+/* ---- liveness additions ------------------------------------------------ */
+/* shared-axis page change: 16 px slide + fade in the direction of travel */
+@keyframes sn-route-fwd { from { opacity: 0; transform: translate3d(16px, 0, 0); } }
+@keyframes sn-route-back { from { opacity: 0; transform: translate3d(-16px, 0, 0); } }
+main.sn-route-fwd { animation: sn-route-fwd 320ms var(--out-cubic) backwards; }
+main.sn-route-back { animation: sn-route-back 320ms var(--out-cubic) backwards; }
+/* nav indicator: one pill that springs between tabs */
+.sn-nav-pill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 0;
+  width: 52px;
+  height: 30px;
+  border-radius: 999px;
+  background: #34405a;
+  pointer-events: none;
+  transition: transform 420ms cubic-bezier(0.34, 1.3, 0.64, 1), opacity 200ms var(--m3-std);
+}
+/* FAB plus turns when its sheet opens */
+.sn-fab > .ms, .sn-fab > svg { transition: rotate 300ms var(--out-cubic); }
+.sn-fab[data-state="open"] > .ms, .sn-fab[data-state="open"] > svg { rotate: 45deg; }
+/* a new row / import arrives at its place, then the tint fades */
+@keyframes sn-new-in { 0% { opacity: 0; transform: translate3d(0, -14px, 0) scale(0.98); } }
+@keyframes sn-new-tint { 0% { background-color: color-mix(in srgb, var(--primary) 18%, transparent); } 100% { background-color: transparent; } }
+main li.sn-new, main [data-row].sn-new { animation: sn-new-in 480ms var(--out-cubic) backwards, sn-new-tint 1400ms var(--m3-std) 200ms backwards; }
+.sn-new-pill { animation: sn-pop 360ms cubic-bezier(0.34, 1.4, 0.64, 1) backwards; }
+/* digit that rolls in when the amount changes */
+@keyframes sn-roll { from { opacity: 0; transform: translate3d(0, 55%, 0); } }
+.sn-roll { display: inline-block; animation: sn-roll 220ms var(--out-cubic) backwards; }
+/* check that draws itself, and the soft ring pulse around a completed thing */
+.sn-tick path { stroke-dasharray: 1; stroke-dashoffset: 0; animation: sn-draw 380ms var(--out-cubic) backwards; }
+@keyframes sn-pulse-ring { 0% { opacity: 0.55; transform: scale(0.8); } 100% { opacity: 0; transform: scale(1.9); } }
+.sn-pulse-ring { position: absolute; inset: 0; border-radius: 999px; border: 2px solid currentColor; pointer-events: none; animation: sn-pulse-ring 700ms var(--out-cubic) both; }
+/* one gentle bob for an empty state's icon */
+@keyframes sn-bob { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-6px); } 70% { transform: translateY(1px); } }
+.sn-bob { animation: sn-bob 900ms var(--m3-std) 350ms 1; }
+/* ring gauges sweep from empty */
+@keyframes sn-ring-sweep { from { stroke-dashoffset: var(--ring-c); } }
+.sn-ring-sweep { animation: sn-ring-sweep 1000ms var(--out-cubic) 300ms backwards; }
+/* sheets: emphasized slide-up, a touch longer than a dialog */
+@media (max-width: 639px) {
+  [data-slot="dialog-content"][data-state="open"] { animation-duration: 420ms; }
+  [data-slot="dialog-content"][data-state="closed"] { animation-duration: 220ms; }
+}
+.sn-sync-text { display: inline-block; animation: sn-pop 300ms var(--out-cubic) backwards; }

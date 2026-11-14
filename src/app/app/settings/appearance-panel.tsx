@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { hapticTick } from "@/lib/haptics";
 import { RotateCcw, Smartphone } from "@/components/icons";
 import { useThemeColor } from "@/lib/theme/theme-color-provider";
 import {
@@ -87,13 +88,16 @@ export function AppearancePanel() {
                 type="button"
                 role="switch"
                 aria-checked={useSystemColor}
-                onClick={() => setUseSystemColor(!useSystemColor)}
+                onClick={() => {
+                  hapticTick(10);
+                  setUseSystemColor(!useSystemColor);
+                }}
                 className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
                   useSystemColor ? "bg-primary" : "bg-muted"
                 }`}
               >
                 <span
-                  className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                  className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform duration-300 ease-[cubic-bezier(0.34,1.3,0.64,1)] ${
                     useSystemColor ? "translate-x-5" : "translate-x-0"
                   }`}
                 />

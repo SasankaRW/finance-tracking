@@ -8,7 +8,9 @@ import { Check, CalendarClock } from "@/components/icons";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { useAccounts, useSubscriptions } from "@/lib/finance/hooks";
 import { recordSubscriptionPayment } from "@/lib/finance/subscription-mutations";
-import { hapticError, hapticSuccess } from "@/lib/haptics";
+import { hapticError, hapticSuccess, hapticTick } from "@/lib/haptics";
+import { DrawCheck } from "@/components/draw-check";
+import { collapseByAttr } from "@/lib/motion/collapse";
 import { getBillKindIcon, getDueDateInfo } from "@/lib/finance/bill-status";
 import { formatCurrencyCode, formatMoney } from "@/lib/format";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -28,6 +30,8 @@ export function UpcomingBillsPanel() {
   const { subscriptions, loading } = useSubscriptions();
   const { accounts } = useAccounts();
   const [payingId, setPayingId] = React.useState<string | null>(null);
+  // Just-paid bills linger for a beat so the tick draws and the ring pulses before the pill collapses away.
+  const [paid, setPaid] = React.useState<Record<string, { s: any; nextDue: Date }>>({});
   const [panelExpanded, setPanelExpanded] = React.useState(false);
 
   const accountById = React.useMemo(
@@ -70,6 +74,20 @@ export function UpcomingBillsPanel() {
     try {
       await recordSubscriptionPayment(user.uid, s.id);
       void hapticSuccess();
+      hapticTick(15);
+      const entry = dueBills.find((b) => b.s.id === s.id);
+      if (entry) {
+        setPaid((p) => ({ ...p, [s.id]: entry }));
+        window.setTimeout(() => {
+          void collapseByAttr("data-bill-id", s.id, { axis: "x", ms: 240 }).done.then(() =>
+            setPaid((p) => {
+              const next = { ...p };
+              delete next[s.id];
+              return next;
+            }),
+          );
+        }, 1000);
+      }
       const isLoan = s.kind === "loan";
       const remaining = isLoan
         ? Math.max((s.loanTotalPayments ?? 0) - (s.loanPaidPayments ?? 0), 0)
@@ -85,9 +103,16 @@ export function UpcomingBillsPanel() {
     }
   };
 
-  const pillsRef = useStaggerReveal<HTMLDivElement>("[data-stagger-item]", [dueBills.length, panelExpanded]);
+  // Paid bills that already left the due list are kept (greyed to "paid") until their pill collapses.
+  const shownBills = React.useMemo(() => {
+    const ids = new Set(dueBills.map((b) => b.s.id));
+    return [...dueBills, ...Object.values(paid).filter((b) => !ids.has(b.s.id))];
+  }, [dueBills, paid]);
 
-  if (loading || dueBills.length === 0) return null;
+  const hasBills = dueBills.length > 0 || Object.keys(paid).length > 0;
+  const pillsRef = useStaggerReveal<HTMLDivElement>("[data-stagger-item]", [hasBills, panelExpanded]);
+
+  if (loading || !hasBills) return null;
 
   return (
     <CollapsiblePanel
@@ -107,18 +132,20 @@ export function UpcomingBillsPanel() {
       }
     >
       <div ref={pillsRef} className="flex flex-wrap gap-2">
-        {dueBills.slice(0, 8).map(({ s, nextDue }) => {
+        {shownBills.slice(0, 8).map(({ s, nextDue }) => {
           const acct = accountById.get(s.accountId);
           const cur = formatCurrencyCode(s.currency ?? acct?.currency);
           const dueInfo = getDueDateInfo(nextDue);
           const KindIcon = getBillKindIcon(s.kind);
           const isOverdue = dueInfo.variant === "destructive";
           const isDueToday = dueInfo.variant === "default";
+          const justPaid = Boolean(paid[s.id]);
 
           return (
             <div
               key={s.id}
               data-stagger-item
+              data-bill-id={s.id}
               className={`flex max-w-full items-center gap-2 rounded-full py-1.5 pl-3 pr-1.5 text-sm ${
                 isOverdue
                   ? "bg-coral/16"
@@ -138,11 +165,19 @@ export function UpcomingBillsPanel() {
               <button
                 type="button"
                 aria-label="Mark paid"
-                disabled={payingId === s.id}
+                disabled={payingId === s.id || justPaid}
                 onClick={() => handleMarkPaid(s, cur, acct?.name ?? "your account")}
-                className="motion-expressive press-expressive flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-green/16 text-green disabled:opacity-50"
+                className="motion-expressive press-expressive relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-green/16 text-green disabled:opacity-50 disabled:data-[paid=true]:opacity-100"
+                data-paid={justPaid}
               >
-                <Check className="h-3.5 w-3.5" />
+                {justPaid ? (
+                  <>
+                    <span className="sn-pulse-ring" aria-hidden="true" />
+                    <DrawCheck className="h-4 w-4" strokeWidth={3} />
+                  </>
+                ) : (
+                  <Check className="h-3.5 w-3.5" />
+                )}
               </button>
             </div>
           );

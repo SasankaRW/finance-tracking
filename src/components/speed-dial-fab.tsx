@@ -167,7 +167,7 @@ export function SpeedDialFab() {
 
       <div
         ref={containerRef}
-        className={`motion-expressive fixed bottom-[calc(100px+env(safe-area-inset-bottom))] right-4 z-40 flex flex-col items-end gap-3 md:hidden `}
+        className={`sn-fab-wrap motion-expressive fixed bottom-[calc(100px+env(safe-area-inset-bottom))] right-4 z-40 flex flex-col items-end gap-3 md:hidden `}
       >
       {SATELLITES.map((s) => (
         <SpeedDialSatellite
@@ -203,7 +203,7 @@ export function SpeedDialFab() {
             className="sn-fab press-expressive"
             aria-label="Add transaction — hold for more options"
           >
-            <Plus className={`h-6 w-6 transition-transform duration-200 ${dialOpen ? "rotate-45" : ""}`} />
+            <Plus className={`h-6 w-6 ${dialOpen ? "rotate-45" : ""}`} />
           </button>
         }
       />

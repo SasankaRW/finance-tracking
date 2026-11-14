@@ -317,7 +317,7 @@ export default function EventsPage({ embedded = false }: { embedded?: boolean })
 
                 <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
                   <div
-                    className={`h-full rounded-full transition-all ${over ? "bg-destructive" : "bg-primary"}`}
+                    className={`meter-fill h-full rounded-full ${over ? "bg-destructive" : "bg-primary"}`}
                     style={{ width: `${pct}%` }}
                   />
                 </div>

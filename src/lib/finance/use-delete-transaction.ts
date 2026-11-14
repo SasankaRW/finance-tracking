@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { useConfirm } from "@/components/confirm-dialog";
 import { deleteTransaction, restoreTransaction } from "@/lib/finance/mutations";
+import { collapseByAttr } from "@/lib/motion/collapse";
 import { hapticError, hapticLight, hapticSuccess } from "@/lib/haptics";
 
 // Shared by every place a transaction can be deleted (transactions list, swipe
@@ -19,7 +20,10 @@ export function useDeleteTransactionWithUndo() {
     if (!(await confirm({ title: "Delete this transaction?", destructive: true }))) return;
 
     const uid = user.uid;
+    // The row collapses out first, then the delete lands (the list re-renders without it).
+    const collapsing = collapseByAttr("data-tx-id", t.id);
     try {
+      await collapsing.done;
       await deleteTransaction(uid, t.id, t.updatedAt as any);
       void hapticSuccess();
       toast.success("Transaction deleted", {
@@ -38,6 +42,7 @@ export function useDeleteTransactionWithUndo() {
         },
       });
     } catch (e) {
+      collapsing.cancel();
       void hapticError();
       toast.error("Failed to delete", {
         description: e instanceof Error ? e.message : undefined,

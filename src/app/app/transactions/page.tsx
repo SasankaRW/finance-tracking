@@ -37,6 +37,7 @@ import {
   deleteCategory,
 } from "@/lib/finance/category-mutations";
 import { CategoryIconPicker, getCategoryIcon } from "@/lib/finance/category-icons";
+import { useNewIds } from "@/lib/motion/use-new-ids";
 import { SwipeableRow } from "@/components/swipeable-row";
 import { formatCurrencyCode, formatMoney } from "@/lib/format";
 import { downloadTextFile, toCsv } from "@/lib/export/csv";
@@ -114,7 +115,9 @@ const TransactionDateGroup = React.memo(function TransactionDateGroup({
   eventById,
   onEdit,
   onDelete,
+  newIds,
 }: {
+  newIds: ReadonlySet<string>;
   group: { key: string; label: string; net: number; items: any[] };
   index: number;
   accountNameById: Map<string, string>;
@@ -170,7 +173,11 @@ const TransactionDateGroup = React.memo(function TransactionDateGroup({
             .join(" · ");
 
           return (
-            <li key={t.id} className={idx > 0 ? "border-t border-border/50" : ""}>
+            <li
+              key={t.id}
+              data-tx-id={t.id}
+              className={`${idx > 0 ? "border-t border-border/50 " : ""}${newIds.has(t.id) ? "sn-new" : ""}`}
+            >
               <SwipeableRow
                 onEdit={() => onEdit(t)}
                 onDelete={() => onDelete(t)}
@@ -610,6 +617,11 @@ export default function TransactionsPage() {
     // which would collapse a scrolled-down list back to the top after e.g. a delete.
     setMobileVisibleCount(MOBILE_PAGE_SIZE);
   }, [filters, debouncedSearch, dateRange]);
+
+  const newTxIds = useNewIds(
+    React.useMemo(() => (filteredTransactions as any[]).map((t) => t.id as string), [filteredTransactions]),
+    loading,
+  );
 
   const visibleGroups = React.useMemo(() => {
     const out: typeof groupedTransactions = [];
@@ -1286,7 +1298,7 @@ export default function TransactionsPage() {
                     : null;
 
                   return (
-                    <TableRow key={t.id} className="group">
+                    <TableRow key={t.id} data-tx-id={t.id} className={`group${newTxIds.has(t.id) ? " sn-new" : ""}`}>
                       <TableCell className="pl-6">
                         <div className="font-medium">{format(occurredAt, "MMM d")}</div>
                         <div className="text-xs text-muted-foreground">{format(occurredAt, "yyyy")}</div>
@@ -1441,6 +1453,7 @@ export default function TransactionsPage() {
                 eventById={eventById}
                 onEdit={handleEditTransaction}
                 onDelete={handleDeleteRow}
+                newIds={newTxIds}
               />
             ))}
             {hasMoreMobile && (
@@ -1451,8 +1464,8 @@ export default function TransactionsPage() {
           </div>
         ) : (
           <div className="rounded-[2rem] border border-dashed px-4 py-12">
-            <div className="flex flex-col items-center gap-3 max-w-sm mx-auto text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+            <div className="animate-fade-in flex flex-col items-center gap-3 max-w-sm mx-auto text-center">
+              <div className="sn-bob flex h-12 w-12 items-center justify-center rounded-full bg-muted">
                 <Receipt className="h-6 w-6 text-muted-foreground" />
               </div>
               <div>

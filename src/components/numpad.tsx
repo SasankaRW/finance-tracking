@@ -1,7 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { Check, Delete } from "@/components/icons";
+import { Delete } from "@/components/icons";
+import { DrawCheck } from "@/components/draw-check";
+import { hapticTick } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 
 type NumpadProps = {
@@ -28,7 +30,10 @@ function NumpadButton({
     <button
       type="button"
       aria-label={ariaLabel}
-      onClick={onClick}
+      onClick={() => {
+        hapticTick(10);
+        onClick();
+      }}
       className={cn(
         "motion-expressive press-expressive relative overflow-hidden flex aspect-square w-full items-center justify-center rounded-full bg-card text-2xl font-semibold  transition-all active:scale-95",
         className,
@@ -47,6 +52,7 @@ export function Numpad({
   confirmLoading,
   className,
 }: NumpadProps) {
+  const [confirmCount, setConfirmCount] = React.useState(0);
   const keys = ["7", "8", "9", "4", "5", "6", "1", "2", "3", ".", "0"];
 
   return (
@@ -72,14 +78,18 @@ export function Numpad({
       <button
         type="button"
         disabled={confirmDisabled || confirmLoading}
-        onClick={onConfirm}
+        onClick={() => {
+          hapticTick(15);
+          setConfirmCount((c) => c + 1);
+          onConfirm();
+        }}
         aria-label="Save transaction"
         className="motion-expressive press-expressive relative overflow-hidden row-span-2 flex items-center justify-center rounded-[2rem] transition-all active:scale-[0.98] disabled:opacity-100 bg-primary text-[#141418] disabled:bg-primary/35 disabled:text-white/85"
       >
         {confirmLoading ? (
           <span className="text-sm font-bold">…</span>
         ) : (
-          <Check className="h-8 w-8 stroke-[2.5]" />
+          <DrawCheck key={`${confirmDisabled ? "off" : "on"}-${confirmCount}`} className="h-8 w-8" />
         )}
       </button>
 

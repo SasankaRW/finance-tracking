@@ -13,6 +13,7 @@ import { Pill } from "@/components/sonoma";
 import { CollapsiblePanel } from "@/components/collapsible-panel";
 import { PendingImportReviewDialog } from "@/components/pending-import-review-dialog";
 import { useStaggerReveal } from "@/lib/motion/use-stagger-reveal";
+import { useNewIds } from "@/lib/motion/use-new-ids";
 
 function toDate(value: unknown) {
   if (value instanceof Timestamp) return value.toDate();
@@ -59,10 +60,13 @@ export function PendingImportsPanel() {
     }
   };
 
-  const pillsRef = useStaggerReveal<HTMLDivElement>("[data-stagger-item]", [
-    (pendingImports as any[]).length,
-    panelExpanded,
-  ]);
+  // Stagger on first show / expand only; a newly arrived import pops in at its own place instead.
+  const hasItems = (pendingImports as any[]).length > 0;
+  const pillsRef = useStaggerReveal<HTMLDivElement>("[data-stagger-item]", [hasItems, panelExpanded]);
+  const newIds = useNewIds(
+    (pendingImports as any[]).map((i) => i.id as string),
+    loading,
+  );
 
   if (loading || (pendingImports as any[]).length === 0) return null;
 
@@ -114,8 +118,9 @@ export function PendingImportsPanel() {
                   key={item.id}
                   type="button"
                   data-stagger-item
+                  data-import-id={item.id}
                   onClick={() => setSelected(item)}
-                  className={`motion-expressive press-expressive flex max-w-full items-center gap-2 rounded-full py-1.5 pl-3 pr-3 text-left text-sm ${
+                  className={`${newIds.has(item.id) ? "sn-new-pill " : ""}motion-expressive press-expressive flex max-w-full items-center gap-2 rounded-full py-1.5 pl-3 pr-3 text-left text-sm ${
                     matched
                       ? isTransfer
                         ? "bg-blue/16"

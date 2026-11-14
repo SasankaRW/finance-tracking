@@ -21,13 +21,14 @@ import {
   Plus,
 } from "@/components/icons";
 import { formatCurrencyCode, formatMoney, formatMoneyCompact } from "@/lib/format";
-import { PageHeader } from "@/components/sonoma";
+import { PageHeader, SyncStatus } from "@/components/sonoma";
 import { cn } from "@/lib/utils";
 import { useBalanceVisibility } from "@/lib/hooks/use-balance-visibility";
 import { getCategoryIcon } from "@/lib/finance/category-icons";
 import { useDeleteTransactionWithUndo } from "@/lib/finance/use-delete-transaction";
 import { SwipeableRow } from "@/components/swipeable-row";
 import { AnimatedNumber } from "@/components/animated-number";
+import { useNewIds } from "@/lib/motion/use-new-ids";
 import { CreateTransactionDialog } from "@/app/app/transactions/create-transaction-dialog";
 import { DebtPillsSummary } from "@/components/debt-pills-summary";
 import { UpcomingBillsPanel } from "@/components/upcoming-bills-panel";
@@ -186,7 +187,8 @@ function BudgetRing({
         strokeDasharray={circumference}
         strokeDashoffset={offset}
         transform={`rotate(-90 ${size / 2} ${size / 2})`}
-        className="transition-[stroke-dashoffset] duration-500 ease-ios"
+        className="sn-ring-sweep transition-[stroke-dashoffset] duration-500 ease-ios"
+        style={{ ["--ring-c" as string]: circumference }}
       />
     </svg>
   );
@@ -305,9 +307,16 @@ export function DashboardMinusMobile({
       .slice(0, 8);
   }, [recentTransactions]);
 
+  const newTodayIds = useNewIds(
+    todayTx.map((t) => t.id as string),
+    isLoading,
+  );
+
   return (
     <div className="space-y-3 md:hidden">
-      <PageHeader eyebrow={format(new Date(), "MMMM yyyy")} title="Overview" />
+      <PageHeader eyebrow={format(new Date(), "MMMM yyyy")} title="Overview">
+        <SyncStatus loading={isLoading} />
+      </PageHeader>
       <div className="flex items-center justify-between gap-3">
         {isLoading ? (
           <Skeleton className="h-12 flex-1 rounded-full" />
@@ -607,7 +616,7 @@ export function DashboardMinusMobile({
                                 <span className="mt-1.5 flex items-center gap-2">
                                   <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
                                     <span
-                                      className="block h-full rounded-full"
+                                      className="meter-fill block h-full rounded-full"
                                       style={{ width: `${pct}%`, backgroundColor: color }}
                                     />
                                   </span>
@@ -695,7 +704,8 @@ export function DashboardMinusMobile({
                 return (
                   <li
                     key={t.id}
-                    className={`animate-ios-in ${idx > 0 ? "border-t border-border/50" : ""}`}
+                    data-tx-id={t.id}
+                    className={`animate-ios-in ${idx > 0 ? "border-t border-border/50" : ""}${newTodayIds.has(t.id) ? " sn-new" : ""}`}
                     style={{ animationDelay: `${180 + Math.min(idx, 6) * 35}ms` }}
                   >
                     <SwipeableRow onDelete={() => void deleteWithUndo(t)}>

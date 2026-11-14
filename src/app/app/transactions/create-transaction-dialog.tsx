@@ -17,6 +17,7 @@ import { useAuth } from "@/lib/auth/auth-provider";
 import { useAccounts, useCategories, useEvents } from "@/lib/finance/hooks";
 import { createIncomeOrExpense, createTransfer } from "@/lib/finance/mutations";
 import { hapticError, hapticSuccess } from "@/lib/haptics";
+import { RollingText } from "@/components/draw-check";
 import { transactionFormSchema, type TransactionFormValues } from "@/lib/finance/transaction-form-schema";
 import { getCurrencySymbol, formatMoney, formatCurrencyCode } from "@/lib/format";
 import {
@@ -279,7 +280,7 @@ export function CreateTransactionDialog({
 
             {isMobile ? (
               <p className={`text-4xl font-bold tabular-nums tracking-tight ${currentType.color}`}>
-                {symbol} {amountText || "0"}
+                <RollingText text={`${symbol} ${amountText || "0"}`} />
               </p>
             ) : (
               <div className="flex items-center justify-center gap-2">

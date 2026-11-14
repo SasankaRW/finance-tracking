@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Calendar, Layers, List, LogOut, Settings, Target } from "@/components/icons";
 import { cn } from "@/lib/utils";
-import { hapticLight } from "@/lib/haptics";
+import { hapticTick } from "@/lib/haptics";
 import { CashlyLogo } from "@/components/cashly-logo";
 import { signOutEverywhere } from "@/lib/auth/auth-actions";
 import { useAuth } from "@/lib/auth/auth-provider";
@@ -25,11 +25,57 @@ const mobileNavItems = [
   { href: "/app/settings", label: "Settings", icon: Settings },
 ].map((i) => ({ ...i, short: shortLabels[i.href] ?? i.label }));
 
+// Order of travel for the shared-axis page slide (Events lives under Planning on phones).
+const ROUTE_ORDER = ["/app", "/app/transactions", "/app/planning", "/app/events", "/app/settings"];
+function routeIndex(path: string) {
+  let best = -1;
+  ROUTE_ORDER.forEach((r, i) => {
+    if (path === r || (r !== "/app" && path.startsWith(r + "/"))) best = i;
+  });
+  return best;
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? "";
+  const prevPath = React.useRef<string | null>(null);
+  const direction = React.useMemo(() => {
+    const prev = prevPath.current;
+    if (prev === null || prev === pathname) return "";
+    return routeIndex(pathname) >= routeIndex(prev) ? "sn-route-fwd" : "sn-route-back";
+  }, [pathname]);
+  React.useEffect(() => {
+    prevPath.current = pathname;
+  }, [pathname]);
+
+  // The nav indicator is one pill that springs under the active tab.
+  const navRef = React.useRef<HTMLElement>(null);
+  const [pill, setPill] = React.useState<{ x: number; y: number } | null>(null);
+  const [pillReady, setPillReady] = React.useState(false);
   const { user } = useAuth();
   const isActive = (href: string) =>
     pathname === href || (pathname.startsWith(href + "/") && href !== "/app");
+
+  const activeHref = mobileNavItems.find((i) => isActive(i.href))?.href ?? null;
+  React.useLayoutEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+    const measure = () => {
+      const ind = activeHref
+        ? nav.querySelector<HTMLElement>(`[data-nav-href="${activeHref}"] .sn-ind`)
+        : null;
+      if (!ind || ind.offsetParent === null) return setPill(null);
+      setPill({ x: ind.offsetLeft, y: ind.offsetTop });
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [activeHref]);
+  React.useEffect(() => {
+    if (pill && !pillReady) {
+      const id = window.requestAnimationFrame(() => setPillReady(true));
+      return () => window.cancelAnimationFrame(id);
+    }
+  }, [pill, pillReady]);
 
   // Below md there's no header to anchor scrolled content under the status
   // bar (that's the "Transaction Trends" overlapping the clock bug) — this
@@ -89,11 +135,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-7xl px-4 pt-[calc(env(safe-area-inset-top)+1.25rem)] pb-[calc(11rem+env(safe-area-inset-bottom))] sm:px-6 md:pt-8 md:pb-10 lg:px-8">
+      <main
+        key={pathname}
+        className={cn("mx-auto w-full max-w-7xl px-4 pt-[calc(env(safe-area-inset-top)+1.25rem)] pb-[calc(11rem+env(safe-area-inset-bottom))] sm:px-6 md:pt-8 md:pb-10 lg:px-8", direction)}
+      >
         {children}
       </main>
 
-      <nav className="sn-nav" aria-label="Main">
+      <nav className="sn-nav" aria-label="Main" ref={navRef}>
+        <span
+          aria-hidden="true"
+          className="sn-nav-pill"
+          style={{
+            transform: pill ? `translate3d(${pill.x}px, ${pill.y}px, 0)` : "translate3d(0, 0, 0)",
+            opacity: pill ? 1 : 0,
+            transitionDuration: pillReady ? undefined : "0ms",
+          }}
+        />
         {mobileNavItems.map((item) => {
           const active = isActive(item.href);
           const Icon = item.icon;
@@ -103,6 +161,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               href={item.href}
               aria-current={active ? "page" : undefined}
               data-compact
+              data-nav-href={item.href}
+              onClick={() => hapticTick(10)}
               className={cn("sn-tab", active && "on")}
             >
               <span className="sn-ind">

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { toast } from "sonner";
+import { collapseByAttr } from "@/lib/motion/collapse";
 import { format } from "date-fns";
 import { Timestamp } from "firebase/firestore";
 import { CalendarIcon, ChevronDown, MessageSquareText, Sparkles } from "@/components/icons";
@@ -93,7 +94,9 @@ export function PendingImportReviewDialog({
   const handleApprove = async () => {
     if (!user || !pendingImport || !canApprove) return;
     setSubmitting(true);
+    const collapsing = collapseByAttr("data-import-id", pendingImport.id, { axis: "x", ms: 220 });
     try {
+      await collapsing.done;
       if (kind === "transfer") {
         await approvePendingImportAsTransfer(user.uid, pendingImport.id, {
           amount: parsedAmount,
@@ -115,6 +118,7 @@ export function PendingImportReviewDialog({
       toast.success("Transaction added");
       onClose();
     } catch (e) {
+      collapsing.cancel();
       toast.error("Failed to add transaction", {
         description: e instanceof Error ? e.message : undefined,
       });
@@ -153,11 +157,14 @@ export function PendingImportReviewDialog({
       destructive: true,
     });
     if (!ok) return;
+    const collapsing = collapseByAttr("data-import-id", pendingImport.id, { axis: "x", ms: 220 });
     try {
+      await collapsing.done;
       await dismissPendingImport(user.uid, pendingImport.id);
       toast.success("Message dismissed");
       onClose();
     } catch (e) {
+      collapsing.cancel();
       toast.error("Failed to dismiss message", {
         description: e instanceof Error ? e.message : undefined,
       });

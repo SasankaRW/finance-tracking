@@ -67,3 +67,16 @@ export async function hapticError() {
     // best-effort
   }
 }
+
+/** A very short tick (10-15 ms) for key presses, toggles and hold completion. navigator.vibrate is guarded. */
+export function hapticTick(ms = 12) {
+  try {
+    if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+      navigator.vibrate(ms);
+      return;
+    }
+  } catch {
+    // best-effort
+  }
+  void hapticSelection();
+}

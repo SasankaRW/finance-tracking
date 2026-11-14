@@ -171,7 +171,7 @@ export default function EventDetailPage() {
                     </div>
                     <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
                         <div
-                            className={`h-full rounded-full transition-all ${over ? "bg-destructive" : "bg-primary"}`}
+                            className={`meter-fill h-full rounded-full ${over ? "bg-destructive" : "bg-primary"}`}
                             style={{ width: `${percent}%` }}
                         />
                     </div>
@@ -201,7 +201,7 @@ export default function EventDetailPage() {
                                         </div>
                                         <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
                                             <div
-                                                className="h-full rounded-full bg-primary"
+                                                className="meter-fill h-full rounded-full bg-primary"
                                                 style={{ width: `${catPercent}%` }}
                                             />
                                         </div>

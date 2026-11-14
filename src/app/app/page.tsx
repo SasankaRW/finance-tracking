@@ -36,6 +36,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAccrualStats, useQuickStats, useSparklineData } from "@/lib/finance/use-trends";
 import { SparklineChart } from "@/components/sparkline-chart";
 import { useMediaQuery } from "@/lib/hooks/use-media-query";
+import { AnimatedNumber } from "@/components/animated-number";
 import { DebtPillsSummary } from "@/components/debt-pills-summary";
 import { UpcomingBillsPanel } from "@/components/upcoming-bills-panel";
 import { PendingImportsPanel } from "@/components/pending-imports-panel";
@@ -393,11 +394,18 @@ export default function DashboardPage() {
                       balanceHidden ? "select-none blur-md" : ""
                     }`}
                   >
-                    {missingUsdRate || hasUnsupportedCurrency
-                      ? "-"
-                      : Math.abs(totalBalanceLkr) >= 1_000_000
-                        ? formatMoneyCompact(totalBalanceLkr, HOME_CURRENCY)
-                        : formatMoney(totalBalanceLkr, HOME_CURRENCY)}
+                    {missingUsdRate || hasUnsupportedCurrency ? (
+                      "-"
+                    ) : (
+                      <AnimatedNumber
+                        value={totalBalanceLkr}
+                        formatFn={(v) =>
+                          Math.abs(v) >= 1_000_000
+                            ? formatMoneyCompact(v, HOME_CURRENCY)
+                            : formatMoney(v, HOME_CURRENCY)
+                        }
+                      />
+                    )}
                   </div>
                   <button
                     type="button"
@@ -485,6 +493,8 @@ export default function DashboardPage() {
               : cashMissingUsdRate || cashUnsupportedCurrency
                 ? "-"
                 : formatMoney(cashInHandLkr, HOME_CURRENCY),
+            num: isLoading || cashMissingUsdRate || cashUnsupportedCurrency ? undefined : cashInHandLkr,
+            fmt: (v: number) => formatMoney(v, HOME_CURRENCY),
             sub: `${accountSummary.cash} cash account${accountSummary.cash !== 1 ? "s" : ""}`,
           },
           {
@@ -492,6 +502,8 @@ export default function DashboardPage() {
             icon: Target,
             iconClass: "text-blue",
             value: isLoading ? "-" : formatMoney(accrualStats.accrualDailyAverage),
+            num: isLoading ? undefined : accrualStats.accrualDailyAverage,
+            fmt: (v: number) => formatMoney(v),
             sub: "incl. upcoming bills",
           },
           {
@@ -499,6 +511,8 @@ export default function DashboardPage() {
             icon: AlertCircle,
             iconClass: "text-amber",
             value: isLoading ? "-" : formatMoney(monthStats.averageExpense),
+            num: isLoading ? undefined : monthStats.averageExpense,
+            fmt: (v: number) => formatMoney(v),
             sub: "per entry",
           },
           {
@@ -506,6 +520,8 @@ export default function DashboardPage() {
             icon: ArrowDownRight,
             iconClass: "text-coral",
             value: isLoading ? "-" : formatMoney(monthStats.largestExpense),
+            num: isLoading ? undefined : monthStats.largestExpense,
+            fmt: (v: number) => formatMoney(v),
             sub: "single expense",
           },
         ].map((stat) => {
@@ -520,7 +536,7 @@ export default function DashboardPage() {
                 {stat.label}
               </div>
               <p className="mt-2 truncate text-lg font-bold tabular-nums sm:text-2xl">
-                {stat.value}
+                {stat.num !== undefined ? <AnimatedNumber value={stat.num} formatFn={stat.fmt} /> : stat.value}
               </p>
               <p className="mt-0.5 text-[11px] text-muted-foreground">
                 {stat.sub}
@@ -659,7 +675,7 @@ export default function DashboardPage() {
                         </div>
                         <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
                           <div
-                            className="h-full rounded-full"
+                            className="meter-fill h-full rounded-full"
                             style={{
                               width: `${pct}%`,
                               backgroundColor: pieColors[idx % pieColors.length],
@@ -740,7 +756,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-white/15">
                   <div
-                    className={`h-full rounded-full transition-all ${budgetOver
+                    className={`meter-fill h-full rounded-full ${budgetOver
                       ? "bg-coral"
                       : budgetWarning
                         ? "bg-amber"
@@ -774,7 +790,7 @@ export default function DashboardPage() {
                         </div>
                         <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                           <div
-                            className={`h-full rounded-full transition-all ${over ? "bg-destructive" : warning ? "bg-amber" : "bg-primary"}`}
+                            className={`meter-fill h-full rounded-full ${over ? "bg-destructive" : warning ? "bg-amber" : "bg-primary"}`}
                             style={{ width: `${pct}%` }}
                           />
                         </div>

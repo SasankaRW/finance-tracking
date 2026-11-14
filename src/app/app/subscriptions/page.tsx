@@ -743,7 +743,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                         <div className="space-y-1">
                           <div className="h-2.5 overflow-hidden rounded-full bg-muted">
                             <div
-                              className="h-full rounded-full bg-primary transition-all"
+                              className="meter-fill h-full rounded-full bg-primary"
                               style={{ width: `${loanProgress.percent}%` }}
                             />
                           </div>
@@ -834,7 +834,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                               <div className="mt-2 max-w-[260px] space-y-1">
                                 <div className="h-2 overflow-hidden rounded-full bg-muted">
                                   <div
-                                    className="h-full rounded-full bg-primary transition-all"
+                                    className="meter-fill h-full rounded-full bg-primary"
                                     style={{ width: `${loanProgress.percent}%` }}
                                   />
                                 </div>
