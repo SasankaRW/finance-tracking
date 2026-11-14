@@ -7,11 +7,14 @@ import { Timestamp } from "firebase/firestore";
 import { ArrowDownLeft, ArrowUpRight, CheckCircle2, HandCoins, Plus, Trash2 } from "@/components/icons";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth/auth-provider";
+import { useConfirm } from "@/components/confirm-dialog";
 import { createDebt, deleteDebt } from "@/lib/finance/debt-mutations";
 import { useDebts } from "@/lib/finance/hooks";
 import { formatCurrencyCode, formatMoney } from "@/lib/format";
+import { useStaggerReveal } from "@/lib/motion/use-stagger-reveal";
 import { COMMON_CURRENCIES } from "@/shared/currency";
 import { SettleDebtDialog } from "@/components/settle-debt-dialog";
+import { RowActionsMenu } from "@/components/row-actions-menu";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,6 +52,7 @@ function toDate(value: unknown) {
 
 export function DebtPillsPanel() {
   const { user } = useAuth();
+  const confirm = useConfirm();
   const { debts, loading } = useDebts();
   const [open, setOpen] = React.useState(false);
   const [personName, setPersonName] = React.useState("");
@@ -64,6 +68,7 @@ export function DebtPillsPanel() {
     () => (debts as any[]).filter((debt) => debt.status !== "settled"),
     [debts],
   );
+  const pillsRef = useStaggerReveal<HTMLDivElement>("[data-stagger-item]", [activeDebts.length, loading]);
 
   const totals = React.useMemo(() => {
     let owedToMe = 0;
@@ -245,7 +250,7 @@ export function DebtPillsPanel() {
         {loading ? (
           <div className="text-sm text-muted-foreground">Loading borrowed money...</div>
         ) : activeDebts.length ? (
-          <div className="flex flex-wrap gap-2">
+          <div ref={pillsRef} className="flex flex-wrap gap-2">
             {activeDebts.map((debt: any) => {
               const isReceivable = debt.direction === "owed_to_me";
               const due = toDate(debt.dueAt);

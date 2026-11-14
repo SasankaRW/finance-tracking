@@ -22,6 +22,7 @@ import {
   Wallet,
 } from "@/components/icons";
 import { useAuth } from "@/lib/auth/auth-provider";
+import { useConfirm } from "@/components/confirm-dialog";
 import { useAccounts, useCategories, useSalaryProfiles } from "@/lib/finance/hooks";
 import {
   createSalaryProfile,
@@ -32,6 +33,10 @@ import {
 } from "@/lib/finance/salary-mutations";
 import { useFxRates } from "@/lib/fx/use-fx-rates";
 import { formatCurrencyCode, formatMoney } from "@/lib/format";
+import { getCategoryIcon } from "@/lib/finance/category-icons";
+import { AnimatedNumber } from "@/components/animated-number";
+import { AnimatePresence, motion } from "motion/react";
+import { iosIn } from "@/lib/motion/variants";
 import { COMMON_CURRENCIES, HOME_CURRENCY } from "@/shared/currency";
 import { Badge } from "@/components/ui/badge";
 import { SettingsStatTile } from "@/app/app/settings/settings-stat-tile";
@@ -44,6 +49,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogBody,
@@ -78,6 +84,8 @@ const salarySchema = z.object({
   accountId: z.string().min(1),
   categoryId: z.string().min(1),
   depositMode: z.enum(["keep_salary_currency", "convert_to_account_currency"]),
+  // Percent (0-100) in the form; converted to a 0-1 fraction before it hits the mutation layer.
+  taxRate: z.number().min(0).max(100).optional(),
   nextPaydayAt: z.date(),
 });
 
@@ -125,6 +133,31 @@ function estimateDepositAmount(
   return null;
 }
 
+// taxRate is a 0-1 fraction (e.g. stored on the salary profile), amount is pre-tax.
+function applyTaxRate(amount: number | null, taxRate: number | null | undefined) {
+  if (amount === null) return null;
+  if (typeof taxRate !== "number" || taxRate <= 0) return amount;
+  return Math.round(amount * (1 - taxRate) * 100) / 100;
+}
+
+// Mirrors what recordSalaryPayment computes when no override amount is passed.
+function computeDefaultRecordAmount(
+  salary: any,
+  salaryCurrency: string,
+  accountCurrency: string,
+  usdToLkr: number | null,
+) {
+  const depositMode =
+    salary.depositMode === "keep_salary_currency" ? "keep_salary_currency" : "convert_to_account_currency";
+  let gross = salary.amount ?? 0;
+  if (depositMode === "convert_to_account_currency" && salaryCurrency !== accountCurrency) {
+    const converted = estimateDepositAmount(gross, salaryCurrency, accountCurrency, usdToLkr);
+    if (converted === null) return null;
+    gross = converted;
+  }
+  return applyTaxRate(gross, salary.taxRate);
+}
+
 function SalaryFormFields({
   form,
   accounts,
@@ -142,10 +175,26 @@ function SalaryFormFields({
   const salaryCurrency = formatCurrencyCode(form.watch("currency"));
   const accountCurrency = formatCurrencyCode(selectedAccount?.currency);
   const depositMode = form.watch("depositMode") ?? "convert_to_account_currency";
-  const estimatedDeposit = selectedAccount
+  const taxRatePercent = form.watch("taxRate");
+  const taxRateFraction = typeof taxRatePercent === "number" ? taxRatePercent / 100 : 0;
+  const estimatedDepositGross = selectedAccount
     ? estimateDepositAmount(amount, salaryCurrency, accountCurrency, usdToLkr)
     : null;
-  const currentHomeValue = estimateDepositAmount(amount, salaryCurrency, HOME_CURRENCY, usdToLkr);
+  const currentHomeValueGross = estimateDepositAmount(amount, salaryCurrency, HOME_CURRENCY, usdToLkr);
+  const estimatedDeposit = applyTaxRate(estimatedDepositGross, taxRateFraction);
+  const currentHomeValue = applyTaxRate(currentHomeValueGross, taxRateFraction);
+
+  const [calcOpen, setCalcOpen] = React.useState(false);
+  const [calcGross, setCalcGross] = React.useState("");
+  const [calcReceived, setCalcReceived] = React.useState("");
+  const calcResultPercent = React.useMemo(() => {
+    const gross = Number(calcGross);
+    const received = Number(calcReceived);
+    if (!gross || !Number.isFinite(gross) || !Number.isFinite(received)) return null;
+    const pct = (1 - received / gross) * 100;
+    if (!Number.isFinite(pct)) return null;
+    return Math.min(95, Math.max(0, pct));
+  }, [calcGross, calcReceived]);
 
   return (
     <DialogBody className="space-y-5">
@@ -300,7 +349,8 @@ function SalaryFormFields({
           )}
           {depositMode === "keep_salary_currency" && salaryCurrency !== HOME_CURRENCY && currentHomeValue !== null && (
             <p className="font-medium text-foreground">
-              Current LKR value: {formatMoney(amount, salaryCurrency)} = {formatMoney(currentHomeValue, HOME_CURRENCY)}
+              Current LKR value: <AnimatedNumber value={amount} formatFn={(v) => formatMoney(v, salaryCurrency)} /> ={" "}
+              <AnimatedNumber value={currentHomeValue} formatFn={(v) => formatMoney(v, HOME_CURRENCY)} />
               {salaryCurrency === "USD" && usdToLkr
                 ? ` at 1 USD = ${usdToLkr.toFixed(2)} ${HOME_CURRENCY}`
                 : ""}
@@ -308,7 +358,8 @@ function SalaryFormFields({
           )}
           {depositMode === "convert_to_account_currency" && salaryCurrency !== accountCurrency && estimatedDeposit !== null && (
             <p className="font-medium text-foreground">
-              Payday estimate: {formatMoney(amount, salaryCurrency)} = {formatMoney(estimatedDeposit, accountCurrency)}
+              Payday estimate: <AnimatedNumber value={amount} formatFn={(v) => formatMoney(v, salaryCurrency)} /> ={" "}
+              <AnimatedNumber value={estimatedDeposit} formatFn={(v) => formatMoney(v, accountCurrency)} />
               {salaryCurrency === "USD" && accountCurrency === HOME_CURRENCY && usdToLkr
                 ? ` at 1 USD = ${usdToLkr.toFixed(2)} ${HOME_CURRENCY}`
                 : ""}
@@ -319,11 +370,98 @@ function SalaryFormFields({
               Live conversion is currently supported for USD to {HOME_CURRENCY}.
             </p>
           )}
+          {taxRateFraction > 0 && estimatedDepositGross !== null && estimatedDeposit !== null && (
+            <p className="font-medium text-foreground">
+              After {taxRatePercent}% deduction:{" "}
+              <AnimatedNumber value={estimatedDepositGross ?? 0} formatFn={(v) => formatMoney(v, accountCurrency)} /> →{" "}
+              <AnimatedNumber value={estimatedDeposit} formatFn={(v) => formatMoney(v, accountCurrency)} />
+            </p>
+          )}
         </div>
       )}
 
       <div className="space-y-2">
-        <Label className="text-xs text-muted-foreground">
+        <div className="flex items-center justify-between">
+          <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+            Tax / Deduction %
+          </Label>
+          <button
+            type="button"
+            className="text-xs font-medium text-primary hover:underline"
+            onClick={() => setCalcOpen((v) => !v)}
+          >
+            {calcOpen ? "Hide calculator" : "Calculate from a payslip"}
+          </button>
+        </div>
+        <Input
+          type="number"
+          step="0.01"
+          min={0}
+          max={100}
+          inputMode="decimal"
+          placeholder="0"
+          className="h-11"
+          {...form.register("taxRate", { valueAsNumber: true })}
+        />
+        <p className="text-xs text-muted-foreground">
+          The share withheld between what payday converts to and what actually lands in your account. Applied automatically to future estimates, and refined each time you record a payment with the real amount.
+        </p>
+
+        {calcOpen && (
+          <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-[11px] text-muted-foreground">Converted gross ({accountCurrency})</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  inputMode="decimal"
+                  placeholder={estimatedDepositGross ? estimatedDepositGross.toFixed(2) : "0.00"}
+                  className="h-10"
+                  value={calcGross}
+                  onChange={(e) => setCalcGross(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[11px] text-muted-foreground">Amount received ({accountCurrency})</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  inputMode="decimal"
+                  placeholder="0.00"
+                  className="h-10"
+                  value={calcReceived}
+                  onChange={(e) => setCalcReceived(e.target.value)}
+                />
+              </div>
+            </div>
+            {calcResultPercent !== null && (
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs text-muted-foreground">
+                  Deduction: <span className="font-semibold text-foreground">{calcResultPercent.toFixed(2)}%</span>
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    form.setValue("taxRate", Math.round(calcResultPercent * 100) / 100, {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    });
+                    setCalcOpen(false);
+                  }}
+                >
+                  Use {calcResultPercent.toFixed(2)}%
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground uppercase tracking-wider">
           Next Payday
         </Label>
         <Popover>
@@ -355,6 +493,7 @@ function SalaryFormFields({
 
 export function SalaryPanel() {
   const { user } = useAuth();
+  const confirm = useConfirm();
   const { accounts } = useAccounts();
   const { categories: incomeCats } = useCategories("income");
   const { salaryProfiles, loading, error } = useSalaryProfiles();
@@ -362,6 +501,9 @@ export function SalaryPanel() {
   const usdToLkr = fxUsd?.rates?.[HOME_CURRENCY] ?? null;
   const [createOpen, setCreateOpen] = React.useState(false);
   const [edit, setEdit] = React.useState<any | null>(null);
+  const [recordTarget, setRecordTarget] = React.useState<any | null>(null);
+  const [recordAmount, setRecordAmount] = React.useState("");
+  const [recording, setRecording] = React.useState(false);
 
   const salaryCategory = React.useMemo(
     () => incomeCats.find((c: any) => c.name?.toLowerCase() === "salary") ?? incomeCats[0],
@@ -429,12 +571,13 @@ export function SalaryPanel() {
       if (salary.status === "active") {
         active++;
         const sourceCurrency = formatCurrencyCode(salary.currency);
-        const estimated = estimateDepositAmount(
+        const estimatedGross = estimateDepositAmount(
           salary.amount ?? 0,
           sourceCurrency,
           HOME_CURRENCY,
           usdToLkr,
         );
+        const estimated = applyTaxRate(estimatedGross, salary.taxRate);
         if (estimated !== null) {
           monthly += estimated;
         } else {
@@ -455,7 +598,10 @@ export function SalaryPanel() {
   const submitCreate = createForm.handleSubmit(async (values) => {
     if (!user) return;
     try {
-      await createSalaryProfile(user.uid, values);
+      await createSalaryProfile(user.uid, {
+        ...values,
+        taxRate: typeof values.taxRate === "number" ? values.taxRate / 100 : undefined,
+      });
       toast.success("Salary source added");
       setCreateOpen(false);
       createForm.reset({
@@ -465,6 +611,7 @@ export function SalaryPanel() {
         accountId: firstAccount?.id ?? "",
         categoryId: salaryCategory?.id ?? "",
         depositMode: "convert_to_account_currency",
+        taxRate: undefined,
         nextPaydayAt: new Date(),
       });
     } catch (e) {
@@ -477,7 +624,10 @@ export function SalaryPanel() {
   const submitEdit = editForm.handleSubmit(async (values) => {
     if (!user) return;
     try {
-      await updateSalaryProfile(user.uid, values);
+      await updateSalaryProfile(user.uid, {
+        ...values,
+        taxRate: typeof values.taxRate === "number" ? values.taxRate / 100 : undefined,
+      });
       toast.success("Salary updated");
       setEdit(null);
     } catch (e) {
@@ -486,6 +636,44 @@ export function SalaryPanel() {
       });
     }
   });
+
+  const submitRecord = async () => {
+    if (!user || !recordTarget) return;
+    const amt = Number(recordAmount);
+    if (!Number.isFinite(amt) || amt <= 0) {
+      toast.error("Enter a valid amount received");
+      return;
+    }
+    setRecording(true);
+    try {
+      await recordSalaryPayment(user.uid, recordTarget.id, new Date(), amt);
+      toast.success("Salary recorded");
+      setRecordTarget(null);
+    } catch (e) {
+      toast.error("Failed to record salary", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
+      setRecording(false);
+    }
+  };
+
+  const recordAccount = recordTarget ? accountById.get(recordTarget.accountId) : null;
+  const recordAccountCurrency = formatCurrencyCode(recordAccount?.currency);
+  const recordSalaryCurrency = recordTarget
+    ? formatCurrencyCode(recordTarget.currency ?? recordAccount?.currency)
+    : "";
+  const recordMode =
+    recordTarget?.depositMode === "keep_salary_currency" ? "keep_salary_currency" : "convert_to_account_currency";
+  const recordGross = recordTarget
+    ? recordMode === "convert_to_account_currency" && recordSalaryCurrency !== recordAccountCurrency
+      ? estimateDepositAmount(recordTarget.amount ?? 0, recordSalaryCurrency, recordAccountCurrency, usdToLkr)
+      : (recordTarget.amount ?? 0)
+    : null;
+  const recordHasTax = typeof recordTarget?.taxRate === "number" && recordTarget.taxRate > 0;
+  const recordDefaultAmount = recordTarget
+    ? computeDefaultRecordAmount(recordTarget, recordSalaryCurrency, recordAccountCurrency, usdToLkr)
+    : null;
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -531,7 +719,7 @@ export function SalaryPanel() {
           icon={Banknote}
           iconWrapClassName="bg-primary/10"
           iconClassName="text-primary"
-          value={formatMoney(stats.monthly, HOME_CURRENCY)}
+          value={<AnimatedNumber value={stats.monthly} formatFn={(v) => formatMoney(v, HOME_CURRENCY)} />}
           sub={`using today's USD rate${stats.unsupportedConversions ? " where available" : ""}`}
         />
         <SettingsStatTile
@@ -539,7 +727,7 @@ export function SalaryPanel() {
           icon={CheckCircle2}
           iconWrapClassName="bg-green/16"
           iconClassName="text-green"
-          value={stats.active}
+          value={<AnimatedNumber value={stats.active} />}
           sub="salary sources"
         />
         <SettingsStatTile
@@ -547,7 +735,7 @@ export function SalaryPanel() {
           icon={Clock}
           iconWrapClassName="bg-amber/16"
           iconClassName="text-amber"
-          value={stats.dueSoon}
+          value={<AnimatedNumber value={stats.dueSoon} />}
           sub="within 7 days or overdue"
         />
         <SettingsStatTile
@@ -555,7 +743,7 @@ export function SalaryPanel() {
           icon={Pause}
           iconWrapClassName="bg-muted"
           iconClassName="text-muted-foreground"
-          value={stats.paused}
+          value={<AnimatedNumber value={stats.paused} />}
           sub="not counted in monthly salary"
         />
       </div>
@@ -569,8 +757,10 @@ export function SalaryPanel() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="py-12 text-center text-sm text-muted-foreground">
-              Loading salary sources...
+            <div className="grid gap-3 lg:grid-cols-2">
+              {[1, 2].map((i) => (
+                <Skeleton key={i} className="h-24 w-full rounded-3xl" />
+              ))}
             </div>
           ) : error ? (
             <div className="py-12 text-center text-sm text-destructive">
@@ -587,18 +777,21 @@ export function SalaryPanel() {
                   salary.depositMode === "keep_salary_currency"
                     ? "keep_salary_currency"
                     : "convert_to_account_currency";
-                const estimatedDeposit = estimateDepositAmount(
+                const estimatedDepositGross = estimateDepositAmount(
                   salary.amount ?? 0,
                   currency,
                   accountCurrency,
                   usdToLkr,
                 );
-                const currentHomeValue = estimateDepositAmount(
+                const currentHomeValueGross = estimateDepositAmount(
                   salary.amount ?? 0,
                   currency,
                   HOME_CURRENCY,
                   usdToLkr,
                 );
+                const estimatedDeposit = applyTaxRate(estimatedDepositGross, salary.taxRate);
+                const currentHomeValue = applyTaxRate(currentHomeValueGross, salary.taxRate);
+                const hasTaxRate = typeof salary.taxRate === "number" && salary.taxRate > 0;
                 const nextPayday =
                   salary.nextPaydayAt instanceof Timestamp ? salary.nextPaydayAt.toDate() : new Date();
                 const lastPaid =
@@ -609,15 +802,17 @@ export function SalaryPanel() {
                 const keepModeNeedsMatchingAccount =
                   depositMode === "keep_salary_currency" && currency !== accountCurrency;
 
+                const SourceIcon = category ? getCategoryIcon(category) : Wallet;
+
                 return (
                   <div
                     key={salary.id}
-                    className={`motion-expressive press-expressive rounded-3xl border bg-card/80 p-4  ${isPaused ? "opacity-70" : ""}`}
+                    className={`motion-expressive press-expressive  rounded-3xl border bg-card/80 p-4 ${isPaused ? "opacity-70" : ""}`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex min-w-0 items-start gap-3">
                         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-green/16">
-                          <Wallet className="h-5 w-5 text-green" />
+                          <SourceIcon className="h-5 w-5 text-green" />
                         </div>
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
@@ -650,6 +845,10 @@ export function SalaryPanel() {
                                 accountId: salary.accountId ?? "",
                                 categoryId: salary.categoryId ?? "",
                                 depositMode,
+                                taxRate:
+                                  typeof salary.taxRate === "number"
+                                    ? Math.round(salary.taxRate * 10000) / 100
+                                    : undefined,
                                 nextPaydayAt: nextPayday,
                                 status: isPaused ? "paused" : "active",
                               });
@@ -686,6 +885,7 @@ export function SalaryPanel() {
                           </DropdownMenuItem>
                           <div className="flex items-center justify-between gap-6 px-2 py-1 text-sm text-coral" onPointerDown={(e) => e.stopPropagation()}><span>Delete</span><HoldButton small label="Delete" icon={<Trash2 className="h-4 w-4" />} onConfirm={async () => {
                               if (!user) return;
+                              if (!(await confirm({ title: "Delete this salary source?", destructive: true }))) return;
                               try {
                                 await deleteSalaryProfile(user.uid, salary.id);
                                 toast.success("Salary deleted");
@@ -703,35 +903,45 @@ export function SalaryPanel() {
                       <div className="rounded-2xl bg-muted/50 p-3">
                         <p className="text-xs text-muted-foreground">Amount</p>
                         <p className="mt-1 text-lg font-bold tabular-nums">
-                          {formatMoney(salary.amount ?? 0, currency)}
+                          <AnimatedNumber value={salary.amount ?? 0} formatFn={(v) => formatMoney(v, currency)} />
                         </p>
                       </div>
                       {depositMode === "convert_to_account_currency" && currency !== accountCurrency && (
                         <div className="rounded-2xl bg-green/16 p-3">
-                          <p className="text-xs text-muted-foreground">Today&apos;s Deposit</p>
-                          <p className="mt-1 text-sm font-semibold text-green dark:text-green">
-                            {estimatedDeposit !== null
-                              ? formatMoney(estimatedDeposit, accountCurrency)
-                              : "Rate unavailable"}
+                          <p className="text-xs text-muted-foreground">
+                            Today&apos;s Deposit{hasTaxRate ? " (after tax)" : ""}
+                          </p>
+                          <p className="mt-1 text-sm font-semibold text-green">
+                            {estimatedDeposit !== null ? (
+                              <AnimatedNumber value={estimatedDeposit} formatFn={(v) => formatMoney(v, accountCurrency)} />
+                            ) : (
+                              "Rate unavailable"
+                            )}
                           </p>
                           {currency === "USD" && accountCurrency === HOME_CURRENCY && usdToLkr && (
                             <p className="mt-1 text-[11px] text-muted-foreground">
                               1 USD = {usdToLkr.toFixed(2)} {HOME_CURRENCY}
+                              {hasTaxRate ? `, ${(salary.taxRate * 100).toFixed(2)}% withheld` : ""}
                             </p>
                           )}
                         </div>
                       )}
                       {depositMode === "keep_salary_currency" && currency !== HOME_CURRENCY && (
                         <div className="rounded-2xl bg-blue/16 p-3">
-                          <p className="text-xs text-muted-foreground">Current LKR Value</p>
-                          <p className="mt-1 text-sm font-semibold text-blue dark:text-blue">
-                            {currentHomeValue !== null
-                              ? formatMoney(currentHomeValue, HOME_CURRENCY)
-                              : "Rate unavailable"}
+                          <p className="text-xs text-muted-foreground">
+                            Current LKR Value{hasTaxRate ? " (after tax)" : ""}
+                          </p>
+                          <p className="mt-1 text-sm font-semibold text-blue">
+                            {currentHomeValue !== null ? (
+                              <AnimatedNumber value={currentHomeValue} formatFn={(v) => formatMoney(v, HOME_CURRENCY)} />
+                            ) : (
+                              "Rate unavailable"
+                            )}
                           </p>
                           {currency === "USD" && usdToLkr && (
                             <p className="mt-1 text-[11px] text-muted-foreground">
                               1 USD = {usdToLkr.toFixed(2)} {HOME_CURRENCY}
+                              {hasTaxRate ? `, ${(salary.taxRate * 100).toFixed(2)}% withheld` : ""}
                             </p>
                           )}
                         </div>
@@ -762,21 +972,10 @@ export function SalaryPanel() {
                       <Button
                         disabled={isPaused || keepModeNeedsMatchingAccount}
                         className="w-full sm:w-auto"
-                        onClick={async () => {
-                          if (!user) return;
-                          try {
-                            await recordSalaryPayment(user.uid, salary.id);
-                            toast.success("Salary recorded", {
-                              description:
-                                depositMode === "convert_to_account_currency" && currency !== accountCurrency
-                                  ? "Converted using today's exchange rate and saved as a fixed deposit."
-                                  : undefined,
-                            });
-                          } catch (e) {
-                            toast.error("Failed to record salary", {
-                              description: e instanceof Error ? e.message : undefined,
-                            });
-                          }
+                        onClick={() => {
+                          const def = computeDefaultRecordAmount(salary, currency, accountCurrency, usdToLkr);
+                          setRecordTarget(salary);
+                          setRecordAmount(def !== null ? def.toFixed(2) : "");
                         }}
                       >
                         <CheckCircle2 className="h-4 w-4 mr-2" />
@@ -853,6 +1052,82 @@ export function SalaryPanel() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(recordTarget)} onOpenChange={(v) => (!v ? setRecordTarget(null) : v)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Record Salary</DialogTitle>
+            <DialogDescription>
+              Confirm what actually landed in {recordAccount?.name ?? "your account"} this payday. Editing it
+              refines the deduction rate used for future estimates.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody className="space-y-3">
+            {recordGross !== null && recordHasTax && (
+              <p className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                Estimated gross: <AnimatedNumber value={recordGross} formatFn={(v) => formatMoney(v, recordAccountCurrency)} /> · current
+                deduction rate {(recordTarget!.taxRate * 100).toFixed(2)}%
+              </p>
+            )}
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                Amount received ({recordAccountCurrency})
+              </Label>
+              <Input
+                type="number"
+                step="0.01"
+                inputMode="decimal"
+                className="h-12 text-lg font-semibold"
+                value={recordAmount}
+                onChange={(e) => setRecordAmount(e.target.value)}
+              />
+              {/* AnimatePresence itself must stay mounted unconditionally — if it
+                  were only rendered inside the validity check below, clearing
+                  the field would unmount AnimatePresence and this message in
+                  the same commit, skipping the exit transition entirely. */}
+              <AnimatePresence mode="wait">
+                {recordDefaultAmount !== null &&
+                  recordAmount !== "" &&
+                  !Number.isNaN(Number(recordAmount)) &&
+                  (() => {
+                    const diff = Number(recordAmount) - recordDefaultAmount;
+                    const matches = Math.abs(diff) < 0.005;
+                    return (
+                      <motion.p
+                        key={matches ? "match" : diff > 0 ? "above" : "below"}
+                        variants={iosIn}
+                        initial="initial"
+                        animate="animate"
+                        exit="exit"
+                        className={`text-xs font-medium ${
+                          matches
+                            ? "text-muted-foreground"
+                            : diff > 0
+                              ? "text-green"
+                              : "text-amber"
+                        }`}
+                      >
+                        {matches
+                          ? "Matches estimate"
+                          : `${diff > 0 ? "+" : "-"}${formatMoney(Math.abs(diff), recordAccountCurrency)} ${
+                              diff > 0 ? "above" : "below"
+                            } estimate`}
+                      </motion.p>
+                    );
+                  })()}
+              </AnimatePresence>
+            </div>
+          </DialogBody>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => setRecordTarget(null)}>
+              Cancel
+            </Button>
+            <Button disabled={recording} onClick={submitRecord} className="min-w-24">
+              {recording ? "Recording..." : "Record"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

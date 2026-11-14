@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Scaled to ~72% about center so the mark sits safely inside the adaptive
+       icon's masked safe zone across circle/squircle/rounded-square launchers. -->
+  <g transform="translate(50,50) scale(0.72) translate(-50,-50)">
+    <rect x="27" y="24" width="46" height="20" rx="10" fill="#ffffff" opacity="0.45" />
+    <rect x="18" y="34" width="64" height="42" rx="14" fill="#ffffff" />
+    <circle cx="30" cy="55" r="4.2" fill="#2f8f6b" />
+    <rect x="44" y="42" width="8" height="16" rx="3" fill="#ffd9a0" />
+    <rect x="55" y="34" width="8" height="24" rx="3" fill="#ffd9a0" />
+    <rect x="66" y="24" width="8" height="34" rx="3" fill="#ffd9a0" />
+  </g>
+</svg>

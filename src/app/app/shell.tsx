@@ -1,13 +1,15 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Calendar, Layers, List, LogOut, Plus, Settings, Target } from "@/components/icons";
+import { Calendar, Layers, List, LogOut, Settings, Target } from "@/components/icons";
 import { cn } from "@/lib/utils";
+import { hapticLight } from "@/lib/haptics";
 import { CashlyLogo } from "@/components/cashly-logo";
 import { signOutEverywhere } from "@/lib/auth/auth-actions";
 import { useAuth } from "@/lib/auth/auth-provider";
-import { CreateTransactionDialog } from "@/app/app/transactions/create-transaction-dialog";
+import { SpeedDialFab } from "@/components/speed-dial-fab";
 
 const navItems = [
   { href: "/app", label: "Dashboard", icon: Layers },
@@ -19,7 +21,7 @@ const navItems = [
 // Mobile has no top bar, so the bottom nav also carries Settings.
 const shortLabels: Record<string, string> = { "/app": "Home", "/app/transactions": "Activity" };
 const mobileNavItems = [
-  ...navItems,
+  ...navItems.filter((item) => item.href !== "/app/events"),
   { href: "/app/settings", label: "Settings", icon: Settings },
 ].map((i) => ({ ...i, short: shortLabels[i.href] ?? i.label }));
 
@@ -29,6 +31,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isActive = (href: string) =>
     pathname === href || (pathname.startsWith(href + "/") && href !== "/app");
 
+  // Below md there's no header to anchor scrolled content under the status
+  // bar (that's the "Transaction Trends" overlapping the clock bug) — this
+  // scrim keeps that strip opaque no matter how far the page scrolls.
+  //
   return (
     <div className="min-h-dvh bg-background">
       <header className="sticky top-0 z-20 hidden bg-background pt-[env(safe-area-inset-top)] md:block">
@@ -87,16 +93,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
-      <div className="sn-fab-float">
-        <CreateTransactionDialog
-          trigger={
-            <button type="button" className="sn-fab press-expressive" aria-label="Add transaction" data-compact>
-              <Plus className="h-6 w-6" />
-            </button>
-          }
-        />
-      </div>
-
       <nav className="sn-nav" aria-label="Main">
         {mobileNavItems.map((item) => {
           const active = isActive(item.href);
@@ -117,6 +113,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           );
         })}
       </nav>
+
+      <SpeedDialFab />
     </div>
   );
 }

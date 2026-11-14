@@ -5,6 +5,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { XIcon } from "@/components/icons"
 
 import { cn } from "@/lib/utils"
+import { EASE_IOS_SPRING } from "@/lib/motion/easings"
 
 function Dialog({
   ...props
@@ -46,6 +47,15 @@ const DialogOverlay = React.forwardRef<
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
+// Drag-to-dismiss thresholds for the grabber below. Below sm, every dialog is
+// a bottom sheet, so this lives in the shared primitive rather than being
+// reimplemented per dialog.
+const DRAG_DISMISS_PX = 110
+const DRAG_DISMISS_VELOCITY = 0.6 // px/ms
+const DRAG_FLING_MS = 220
+const DRAG_SNAP_BACK_MS = 220
+const SNAP_BACK_EASE = `cubic-bezier(${EASE_IOS_SPRING.join(", ")})`
+
 function DialogContent({
   className,
   children,
@@ -54,6 +64,63 @@ function DialogContent({
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
+  const hiddenCloseRef = React.useRef<HTMLButtonElement>(null)
+  const dragStateRef = React.useRef<{ startY: number; startTime: number } | null>(null)
+  const [dragY, setDragY] = React.useState(0)
+  const [flinging, setFlinging] = React.useState(false)
+  const [snappingBack, setSnappingBack] = React.useState(false)
+  const snapBackTimerRef = React.useRef<number | null>(null)
+
+  const onGrabberPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    dragStateRef.current = { startY: e.clientY, startTime: performance.now() }
+    setFlinging(false)
+    if (snapBackTimerRef.current !== null) {
+      window.clearTimeout(snapBackTimerRef.current)
+      snapBackTimerRef.current = null
+    }
+    setSnappingBack(false)
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+  }
+
+  const onGrabberPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragStateRef.current) return
+    setDragY(Math.max(0, e.clientY - dragStateRef.current.startY))
+  }
+
+  const endGrabberDrag = () => {
+    const state = dragStateRef.current
+    dragStateRef.current = null
+    if (!state) return
+
+    const elapsed = Math.max(1, performance.now() - state.startTime)
+    const velocity = dragY / elapsed
+
+    if (dragY > DRAG_DISMISS_PX || velocity > DRAG_DISMISS_VELOCITY) {
+      // Finish the gesture as a smooth fling off-screen, then let Radix
+      // actually close/unmount once that's done — driving the exit from the
+      // CSS animate-out classes instead would restart from their own keyframe
+      // values and visibly snap back to center first.
+      setFlinging(true)
+      setDragY(1200)
+      window.setTimeout(() => hiddenCloseRef.current?.click(), DRAG_FLING_MS)
+    } else {
+      // Released short of the dismiss threshold — spring back instead of
+      // snapping instantly. Same inline-transition-then-clear technique as
+      // the fling above (no persistent transition class, no will-change), so
+      // it can't reintroduce the corner-clip bug documented below.
+      setSnappingBack(true)
+      setDragY(0)
+      if (snapBackTimerRef.current !== null) window.clearTimeout(snapBackTimerRef.current)
+      snapBackTimerRef.current = window.setTimeout(() => setSnappingBack(false), DRAG_SNAP_BACK_MS)
+    }
+  }
+
+  React.useEffect(() => {
+    return () => {
+      if (snapBackTimerRef.current !== null) window.clearTimeout(snapBackTimerRef.current)
+    }
+  }, [])
+
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
@@ -63,8 +130,33 @@ function DialogContent({
           "bg-card shadow-[inset_0_1px_0_rgba(255,255,255,.06)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom sm:data-[state=closed]:zoom-out-95 sm:data-[state=open]:zoom-in-95 sm:data-[state=closed]:slide-out-to-top-2 sm:data-[state=open]:slide-in-from-top-2 fixed bottom-0 left-[50%] z-50 grid max-h-[92dvh] w-full translate-x-[-50%] overflow-y-auto rounded-t-[28px] duration-200 outline-none sm:top-[50%] sm:bottom-auto sm:max-h-[calc(100dvh-2rem)] sm:max-w-lg sm:translate-y-[-50%] sm:rounded-[28px]",
           className
         )}
+        style={
+          dragY > 0 || snappingBack
+            ? {
+                transform: `translate(-50%, ${dragY}px)`,
+                transition: flinging
+                  ? `transform ${DRAG_FLING_MS}ms cubic-bezier(0.32, 0.72, 0, 1)`
+                  : snappingBack
+                    ? `transform ${DRAG_SNAP_BACK_MS}ms ${SNAP_BACK_EASE}`
+                    : "none",
+              }
+            : undefined
+        }
         {...props}
       >
+        {/* Drag handle: mobile-only (every dialog below sm is a bottom sheet).
+            Scoped to just this small bar, not the whole header, so it never
+            steals a drag from scrollable content or the close/title area. */}
+        <div
+          onPointerDown={onGrabberPointerDown}
+          onPointerMove={onGrabberPointerMove}
+          onPointerUp={endGrabberDrag}
+          onPointerCancel={endGrabberDrag}
+          className="flex shrink-0 touch-none cursor-grab justify-center pt-3 pb-1 active:cursor-grabbing sm:hidden"
+        >
+          <div className="h-1.5 w-10 rounded-full bg-muted-foreground/30" />
+        </div>
+
         {children}
         {showCloseButton && (
           <DialogPrimitive.Close
@@ -75,6 +167,9 @@ function DialogContent({
             <span className="sr-only">Close</span>
           </DialogPrimitive.Close>
         )}
+        {/* Always present regardless of showCloseButton — the fling-dismiss
+            above needs a Close to trigger programmatically. */}
+        <DialogPrimitive.Close ref={hiddenCloseRef} tabIndex={-1} aria-hidden="true" className="hidden" />
       </DialogPrimitive.Content>
     </DialogPortal>
   )

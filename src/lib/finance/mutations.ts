@@ -371,4 +371,61 @@ export async function deleteTransaction(
   });
 }
 
+// Reverses deleteTransaction: re-applies the same balance deltas with the sign
+// flipped and flips status back to active. Backs the "Deleted · Undo" toast —
+// a second safety net after the confirm dialog, not a replacement for it.
+export async function restoreTransaction(uid: string, transactionId: string) {
+  const db = getFirebaseDb();
+  const tRef = transactionDoc(uid, transactionId);
+
+  await runTransaction(db, async (trx) => {
+    const tSnap = await trx.get(tRef);
+    if (!tSnap.exists()) throw new Error("Transaction not found");
+    const t = tSnap.data() as any;
+    if (t.status !== "deleted") return; // already restored, or never was deleted
+
+    const kind = t.kind as "income" | "expense" | "transfer";
+    const amount = t.amount as number;
+
+    if (kind === "income" || kind === "expense") {
+      const aRef = accountDoc(uid, t.accountId as string);
+      const aSnap = await trx.get(aRef);
+      if (!aSnap.exists()) throw new Error("Account not found");
+      const prev = aSnap.data().balance as number;
+      const delta = kind === "income" ? amount : -amount;
+      trx.update(aRef, {
+        balance: prev + delta,
+        updatedAt: serverTimestamp(),
+        balanceMutationId: transactionId,
+      });
+    } else {
+      const fromRef = accountDoc(uid, t.fromAccountId as string);
+      const toRef = accountDoc(uid, t.toAccountId as string);
+      const fromSnap = await trx.get(fromRef);
+      const toSnap = await trx.get(toRef);
+      if (!fromSnap.exists() || !toSnap.exists())
+        throw new Error("Account not found");
+
+      const fromPrev = fromSnap.data().balance as number;
+      const toPrev = toSnap.data().balance as number;
+      trx.update(fromRef, {
+        balance: fromPrev - amount,
+        updatedAt: serverTimestamp(),
+        balanceMutationId: transactionId,
+      });
+      trx.update(toRef, {
+        balance: toPrev + amount,
+        updatedAt: serverTimestamp(),
+        balanceMutationId: transactionId,
+      });
+    }
+
+    trx.update(tRef, {
+      status: "active",
+      deletedAt: deleteField(),
+      updatedAt: serverTimestamp(),
+    });
+  });
+}
+
 

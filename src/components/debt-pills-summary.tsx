@@ -6,9 +6,10 @@ import { Timestamp } from "firebase/firestore";
 import { ArrowDownLeft, ArrowUpRight, Check, HandCoins } from "@/components/icons";
 import { useDebts } from "@/lib/finance/hooks";
 import { formatCurrencyCode, formatMoney } from "@/lib/format";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Pill, Tile } from "@/components/sonoma";
+import { Pill } from "@/components/sonoma";
+import { CollapsiblePanel } from "@/components/collapsible-panel";
 import { SettleDebtDialog } from "@/components/settle-debt-dialog";
+import { useStaggerReveal } from "@/lib/motion/use-stagger-reveal";
 
 function toDate(value: unknown) {
   if (value instanceof Timestamp) return value.toDate();
@@ -19,6 +20,7 @@ function toDate(value: unknown) {
 export function DebtPillsSummary() {
   const { debts, loading } = useDebts();
   const [settlingDebt, setSettlingDebt] = React.useState<any | null>(null);
+  const [panelExpanded, setPanelExpanded] = React.useState(false);
 
   const activeDebts = React.useMemo(
     () => (debts as any[]).filter((debt) => debt.status !== "settled"),
@@ -36,6 +38,8 @@ export function DebtPillsSummary() {
 
     return { owedToMe, iOwe };
   }, [activeDebts]);
+
+  const pillsRef = useStaggerReveal<HTMLDivElement>("[data-stagger-item]", [activeDebts.length, panelExpanded]);
 
   if (loading || activeDebts.length === 0) return null;
 
@@ -57,22 +61,31 @@ export function DebtPillsSummary() {
   );
 
   return (
-    <Card className="py-4 sm:py-5">
-      <CardHeader className="px-4 sm:px-5">
-        <div className="flex items-center justify-between gap-3">
-          <CardTitle className="flex items-center gap-2.5">
-            <Tile tone="coral">
-              <HandCoins className="h-5 w-5" />
-            </Tile>
-            <span>Borrowed money</span>
-          </CardTitle>
-          <div className="hidden flex-wrap gap-2 sm:flex">{totalPills}</div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3 px-4 sm:px-5">
-        <div className="flex flex-wrap gap-2 sm:hidden">{totalPills}</div>
-
-        <div className="flex flex-wrap gap-2">
+    <>
+      <CollapsiblePanel
+        storageKey="cashly:borrowed-money-expanded:v1"
+        icon={<HandCoins className="h-4 w-4" />}
+        tone="coral"
+        title="Borrowed money"
+        onExpandedChange={setPanelExpanded}
+        summary={
+          <>
+            {totals.owedToMe > 0 && (
+              <Pill tone="green">
+                <ArrowDownLeft className="h-3 w-3" />
+                {formatMoney(totals.owedToMe)}
+              </Pill>
+            )}
+            {totals.iOwe > 0 && (
+              <Pill tone="coral">
+                <ArrowUpRight className="h-3 w-3" />
+                {formatMoney(totals.iOwe)}
+              </Pill>
+            )}
+          </>
+        }
+      >
+        <div ref={pillsRef} className="flex flex-wrap gap-2">
           {activeDebts.slice(0, 8).map((debt: any) => {
             const isReceivable = debt.direction === "owed_to_me";
             const due = toDate(debt.dueAt);
@@ -108,7 +121,7 @@ export function DebtPillsSummary() {
           })}
           {activeDebts.length > 8 && <Pill tone="neutral">+{activeDebts.length - 8} more</Pill>}
         </div>
-      </CardContent>
+      </CollapsiblePanel>
 
       <SettleDebtDialog
         debt={settlingDebt}
@@ -117,6 +130,6 @@ export function DebtPillsSummary() {
           if (!next) setSettlingDebt(null);
         }}
       />
-    </Card>
+    </>
   );
 }

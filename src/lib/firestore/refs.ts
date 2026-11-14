@@ -73,4 +73,20 @@ export function eventDoc(uid: string, eventId: string) {
   return doc(getFirebaseDb(), "users", uid, "events", eventId);
 }
 
+export function smsRulesCol(uid: string) {
+  return collection(getFirebaseDb(), "users", uid, "smsRules");
+}
+
+export function smsRuleDoc(uid: string, ruleId: string) {
+  return doc(getFirebaseDb(), "users", uid, "smsRules", ruleId);
+}
+
+export function pendingImportsCol(uid: string) {
+  return collection(getFirebaseDb(), "users", uid, "pendingImports");
+}
+
+export function pendingImportDoc(uid: string, pendingImportId: string) {
+  return doc(getFirebaseDb(), "users", uid, "pendingImports", pendingImportId);
+}
+
 

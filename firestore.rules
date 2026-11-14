@@ -196,7 +196,7 @@ service cloud.firestore {
         && request.resource.data.name is string
         && request.resource.data.name.size() >= 1
         && request.resource.data.name.size() <= 64
-        && (!("kind" in request.resource.data) || request.resource.data.kind in ["subscription", "loan"])
+        && (!("kind" in request.resource.data) || request.resource.data.kind in ["subscription", "loan", "rent"])
         && isNumber(request.resource.data.amount)
         && request.resource.data.amount > 0
         && request.resource.data.currency is string
@@ -610,6 +610,21 @@ service cloud.firestore {
         allow create: if isAuthedAs(userId) && isEventDocValidCreate(eventId);
         allow update: if isAuthedAs(userId) && isEventDocValidUpdate(eventId);
         allow delete: if isAuthedAs(userId);
+      }
+
+      match /salaryProfiles/{salaryProfileId} {
+        allow read: if isAuthedAs(userId);
+        allow create, update, delete: if isAuthedAs(userId);
+      }
+
+      match /smsRules/{ruleId} {
+        allow read: if isAuthedAs(userId);
+        allow create, update, delete: if isAuthedAs(userId);
+      }
+
+      match /pendingImports/{pendingImportId} {
+        allow read: if isAuthedAs(userId);
+        allow create, update, delete: if isAuthedAs(userId);
       }
     }
   }

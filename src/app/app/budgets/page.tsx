@@ -30,11 +30,14 @@ import {
   PiggyBank,
 } from "@/components/icons";
 import { useAuth } from "@/lib/auth/auth-provider";
+import { useConfirm } from "@/components/confirm-dialog";
 import { useBudgets, useCategories, useTransactions } from "@/lib/finance/hooks";
 import { createBudget, deleteBudget } from "@/lib/finance/budget-mutations";
 import { COMMON_CURRENCIES, DEFAULT_CURRENCY, HOME_CURRENCY } from "@/shared/currency";
 import { useFxRates } from "@/lib/fx/use-fx-rates";
 import { formatCurrencyCode, formatMoney } from "@/lib/format";
+import { useStaggerReveal } from "@/lib/motion/use-stagger-reveal";
+import { getCategoryIcon } from "@/lib/finance/category-icons";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -92,8 +95,23 @@ function monthToDate(month: string) {
   return new Date(parseInt(year), parseInt(monthNum) - 1, 1);
 }
 
+// Shared by the mobile card and desktop table rows so the over/warning/ok color logic can't drift.
+function budgetTone(b: { remaining: number; percent: number }) {
+  const over = b.remaining < 0;
+  const warning = b.percent >= 80 && !over;
+  return {
+    over,
+    warning,
+    textClass: over ? "text-destructive" : warning ? "text-amber" : "text-primary",
+    iconBgClass: over ? "bg-destructive/10" : warning ? "bg-amber/16" : "bg-primary/10",
+    barClass: over ? "bg-destructive" : warning ? "bg-amber" : "bg-primary",
+    badgeVariant: (over ? "destructive" : warning ? "secondary" : "outline") as "destructive" | "secondary" | "outline",
+  };
+}
+
 export default function BudgetsPage({ embedded = false }: { embedded?: boolean }) {
   const { user } = useAuth();
+  const confirm = useConfirm();
   const [mode, setMode] = React.useState<SummaryMode>("monthly");
   const [month, setMonth] = React.useState(currentMonth());
   const { budgets, loading, error } = useBudgets(month);
@@ -190,11 +208,16 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
   const budgetRows = React.useMemo(() => {
     if (mode !== "monthly") return [];
 
-    const nameById = new Map(expenseCategories.map((c: any) => [c.id, c.name]));
+    const categoryById = new Map(expenseCategories.map((c: any) => [c.id, c]));
 
     return (budgets as any[]).map((b) => {
       const currency = formatCurrencyCode(b.currency ?? HOME_CURRENCY);
-      const scopeName = b.categoryId ? nameById.get(b.categoryId) ?? "Category" : "Overall";
+      const category = b.categoryId ? categoryById.get(b.categoryId) : null;
+      const scopeName = category?.name ?? (b.categoryId ? "Category" : "Overall");
+      // "Overall" (no category) keeps the Target icon — it's the one row that
+      // genuinely isn't a single category, so a generic goal icon is correct
+      // there rather than a mismatch.
+      const icon = category ? getCategoryIcon(category) : Target;
 
       let spentInBudgetCurrency = 0;
       let missingUsdRate = false;
@@ -224,6 +247,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
       return {
         ...b,
         scopeName,
+        icon,
         currency,
         spentInBudgetCurrency,
         remaining,
@@ -233,6 +257,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
       };
     });
   }, [mode, budgets, expenseCategories, transactions, convert]);
+  const mobileListRef = useStaggerReveal<HTMLDivElement>("[data-stagger-item]", [budgetRows.length, loading]);
 
   const navigateMonth = (direction: "prev" | "next") => {
     const [year, monthNum] = month.split("-");
@@ -430,6 +455,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
               <Button
                 variant="outline"
                 size="icon"
+                aria-label="Previous period"
                 onClick={() => {
                   if (mode === "weekly") navigateWeek("prev");
                   else if (mode === "yearly") navigateYear("prev");
@@ -444,6 +470,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
               <Button
                 variant="outline"
                 size="icon"
+                aria-label="Next period"
                 onClick={() => {
                   if (mode === "weekly") navigateWeek("next");
                   else if (mode === "yearly") navigateYear("next");
@@ -460,13 +487,13 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
 
         {/* Summary Cards */}
         <TabsContent value={mode} className="mt-0">
-          <div className="grid grid-cols-2 divide-x divide-y divide-border/60 overflow-hidden rounded-[2rem] bg-card sm:grid-cols-4 sm:divide-y-0">
+          <div className="grid grid-cols-2 divide-x divide-y divide-border/60 overflow-hidden sn-panel sm:grid-cols-4 sm:divide-y-0">
             <div className="p-3 sm:p-4">
               <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
                 <TrendingUp className="h-3.5 w-3.5 text-green" />
                 Income
               </div>
-              <p className="mt-2 truncate font-display text-lg font-bold tabular-nums text-green sm:text-2xl">
+              <p className="mt-2 truncate text-lg font-bold tabular-nums text-green sm:text-2xl">
                 {summary.missingUsdRate || summary.unsupportedCurrency
                   ? "-"
                   : `+${formatMoney(summary.incomeLkr, HOME_CURRENCY)}`}
@@ -481,7 +508,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
                 <TrendingDown className="h-3.5 w-3.5 text-coral" />
                 Expenses
               </div>
-              <p className="mt-2 truncate font-display text-lg font-bold tabular-nums text-coral sm:text-2xl">
+              <p className="mt-2 truncate text-lg font-bold tabular-nums text-coral sm:text-2xl">
                 {summary.missingUsdRate || summary.unsupportedCurrency
                   ? "-"
                   : `-${formatMoney(summary.expenseLkr, HOME_CURRENCY)}`}
@@ -496,7 +523,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
                 <PiggyBank className="h-3.5 w-3.5 text-primary" />
                 Net
               </div>
-              <p className={`mt-2 truncate font-display text-lg font-bold tabular-nums sm:text-2xl ${summary.netLkr >= 0 ? "text-green" : "text-coral"}`}>
+              <p className={`mt-2 truncate text-lg font-bold tabular-nums sm:text-2xl ${summary.netLkr >= 0 ? "text-green" : "text-coral"}`}>
                 {summary.missingUsdRate || summary.unsupportedCurrency
                   ? "-"
                   : `${summary.netLkr >= 0 ? "+" : ""}${formatMoney(summary.netLkr, HOME_CURRENCY)}`}
@@ -511,7 +538,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
                 <Target className="h-3.5 w-3.5 text-blue" />
                 Budgets
               </div>
-              <p className="mt-2 font-display text-lg font-bold tabular-nums sm:text-2xl">{budgetRows.length}</p>
+              <p className="mt-2 text-lg font-bold tabular-nums sm:text-2xl">{budgetRows.length}</p>
               <p className="mt-0.5 text-[11px] text-muted-foreground">
                 {mode === "monthly" ? `active for ${monthName}` : "view monthly tab"}
               </p>
@@ -545,7 +572,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="grid gap-3 p-4 md:hidden">
+            <div ref={mobileListRef} className="grid gap-3 p-4 md:hidden">
               {loading ? (
                 <div className="rounded-3xl border p-6 text-center text-sm text-muted-foreground">
                   Loading budgets...
@@ -556,20 +583,16 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
                 </div>
               ) : budgetRows.length ? (
                 budgetRows.map((b) => {
-                  const over = b.remaining < 0;
-                  const warning = b.percent >= 80 && !over;
-                  const tone = over ? "text-destructive" : warning ? "text-amber" : "text-primary";
+                  const tone = budgetTone(b);
 
                   return (
-                    <Card key={b.id} className="surface-container-high py-0">
+                    <Card key={b.id} data-stagger-item className="surface-container-high py-0">
                       <CardContent className="space-y-4 p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl ${
-                                over ? "bg-destructive/10" : warning ? "bg-amber/16" : "bg-primary/10"
-                              }`}>
-                                <Target className={`h-4 w-4 ${tone}`} />
+                              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl ${tone.iconBgClass}`}>
+                                <b.icon className={`h-4 w-4 ${tone.textClass}`} />
                               </div>
                               <div className="min-w-0">
                                 <p className="truncate font-semibold">{b.scopeName}</p>
@@ -579,9 +602,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
                               </div>
                             </div>
                           </div>
-                          <Badge variant={over ? "destructive" : warning ? "secondary" : "outline"}>
-                            {b.percent}%
-                          </Badge>
+                          <Badge variant={tone.badgeVariant}>{b.percent}%</Badge>
                         </div>
 
                         <div className="space-y-2">
@@ -595,15 +616,13 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
                           </div>
                           <div className="h-2.5 overflow-hidden rounded-full bg-muted">
                             <div
-                              className={`h-full rounded-full transition-all ${
-                                over ? "bg-destructive" : warning ? "bg-amber" : "bg-primary"
-                              }`}
+                              className={`h-full rounded-full transition-all ${tone.barClass}`}
                               style={{ width: `${b.percent}%` }}
                             />
                           </div>
                           <div className="flex items-center justify-between gap-3 text-sm">
                             <span className="text-muted-foreground">Remaining</span>
-                            <span className={`font-semibold tabular-nums ${over ? "text-destructive" : ""}`}>
+                            <span className={`font-semibold tabular-nums ${tone.over ? "text-destructive" : ""}`}>
                               {b.missingUsdRate || b.unsupportedCurrency
                                 ? "-"
                                 : formatMoney(b.remaining, b.currency)}
@@ -613,6 +632,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
 
                         <div className="flex items-center justify-between rounded-2xl bg-coral/10 px-3 py-1.5 text-sm text-coral"><span>Delete budget</span><HoldButton small label="Delete" icon={<Trash2 className="h-4 w-4" />} onConfirm={async () => {
                             if (!user) return;
+                            if (!(await confirm({ title: "Delete this budget?", destructive: true }))) return;
                             try {
                               await deleteBudget(user.uid, b.id);
                               toast.success("Budget deleted");
@@ -671,18 +691,13 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
                 ) : budgetRows.length ? (
                   budgetRows.map((b) => {
                     const isOverall = !b.categoryId;
-                    const over = b.remaining < 0;
-                    const warning = b.percent >= 80 && !over;
+                    const tone = budgetTone(b);
                     return (
                       <TableRow key={b.id} className="group">
                         <TableCell className="pl-6">
                           <div className="flex items-center gap-3">
-                            <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-                              over ? "bg-destructive/10" : warning ? "bg-amber/16" : "bg-primary/10"
-                            }`}>
-                              <Target className={`h-4 w-4 ${
-                                over ? "text-destructive" : warning ? "text-amber" : "text-primary"
-                              }`} />
+                            <div className={`flex h-10 w-10 items-center justify-center rounded-2xl ${tone.iconBgClass}`}>
+                              <b.icon className={`h-4 w-4 ${tone.textClass}`} />
                             </div>
                             <div>
                               <div className="font-medium">{b.scopeName}</div>
@@ -710,33 +725,37 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
                                   ? "—"
                                   : formatMoney(b.spentInBudgetCurrency, b.currency)}
                               </span>
-                              <span className={`font-medium ${over ? "text-destructive" : warning ? "text-amber" : ""}`}>
+                              <span className={`font-medium ${tone.over ? "text-destructive" : tone.warning ? "text-amber" : ""}`}>
                                 {b.percent}%
                               </span>
                             </div>
                             <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
                               <div
-                                className={`h-full rounded-full transition-all ${
-                                  over ? "bg-destructive" : warning ? "bg-amber" : "bg-primary"
-                                }`}
+                                className={`h-full rounded-full transition-all ${tone.barClass}`}
                                 style={{ width: `${b.percent}%` }}
                               />
                             </div>
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
-                          <span className={`font-semibold tabular-nums ${over ? "text-destructive" : ""}`}>
+                          <span className={`font-semibold tabular-nums ${tone.over ? "text-destructive" : ""}`}>
                             {b.missingUsdRate || b.unsupportedCurrency
                               ? "—"
                               : formatMoney(b.remaining, b.currency)}
                           </span>
-                          {over && (
+                          {tone.over && (
                             <div className="text-xs text-destructive">over budget</div>
                           )}
                         </TableCell>
                         <TableCell className="text-right pr-6">
-                          <HoldButton small label="Delete" icon={<Trash2 className="h-4 w-4" />} onConfirm={async () => {
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            aria-label={`Delete ${b.scopeName} budget`}
+                            className="h-8 w-8 p-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 text-destructive hover:text-destructive"
+                            onClick={async () => {
                               if (!user) return;
+                              if (!(await confirm({ title: "Delete this budget?", destructive: true }))) return;
                               try {
                                 await deleteBudget(user.uid, b.id);
                                 toast.success("Budget deleted");

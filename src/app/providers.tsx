@@ -2,10 +2,13 @@
 
 import * as React from "react";
 import { ThemeProvider } from "next-themes";
+import { MotionConfig } from "motion/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/lib/auth/auth-provider";
 import { ThemeColorProvider } from "@/lib/theme/theme-color-provider";
+import { ConfirmDialogProvider } from "@/components/confirm-dialog";
+import { LenisProvider } from "@/lib/motion/lenis-provider";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -21,14 +24,18 @@ const queryClient = new QueryClient({
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider attribute="class" defaultTheme="dark" forcedTheme="dark" enableSystem={false}>
-      <ThemeColorProvider>
-        <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            {children}
-            <Toaster closeButton />
-          </AuthProvider>
-        </QueryClientProvider>
-      </ThemeColorProvider>
+      <MotionConfig reducedMotion="user">
+        <ThemeColorProvider>
+          <QueryClientProvider client={queryClient}>
+            <AuthProvider>
+              <ConfirmDialogProvider>
+                <LenisProvider>{children}</LenisProvider>
+                <Toaster closeButton />
+              </ConfirmDialogProvider>
+            </AuthProvider>
+          </QueryClientProvider>
+        </ThemeColorProvider>
+      </MotionConfig>
     </ThemeProvider>
   );
 }

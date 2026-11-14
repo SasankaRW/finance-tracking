@@ -1,28 +1,30 @@
 "use client";
 
 import * as React from "react";
-import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { AnimatePresence, motion } from "motion/react";
+import { iosIn } from "@/lib/motion/variants";
 import {
   CalendarIcon,
   Plus,
-  ArrowDownRight,
-  ArrowUpRight,
-  ArrowLeftRight,
-  Tag,
-  Wallet,
-  Building2,
-  CreditCard,
   StickyNote,
   MapPin,
 } from "@/components/icons";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { useAccounts, useCategories, useEvents } from "@/lib/finance/hooks";
 import { createIncomeOrExpense, createTransfer } from "@/lib/finance/mutations";
+import { hapticError, hapticSuccess } from "@/lib/haptics";
+import { transactionFormSchema, type TransactionFormValues } from "@/lib/finance/transaction-form-schema";
 import { getCurrencySymbol, formatMoney, formatCurrencyCode } from "@/lib/format";
+import {
+  AccountSelect,
+  CategorySelect,
+  round2,
+  transactionTypes,
+} from "@/app/app/transactions/transaction-form-fields";
 import { useFxRates } from "@/lib/fx/use-fx-rates";
 import { COMMON_CURRENCIES, DEFAULT_CURRENCY } from "@/shared/currency";
 import { Button } from "@/components/ui/button";
@@ -48,141 +50,6 @@ import {
 } from "@/components/numpad";
 import { useMediaQuery } from "@/lib/hooks/use-media-query";
 
-const kindSchema = z.enum(["expense", "income", "transfer"]);
-
-const createSchema = z
-  .object({
-    kind: kindSchema,
-    amount: z.number().positive().finite(),
-    accountId: z.string().optional(),
-    categoryId: z.string().optional(),
-    eventId: z.string().optional(),
-    fromAccountId: z.string().optional(),
-    toAccountId: z.string().optional(),
-    occurredAt: z.date(),
-    note: z.string().max(280).optional(),
-  })
-  .superRefine((v, ctx) => {
-    if (v.kind === "transfer") {
-      if (!v.fromAccountId)
-        ctx.addIssue({ code: "custom", path: ["fromAccountId"], message: "Required" });
-      if (!v.toAccountId)
-        ctx.addIssue({ code: "custom", path: ["toAccountId"], message: "Required" });
-      if (v.fromAccountId && v.toAccountId && v.fromAccountId === v.toAccountId) {
-        ctx.addIssue({ code: "custom", path: ["toAccountId"], message: "Must be different" });
-      }
-    } else {
-      if (!v.accountId)
-        ctx.addIssue({ code: "custom", path: ["accountId"], message: "Required" });
-      if (!v.categoryId)
-        ctx.addIssue({ code: "custom", path: ["categoryId"], message: "Required" });
-    }
-  });
-
-type CreateValues = z.infer<typeof createSchema>;
-
-const transactionTypes = [
-  { value: "expense", label: "Expense", icon: ArrowDownRight, color: "text-coral", pill: "bg-coral/16 text-coral" },
-  { value: "income", label: "Income", icon: ArrowUpRight, color: "text-green", pill: "bg-green/16 text-green" },
-  { value: "transfer", label: "Transfer", icon: ArrowLeftRight, color: "text-blue", pill: "bg-blue/16 text-blue" },
-] as const;
-
-function round2(x: number) {
-  return Math.round(x * 100) / 100;
-}
-
-function accountIcon(type: string) {
-  switch (type) {
-    case "bank":
-      return Building2;
-    case "card":
-      return CreditCard;
-    default:
-      return Wallet;
-  }
-}
-
-function AccountSelect({
-  accounts,
-  value,
-  onChange,
-  label,
-  excludeId,
-}: {
-  accounts: any[];
-  value?: string;
-  onChange: (id: string) => void;
-  label: string;
-  excludeId?: string;
-}) {
-  const options = excludeId
-    ? accounts.filter((a) => a.id !== excludeId)
-    : accounts;
-
-  if (!options.length) {
-    return (
-      <div className="rounded-2xl border border-dashed p-3 text-center text-xs text-muted-foreground">
-        No accounts available
-      </div>
-    );
-  }
-
-  const selected = options.find((a) => a.id === value);
-  const Icon = accountIcon(selected?.type ?? "");
-
-  return (
-    <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className="h-11 w-full gap-2 rounded-2xl px-3">
-        <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <SelectValue placeholder={label}>{selected?.name}</SelectValue>
-      </SelectTrigger>
-      <SelectContent>
-        {options.map((account) => {
-          const currency = formatCurrencyCode(account.currency);
-          return (
-            <SelectItem key={account.id} value={account.id}>
-              <span className="flex w-full items-center gap-2.5">
-                <span className="min-w-0 flex-1 truncate font-medium">{account.name}</span>
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  {formatMoney(account.balance ?? 0, currency)}
-                </span>
-              </span>
-            </SelectItem>
-          );
-        })}
-      </SelectContent>
-    </Select>
-  );
-}
-
-function CategorySelect({
-  categories,
-  value,
-  onChange,
-}: {
-  categories: any[];
-  value?: string;
-  onChange: (id: string) => void;
-}) {
-  const selected = categories.find((c: any) => c.id === value);
-
-  return (
-    <Select value={value ?? ""} onValueChange={onChange}>
-      <SelectTrigger className="h-11 w-full gap-2 rounded-2xl px-3">
-        <Tag className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <SelectValue placeholder="Category">{selected?.name}</SelectValue>
-      </SelectTrigger>
-      <SelectContent>
-        {categories.map((c: any) => (
-          <SelectItem key={c.id} value={c.id}>
-            {c.name}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
-
 export function CreateTransactionDialog({
   triggerLabel = "Add Transaction",
   defaultEventId,
@@ -193,7 +60,7 @@ export function CreateTransactionDialog({
 }: {
   triggerLabel?: string;
   defaultEventId?: string;
-  defaultKind?: CreateValues["kind"];
+  defaultKind?: TransactionFormValues["kind"];
   trigger?: React.ReactNode;
   openOnMount?: boolean;
   openSignal?: string | null;
@@ -213,8 +80,8 @@ export function CreateTransactionDialog({
     if (openOnMount) setOpen(true);
   }, [openOnMount, openSignal]);
 
-  const form = useForm<CreateValues>({
-    resolver: zodResolver(createSchema),
+  const form = useForm<TransactionFormValues>({
+    resolver: zodResolver(transactionFormSchema),
     defaultValues: {
       kind: defaultKind,
       occurredAt: new Date(),
@@ -336,6 +203,7 @@ export function CreateTransactionDialog({
           note: values.note?.trim() || undefined,
         });
       }
+      void hapticSuccess();
       toast.success("Transaction saved");
       setOpen(false);
       setAmountText("");
@@ -346,6 +214,7 @@ export function CreateTransactionDialog({
         eventId: defaultEventId ?? undefined,
       });
     } catch (e) {
+      void hapticError();
       toast.error("Failed to save transaction", {
         description: e instanceof Error ? e.message : undefined,
       });
@@ -366,10 +235,6 @@ export function CreateTransactionDialog({
         showCloseButton
         className="!flex max-h-[96dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-md"
       >
-        <div className="flex shrink-0 justify-center pt-3 pb-1">
-          <div className="h-1.5 w-10 rounded-full bg-muted-foreground/30" />
-        </div>
-
         <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-2">
           <div className="flex flex-wrap gap-2">
             {transactionTypes.map((type) => {
@@ -431,15 +296,24 @@ export function CreateTransactionDialog({
               </div>
             )}
 
-            {needsConversion && parsedAmount > 0 && (
-              <p className="mt-1 text-sm text-muted-foreground">
-                {typeof convertedAmount === "number"
-                  ? `= ${formatMoney(convertedAmount, targetCurrency)}`
-                  : fxFetching
-                    ? "Fetching rate…"
-                    : "Rate unavailable"}
-              </p>
-            )}
+            <AnimatePresence>
+              {needsConversion && parsedAmount > 0 && (
+                <motion.p
+                  key="conversion"
+                  variants={iosIn}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  className="mt-1 text-sm text-muted-foreground"
+                >
+                  {typeof convertedAmount === "number"
+                    ? `= ${formatMoney(convertedAmount, targetCurrency)}`
+                    : fxFetching
+                      ? "Fetching rate…"
+                      : "Rate unavailable"}
+                </motion.p>
+              )}
+            </AnimatePresence>
           </div>
 
           <div className="mt-3 grid grid-cols-2 gap-2">

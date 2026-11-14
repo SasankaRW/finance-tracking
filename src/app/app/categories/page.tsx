@@ -11,25 +11,22 @@ import {
   Tag,
   TrendingUp,
   TrendingDown,
-  MoreHorizontal,
   Pencil,
   Trash2,
 } from "@/components/icons";
 import { useAuth } from "@/lib/auth/auth-provider";
+import { useConfirm } from "@/components/confirm-dialog";
+import { RowActionsMenu } from "@/components/row-actions-menu";
 import { useCategories } from "@/lib/finance/hooks";
 import {
   createCategory,
   deleteCategory,
   renameCategory,
 } from "@/lib/finance/category-mutations";
+import { CategoryIconPicker, getCategoryIcon, getCategoryIconKey } from "@/lib/finance/category-icons";
+import { SettingsStatTile } from "@/app/app/settings/settings-stat-tile";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Dialog,
   DialogBody,
@@ -42,48 +39,74 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 
 const createSchema = z.object({
   kind: z.enum(["income", "expense"]),
   name: z.string().min(1).max(48),
+  icon: z.string().max(32).optional(),
 });
 type CreateValues = z.infer<typeof createSchema>;
 
 const renameSchema = z.object({
   categoryId: z.string().min(1),
   name: z.string().min(1).max(48),
+  icon: z.string().max(32).optional(),
 });
 type RenameValues = z.infer<typeof renameSchema>;
 
+// A compact icon-preview button that pops the picker grid open, so the form
+// stays a single tidy field instead of an always-open grid crowding the dialog.
+function IconPickerField({
+  value,
+  fallback,
+  onChange,
+}: {
+  value?: string;
+  fallback: { name?: string; kind?: string };
+  onChange: (key: string) => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const Icon = getCategoryIcon({ ...fallback, icon: value });
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="motion-expressive press-expressive flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground"
+          aria-label="Choose icon"
+        >
+          <Icon className="h-5 w-5" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-3" align="start">
+        <CategoryIconPicker
+          value={value ?? getCategoryIconKey(fallback)}
+          onChange={(key) => {
+            onChange(key);
+            setOpen(false);
+          }}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function CategoryTable({ kind }: { kind: "income" | "expense" }) {
   const { user } = useAuth();
+  const confirm = useConfirm();
   const { categories, loading, error } = useCategories(kind);
   const [createOpen, setCreateOpen] = React.useState(false);
   const [edit, setEdit] = React.useState<any | null>(null);
 
   const createForm = useForm<CreateValues>({
     resolver: zodResolver(createSchema),
-    defaultValues: { kind, name: "" },
+    defaultValues: { kind, name: "", icon: "" },
   });
   const editForm = useForm<RenameValues>({
     resolver: zodResolver(renameSchema),
-    defaultValues: { categoryId: "", name: "" },
+    defaultValues: { categoryId: "", name: "", icon: "" },
   });
 
   const submitCreate = createForm.handleSubmit(async (values) => {
@@ -92,7 +115,7 @@ function CategoryTable({ kind }: { kind: "income" | "expense" }) {
       await createCategory(user.uid, values);
       toast.success("Category created");
       setCreateOpen(false);
-      createForm.reset({ kind, name: "" });
+      createForm.reset({ kind, name: "", icon: "" });
     } catch (e) {
       toast.error("Failed to create category", {
         description: e instanceof Error ? e.message : undefined,
@@ -120,7 +143,7 @@ function CategoryTable({ kind }: { kind: "income" | "expense" }) {
       {/* Header with Add Button */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${
+          <div className={`h-10 w-10 rounded-2xl flex items-center justify-center ${
             isIncome ? "bg-green/16" : "bg-coral/16"
           }`}>
             {isIncome ? (
@@ -158,12 +181,19 @@ function CategoryTable({ kind }: { kind: "income" | "expense" }) {
                   <Label className="text-xs text-muted-foreground">
                     Category Name
                   </Label>
-                  <Input
-                    placeholder={isIncome ? "e.g., Salary, Freelance" : "e.g., Food, Transport"}
-                    className="h-11"
-                    {...createForm.register("name")}
-                    autoFocus
-                  />
+                  <div className="flex gap-2">
+                    <IconPickerField
+                      value={createForm.watch("icon")}
+                      fallback={{ name: createForm.watch("name"), kind }}
+                      onChange={(key) => createForm.setValue("icon", key)}
+                    />
+                    <Input
+                      placeholder={isIncome ? "e.g., Salary, Freelance" : "e.g., Food, Transport"}
+                      className="h-11 flex-1"
+                      {...createForm.register("name")}
+                      autoFocus
+                    />
+                  </div>
                 </div>
               </DialogBody>
               <DialogFooter>
@@ -179,112 +209,102 @@ function CategoryTable({ kind }: { kind: "income" | "expense" }) {
         </Dialog>
       </div>
 
-      {/* Categories List */}
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/50 hover:bg-muted/50">
-                <TableHead className="pl-6">Category</TableHead>
-                <TableHead className="w-[60px] pr-6" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={2} className="h-32 text-center text-muted-foreground">
-                    Loading categories…
-                  </TableCell>
-                </TableRow>
-              ) : error ? (
-                <TableRow>
-                  <TableCell colSpan={2} className="h-32 text-center text-destructive">
-                    Failed to load categories{error?.message ? `: ${error.message}` : ""}
-                  </TableCell>
-                </TableRow>
-              ) : categories.length ? (
-                categories.map((c: any) => (
-                  <TableRow key={c.id} className="group">
-                    <TableCell className="pl-6">
-                      <div className="flex items-center gap-3">
-                        <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${
-                          isIncome ? "bg-green/16" : "bg-coral/16"
-                        }`}>
-                          <Tag className={`h-4 w-4 ${isIncome ? "text-green" : "text-coral"}`} />
-                        </div>
-                        <span className="font-medium">{c.name}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right pr-6">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 focus:opacity-100"
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setEdit(c);
-                              editForm.reset({ categoryId: c.id, name: c.name });
-                            }}
-                          >
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Rename
-                          </DropdownMenuItem>
-                          <div className="flex items-center justify-between gap-6 px-2 py-1 text-sm text-coral" onPointerDown={(e) => e.stopPropagation()}><span>Delete</span><HoldButton small label="Delete" icon={<Trash2 className="h-4 w-4" />} onConfirm={async () => {
-                              if (!user) return;
-                              try {
-                                await deleteCategory(user.uid, c.id);
-                                toast.success("Category deleted");
-                              } catch (e) {
-                                toast.error("Failed to delete category", {
-                                  description: e instanceof Error ? e.message : undefined,
-                                });
-                              }
-                            }} /></div>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={2} className="h-32 text-center">
-                    <div className="flex flex-col items-center gap-2">
-                      <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                        isIncome ? "bg-green/16" : "bg-coral/16"
-                      }`}>
-                        <Tag className={`h-5 w-5 ${isIncome ? "text-green" : "text-coral"}`} />
-                      </div>
-                      <p className="font-medium">No categories yet</p>
-                      <p className="text-sm text-muted-foreground">
-                        Add a category to organize your {kind}
-                      </p>
-                      <Button variant="outline" size="sm" onClick={() => setCreateOpen(true)}>
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add Category
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      {/* Categories — a tile grid rather than a table: one markup at every
+          width, tap a tile to edit (a bigger target than the ⋯ menu), and the
+          menu stays for delete. */}
+      {loading ? (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-[4.25rem] animate-pulse rounded-2xl bg-muted/60" />
+          ))}
+        </div>
+      ) : error ? (
+        <div className="rounded-3xl border border-destructive/30 bg-destructive/5 p-6 text-center text-sm text-destructive">
+          Failed to load categories{error?.message ? `: ${error.message}` : ""}
+        </div>
+      ) : categories.length ? (
+        <div className="animate-ios-in grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">
+          {categories.map((c: any) => {
+            const RowIcon = getCategoryIcon(c);
+            const openEdit = () => {
+              setEdit(c);
+              editForm.reset({ categoryId: c.id, name: c.name, icon: c.icon ?? "" });
+            };
+            return (
+              <div
+                key={c.id}
+                className="flex min-w-0 items-center gap-2 rounded-2xl bg-card py-2 pl-2 pr-1"
+              >
+                <button
+                  type="button"
+                  onClick={openEdit}
+                  aria-label={`Edit ${c.name}`}
+                  className="motion-expressive press-expressive flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-xl px-1 text-left"
+                >
+                  <span
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                      isIncome ? "bg-green/16" : "bg-coral/16"
+                    }`}
+                  >
+                    <RowIcon className={`h-4 w-4 ${isIncome ? "text-green" : "text-coral"}`} />
+                  </span>
+                  <span className="truncate text-sm font-semibold">{c.name}</span>
+                </button>
+                <RowActionsMenu
+                  ariaLabel={`${c.name} actions`}
+                  triggerClassName="h-9 w-9 shrink-0 rounded-full p-0 text-muted-foreground"
+                  actions={[
+                    { label: "Edit", icon: Pencil, onClick: openEdit },
+                    {
+                      label: "Delete",
+                      icon: Trash2,
+                      destructive: true,
+                      onClick: async () => {
+                        if (!user) return;
+                        if (!(await confirm({ title: "Delete this category?", destructive: true }))) return;
+                        try {
+                          await deleteCategory(user.uid, c.id);
+                          toast.success("Category deleted");
+                        } catch (e) {
+                          toast.error("Failed to delete category", {
+                            description: e instanceof Error ? e.message : undefined,
+                          });
+                        }
+                      },
+                    },
+                  ]}
+                />
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="rounded-3xl border border-dashed p-8 text-center">
+          <div className="flex flex-col items-center gap-2">
+            <div
+              className={`flex h-10 w-10 items-center justify-center rounded-full ${
+                isIncome ? "bg-green/16" : "bg-coral/16"
+              }`}
+            >
+              <Tag className={`h-5 w-5 ${isIncome ? "text-green" : "text-coral"}`} />
+            </div>
+            <p className="font-medium">No categories yet</p>
+            <p className="text-sm text-muted-foreground">Add a category to organize your {kind}</p>
+            <Button variant="outline" size="sm" onClick={() => setCreateOpen(true)}>
+              <Plus className="mr-1 h-4 w-4" />
+              Add Category
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Edit Dialog */}
       <Dialog open={Boolean(edit)} onOpenChange={(v) => (!v ? setEdit(null) : v)}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Rename Category</DialogTitle>
+            <DialogTitle>Edit Category</DialogTitle>
             <DialogDescription>
-              Update the category name
+              Update the category name or icon
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={submitEdit}>
@@ -293,7 +313,14 @@ function CategoryTable({ kind }: { kind: "income" | "expense" }) {
                 <Label className="text-xs text-muted-foreground">
                   Category Name
                 </Label>
-                <Input className="h-11" {...editForm.register("name")} autoFocus />
+                <div className="flex gap-2">
+                  <IconPickerField
+                    value={editForm.watch("icon")}
+                    fallback={{ name: editForm.watch("name"), kind: edit?.kind }}
+                    onChange={(key) => editForm.setValue("icon", key)}
+                  />
+                  <Input className="h-11 flex-1" {...editForm.register("name")} autoFocus />
+                </div>
               </div>
             </DialogBody>
             <DialogFooter>
@@ -327,39 +354,23 @@ export default function CategoriesPage() {
       </div>
 
       {/* Summary Stats */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Expense Categories
-              </CardTitle>
-              <div className="h-8 w-8 rounded-full bg-coral/16 flex items-center justify-center">
-                <TrendingDown className="h-4 w-4 text-coral" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{expenseCategories.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">for tracking expenses</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Income Categories
-              </CardTitle>
-              <div className="h-8 w-8 rounded-full bg-green/16 flex items-center justify-center">
-                <TrendingUp className="h-4 w-4 text-green" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{incomeCategories.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">for tracking income</p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-2 gap-2 sm:gap-3">
+        <SettingsStatTile
+          label="Expense Categories"
+          icon={TrendingDown}
+          iconWrapClassName="bg-coral/16"
+          iconClassName="text-coral"
+          value={expenseCategories.length}
+          sub="for tracking expenses"
+        />
+        <SettingsStatTile
+          label="Income Categories"
+          icon={TrendingUp}
+          iconWrapClassName="bg-green/16"
+          iconClassName="text-green"
+          value={incomeCategories.length}
+          sub="for tracking income"
+        />
       </div>
 
       {/* Category Tabs */}

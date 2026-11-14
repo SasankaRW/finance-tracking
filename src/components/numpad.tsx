@@ -50,7 +50,7 @@ export function Numpad({
   const keys = ["7", "8", "9", "4", "5", "6", "1", "2", "3", ".", "0"];
 
   return (
-    <div className={cn("grid grid-cols-4 gap-2 sm:gap-3", className)}>
+    <div className={cn("animate-ios-in grid grid-cols-4 gap-2 sm:gap-3", className)}>
       {keys.slice(0, 3).map((key) => (
         <NumpadButton key={key} onClick={() => onDigit(key)} ariaLabel={key}>
           {key}

@@ -10,9 +10,11 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { MapPin, Plus, Trash2, Calendar, TrendingUp, PiggyBank, Archive } from "@/components/icons";
 import { useAuth } from "@/lib/auth/auth-provider";
+import { useConfirm } from "@/components/confirm-dialog";
 import { useEvents, useTransactions } from "@/lib/finance/hooks";
 import { createEvent, deleteEvent } from "@/lib/finance/event-mutations";
 import { formatMoney } from "@/lib/format";
+import { useStaggerReveal } from "@/lib/motion/use-stagger-reveal";
 import { COMMON_CURRENCIES, DEFAULT_CURRENCY } from "@/shared/currency";
 import { Button } from "@/components/ui/button";
 import {
@@ -50,10 +52,12 @@ const createSchema = z
 
 type CreateValues = z.infer<typeof createSchema>;
 
-export default function EventsPage() {
+export default function EventsPage({ embedded = false }: { embedded?: boolean }) {
   const { user } = useAuth();
+  const confirm = useConfirm();
   const { events, loading: eventsLoading } = useEvents();
   const { transactions } = useTransactions();
+  const eventsGridRef = useStaggerReveal<HTMLDivElement>("[data-stagger-item]", [events.length, eventsLoading]);
 
   const spentByEvent = React.useMemo(() => {
     const map = new Map<string, number>();
@@ -93,14 +97,16 @@ export default function EventsPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="sn-eye">Trips and plans</p>
-          <h1 className="sn-head mt-1.5">Events<span className="sn-dot">.</span></h1>
-          <p className="mt-1 hidden text-sm text-muted-foreground sm:block">
-            Track event budgets separately while still deducting from real accounts
-          </p>
-        </div>
+      <div className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${embedded ? "items-stretch sm:items-center" : ""}`}>
+        {!embedded && (
+          <div>
+            <p className="sn-eye">Trips and plans</p>
+            <h1 className="sn-head mt-1.5">Events<span className="sn-dot">.</span></h1>
+            <p className="mt-1 hidden text-sm text-muted-foreground sm:block">
+              Track event budgets separately while still deducting from real accounts
+            </p>
+          </div>
+        )}
 
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
@@ -193,13 +199,13 @@ export default function EventsPage() {
       </div>
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-2 divide-x divide-y divide-border/60 overflow-hidden rounded-[2rem] bg-card sm:grid-cols-4 sm:divide-y-0">
+      <div className="grid grid-cols-2 divide-x divide-y divide-border/60 overflow-hidden sn-panel sm:grid-cols-4 sm:divide-y-0">
         <div className="p-3 sm:p-4">
           <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
             <Calendar className="h-3.5 w-3.5 text-primary" />
             Events
           </div>
-          <p className="mt-2 font-display text-lg font-bold tabular-nums sm:text-2xl">{events.length}</p>
+          <p className="mt-2 text-lg font-bold tabular-nums sm:text-2xl">{events.length}</p>
           <p className="mt-0.5 text-[11px] text-muted-foreground">
             {events.filter((e: any) => e.status !== "archived").length} active
           </p>
@@ -210,7 +216,7 @@ export default function EventsPage() {
             <PiggyBank className="h-3.5 w-3.5 text-blue" />
             Budget
           </div>
-          <p className="mt-2 truncate font-display text-lg font-bold tabular-nums sm:text-2xl">
+          <p className="mt-2 truncate text-lg font-bold tabular-nums sm:text-2xl">
             {formatMoney(events.reduce((sum: number, e: any) => sum + (e.budgetMax ?? 0), 0))}
           </p>
           <p className="mt-0.5 text-[11px] text-muted-foreground">across all events</p>
@@ -221,7 +227,7 @@ export default function EventsPage() {
             <TrendingUp className="h-3.5 w-3.5 text-coral" />
             Spent
           </div>
-          <p className="mt-2 truncate font-display text-lg font-bold tabular-nums text-coral sm:text-2xl">
+          <p className="mt-2 truncate text-lg font-bold tabular-nums text-coral sm:text-2xl">
             {formatMoney(Array.from(spentByEvent.values()).reduce((sum, val) => sum + val, 0))}
           </p>
           <p className="mt-0.5 text-[11px] text-muted-foreground">from event transactions</p>
@@ -232,7 +238,7 @@ export default function EventsPage() {
             <Archive className="h-3.5 w-3.5 text-amber" />
             Archived
           </div>
-          <p className="mt-2 font-display text-lg font-bold tabular-nums sm:text-2xl">
+          <p className="mt-2 text-lg font-bold tabular-nums sm:text-2xl">
             {events.filter((e: any) => e.status === "archived").length}
           </p>
           <p className="mt-0.5 text-[11px] text-muted-foreground">completed events</p>
@@ -240,9 +246,9 @@ export default function EventsPage() {
       </div>
 
       {/* Events Grid */}
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+      <div ref={eventsGridRef} className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
         {eventsLoading ? (
-          <div className="rounded-[2rem] bg-card p-8 text-center text-sm text-muted-foreground md:col-span-2 lg:col-span-3">
+          <div className="sn-panel p-8 text-center text-sm text-muted-foreground md:col-span-2 lg:col-span-3">
             Loading events…
           </div>
         ) : events.length ? (
@@ -263,11 +269,11 @@ export default function EventsPage() {
             return (
               <div
                 key={e.id}
-                className="motion-expressive rounded-[2rem] bg-card p-4"
+                className="motion-expressive sn-panel p-4"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="font-display truncate text-base font-bold">{e.name}</p>
+                    <p className="truncate text-base font-bold">{e.name}</p>
                     <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
                       <MapPin className="h-3.5 w-3.5 shrink-0" />
                       <span className="truncate">
@@ -294,13 +300,13 @@ export default function EventsPage() {
                 </div>
 
                 <div className="mt-4 flex items-end justify-between gap-3">
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-xs text-muted-foreground">Spent</p>
-                    <p className="font-display text-xl font-bold tabular-nums">{formatMoney(spent, currency)}</p>
+                    <p className="truncate text-xl font-bold tabular-nums">{formatMoney(spent, currency)}</p>
                   </div>
-                  <div className="text-right">
+                  <div className="min-w-0 text-right">
                     <p className="text-xs text-muted-foreground">Budget range</p>
-                    <p className="text-sm font-medium tabular-nums">
+                    <p className="truncate text-sm font-medium tabular-nums">
                       {formatMoney(min, currency)} – {formatMoney(max, currency)}
                     </p>
                     <p className={`mt-0.5 text-xs ${over ? "text-destructive" : "text-muted-foreground"}`}>

@@ -8,6 +8,7 @@ import type {
   Unsubscribe,
 } from "firebase/firestore";
 import { onSnapshot } from "firebase/firestore";
+import { toast } from "sonner";
 
 export function useRealtimeQuery<T = DocumentData>(
   query: Query | null,
@@ -63,6 +64,13 @@ export function useRealtimeQuery<T = DocumentData>(
       }
     };
   }, [query]);
+
+  React.useEffect(() => {
+    if (!error) return;
+    toast.error("Couldn't load the latest data", {
+      description: error.message || "Check your connection and try again.",
+    });
+  }, [error]);
 
   return { data, loading, error };
 }
