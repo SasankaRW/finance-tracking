@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Calendar, Layers, List, LogOut, Settings, Target } from "lucide-react";
+import { Calendar, Layers, List, LogOut, Plus, Settings, Target } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import { CashlyLogo } from "@/components/cashly-logo";
 import { signOutEverywhere } from "@/lib/auth/auth-actions";
 import { useAuth } from "@/lib/auth/auth-provider";
+import { CreateTransactionDialog } from "@/app/app/transactions/create-transaction-dialog";
 
 const navItems = [
   { href: "/app", label: "Dashboard", icon: Layers },
@@ -24,35 +25,37 @@ const mobileNavItems = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? "";
   const { user } = useAuth();
+  const isActive = (href: string) =>
+    pathname === href || (pathname.startsWith(href + "/") && href !== "/app");
 
   return (
     <div className="min-h-dvh bg-background">
-      <header className="sticky top-0 z-20 hidden bg-background/90 backdrop-blur-xl supports-backdrop-filter:bg-background/75 pt-[env(safe-area-inset-top)] md:block">
-        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-3 px-3 sm:h-16 sm:px-6 lg:px-8">
+      <header className="sticky top-0 z-20 hidden bg-background pt-[env(safe-area-inset-top)] md:block">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-6 lg:px-8">
           <div className="flex items-center gap-6 lg:gap-8">
-            <Link href="/app" className="group flex items-center gap-2.5">
-              <CashlyLogo className="motion-expressive h-9 w-9 drop-shadow-sm group-active:scale-90" />
-              <span className="font-display text-lg font-bold tracking-tight">Cashly</span>
+            <Link href="/app" className="flex items-center gap-2.5">
+              <CashlyLogo className="h-9 w-9" />
+              <span className="text-lg font-semibold tracking-[-0.3px]">Cashly</span>
             </Link>
 
-            <nav className="hidden items-center gap-1 md:flex">
+            <nav className="hidden items-center gap-1.5 md:flex" aria-label="Main">
               {navItems.map((item) => {
-                const active =
-                  pathname === item.href ||
-                  (pathname.startsWith(item.href + "/") && item.href !== "/app");
+                const active = isActive(item.href);
                 const Icon = item.icon;
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
+                    aria-current={active ? "page" : undefined}
+                    data-compact
                     className={cn(
-                      "motion-expressive press-expressive flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-colors",
+                      "sn-btn flex h-9 items-center gap-2 rounded-full px-4 text-[13.5px] font-medium",
                       active
-                        ? "bg-secondary text-secondary-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted/60",
+                        ? "bg-primary/16 font-semibold text-primary"
+                        : "bg-white/7 text-white/85",
                     )}
                   >
-                    <Icon className="h-4 w-4" />
+                    <Icon className="h-4 w-4" filled={active} />
                     {item.label}
                   </Link>
                 );
@@ -60,21 +63,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </nav>
           </div>
           <div className="flex items-center gap-2">
-            <div className="hidden text-sm text-muted-foreground lg:block truncate max-w-[200px]">
+            <div className="hidden max-w-[200px] truncate text-sm text-muted-foreground lg:block">
               {user?.email}
             </div>
-            <Link
-              href="/app/settings"
-              aria-label="Settings"
-              className="motion-expressive press-expressive flex h-9 w-9 items-center justify-center rounded-full bg-secondary text-secondary-foreground hover:rounded-xl"
-            >
+            <Link href="/app/settings" aria-label="Settings" data-compact className="sn-icon sm">
               <Settings className="h-4 w-4" />
             </Link>
             <button
               type="button"
               aria-label="Sign out"
+              data-compact
               onClick={() => signOutEverywhere()}
-              className="motion-expressive press-expressive flex h-9 w-9 items-center justify-center rounded-full bg-secondary text-secondary-foreground hover:rounded-xl"
+              className="sn-icon sm"
             >
               <LogOut className="h-4 w-4" />
             </button>
@@ -82,48 +82,40 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-7xl px-3 sm:px-6 lg:px-8 pb-28 md:pb-8 pt-[calc(env(safe-area-inset-top)+1rem)] md:pt-8">
+      <main className="mx-auto w-full max-w-7xl px-4 pt-[calc(env(safe-area-inset-top)+1.25rem)] pb-[calc(8.5rem+env(safe-area-inset-bottom))] sm:px-6 md:pt-8 md:pb-10 lg:px-8">
         {children}
       </main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-20 bg-background/90 backdrop-blur-xl supports-backdrop-filter:bg-background/75 md:hidden pb-[env(safe-area-inset-bottom)]">
-        <div className="mx-auto flex max-w-7xl gap-1 px-2 pb-2 pt-2.5">
-          {mobileNavItems.map((item) => {
-            const active =
-              pathname === item.href ||
-              (pathname.startsWith(item.href + "/") && item.href !== "/app");
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="group flex flex-1 flex-col items-center gap-1 py-1 text-[11px]"
-              >
-                <span
-                  className={cn(
-                    "motion-expressive flex h-8 w-14 items-center justify-center rounded-full transition-colors group-active:scale-90",
-                    active
-                      ? "bg-secondary text-secondary-foreground"
-                      : "text-muted-foreground group-hover:bg-muted/60",
-                  )}
-                >
-                  <Icon className={cn("h-5 w-5", active && "stroke-[2.5]")} />
-                </span>
-                <span
-                  className={cn(
-                    "max-w-full truncate",
-                    active ? "font-bold text-foreground" : "font-medium text-muted-foreground",
-                  )}
-                >
-                  {item.label}
-                </span>
-              </Link>
-            );
-          })}
-        </div>
+      <div className="sn-fab-float">
+        <CreateTransactionDialog
+          trigger={
+            <button type="button" className="sn-fab press-expressive" aria-label="Add transaction" data-compact>
+              <Plus className="h-6 w-6" />
+            </button>
+          }
+        />
+      </div>
+
+      <nav className="sn-nav" aria-label="Main">
+        {mobileNavItems.map((item) => {
+          const active = isActive(item.href);
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-current={active ? "page" : undefined}
+              data-compact
+              className={cn("sn-tab", active && "on")}
+            >
+              <span className="sn-ind">
+                <Icon className="h-[22px] w-[22px]" filled={active} />
+              </span>
+              <span className="max-w-full truncate">{item.label}</span>
+            </Link>
+          );
+        })}
       </nav>
     </div>
   );
 }
-
-

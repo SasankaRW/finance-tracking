@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
-import { XIcon } from "lucide-react"
+import { XIcon } from "@/components/icons"
 
 import { cn } from "@/lib/utils"
 
@@ -38,7 +38,7 @@ const DialogOverlay = React.forwardRef<
     ref={ref}
     data-slot="dialog-overlay"
     className={cn(
-      "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/60 backdrop-blur-sm",
+      "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/60",
       className
     )}
     {...props}
@@ -60,7 +60,7 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "surface-tonal data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom sm:data-[state=closed]:zoom-out-95 sm:data-[state=open]:zoom-in-95 sm:data-[state=closed]:slide-out-to-top-2 sm:data-[state=open]:slide-in-from-top-2 fixed bottom-0 left-[50%] z-50 grid max-h-[92dvh] w-full translate-x-[-50%] overflow-y-auto rounded-t-[2rem] border border-b-0 shadow-2xl duration-200 outline-none sm:top-[50%] sm:bottom-auto sm:max-h-[calc(100dvh-2rem)] sm:max-w-lg sm:translate-y-[-50%] sm:rounded-3xl sm:border",
+          "bg-card shadow-[inset_0_1px_0_rgba(255,255,255,.06)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom sm:data-[state=closed]:zoom-out-95 sm:data-[state=open]:zoom-in-95 sm:data-[state=closed]:slide-out-to-top-2 sm:data-[state=open]:slide-in-from-top-2 fixed bottom-0 left-[50%] z-50 grid max-h-[92dvh] w-full translate-x-[-50%] overflow-y-auto rounded-t-[28px] duration-200 outline-none sm:top-[50%] sm:bottom-auto sm:max-h-[calc(100dvh-2rem)] sm:max-w-lg sm:translate-y-[-50%] sm:rounded-[28px]",
           className
         )}
         {...props}
@@ -69,7 +69,7 @@ function DialogContent({
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="dialog-close"
-            className="ring-offset-background focus:ring-ring press-expressive motion-expressive absolute top-3 right-3 flex h-9 w-9 items-center justify-center rounded-full bg-secondary/80 opacity-90 transition-all hover:bg-secondary hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none sm:top-4 sm:right-4 sm:h-8 sm:w-8 [&_svg]:pointer-events-none [&_svg]:shrink-0"
+            className="sn-icon sm press-expressive absolute top-3 right-3 disabled:pointer-events-none sm:top-4 sm:right-4 [&_svg]:pointer-events-none [&_svg]:shrink-0"
           >
             <XIcon className="h-4 w-4" />
             <span className="sr-only">Close</span>
@@ -105,7 +105,7 @@ function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="dialog-footer"
       className={cn(
-        "flex flex-col-reverse gap-2 border-t bg-background/85 p-4 pt-3 backdrop-blur sm:flex-row sm:justify-end sm:border-0 sm:bg-transparent sm:p-6 sm:pt-0 sm:backdrop-blur-none",
+        "flex flex-col-reverse gap-2 bg-card p-4 pt-3 sm:flex-row sm:justify-end sm:bg-transparent sm:p-6 sm:pt-0",
         className
       )}
       {...props}
@@ -120,7 +120,7 @@ function DialogTitle({
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
-      className={cn("font-display text-lg leading-none font-bold tracking-tight", className)}
+      className={cn("text-[20px] leading-tight font-semibold tracking-[-0.3px]", className)}
       {...props}
     />
   )

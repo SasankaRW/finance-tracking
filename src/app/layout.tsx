@@ -1,19 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Providers } from "@/app/providers";
 import { getThemeColorBootScript } from "@/lib/theme/colors";
-
-import { Inter, Bricolage_Grotesque } from "next/font/google";
-
-const inter = Inter({
-  variable: "--font-sans",
-  subsets: ["latin"],
-});
-
-const bricolage = Bricolage_Grotesque({
-  variable: "--font-display",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: {
@@ -21,6 +9,16 @@ export const metadata: Metadata = {
     template: "%s · Cashly",
   },
   description: "Personal expense & income tracking with real-time sync and offline support.",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    apple: "/icon-192.png",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0b0b0e",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({
@@ -29,7 +27,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -37,7 +35,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={`${inter.variable} ${bricolage.variable} antialiased`}>
+      <body className="antialiased">
         <Providers>{children}</Providers>
       </body>
     </html>
