@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { HoldButton } from "@/components/sonoma";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -235,11 +236,8 @@ function CategoryTable({ kind }: { kind: "income" | "expense" }) {
                             <Pencil className="h-4 w-4 mr-2" />
                             Rename
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onClick={async () => {
+                          <div className="flex items-center justify-between gap-6 px-2 py-1 text-sm text-coral" onPointerDown={(e) => e.stopPropagation()}><span>Delete</span><HoldButton small label="Delete" icon={<Trash2 className="h-4 w-4" />} onConfirm={async () => {
                               if (!user) return;
-                              if (!confirm("Delete this category?")) return;
                               try {
                                 await deleteCategory(user.uid, c.id);
                                 toast.success("Category deleted");
@@ -248,11 +246,7 @@ function CategoryTable({ kind }: { kind: "income" | "expense" }) {
                                   description: e instanceof Error ? e.message : undefined,
                                 });
                               }
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
+                            }} /></div>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -325,7 +319,8 @@ export default function CategoriesPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Categories</h1>
+        <p className="sn-eye">Organize</p>
+          <h1 className="sn-head mt-1.5">Categories<span className="sn-dot">.</span></h1>
         <p className="text-sm text-muted-foreground mt-1">
           Organize your transactions with custom categories
         </p>

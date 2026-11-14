@@ -17,10 +17,11 @@ const navItems = [
 ];
 
 // Mobile has no top bar, so the bottom nav also carries Settings.
+const shortLabels: Record<string, string> = { "/app": "Home", "/app/transactions": "Activity" };
 const mobileNavItems = [
   ...navItems,
   { href: "/app/settings", label: "Settings", icon: Settings },
-];
+].map((i) => ({ ...i, short: shortLabels[i.href] ?? i.label }));
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? "";
@@ -111,7 +112,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <span className="sn-ind">
                 <Icon className="h-[22px] w-[22px]" filled={active} />
               </span>
-              <span className="max-w-full truncate">{item.label}</span>
+              <span className="max-w-full truncate">{item.short}</span>
             </Link>
           );
         })}

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { HoldButton } from "@/components/sonoma";
 import { format } from "date-fns";
 import { Timestamp } from "firebase/firestore";
 import { ArrowDownLeft, ArrowUpRight, CheckCircle2, HandCoins, Plus, Trash2 } from "@/components/icons";
@@ -279,15 +280,8 @@ export function DebtPillsPanel() {
                   >
                     <CheckCircle2 className="h-4 w-4" />
                   </Button>
-                  <Button
-                    type="button"
-                    size="icon-sm"
-                    variant="ghost"
-                    className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
-                    aria-label="Delete"
-                    onClick={async () => {
+                  <HoldButton small label="Delete" icon={<Trash2 className="h-4 w-4" />} onConfirm={async () => {
                       if (!user) return;
-                      if (!confirm("Delete this money tracker?")) return;
                       try {
                         await deleteDebt(user.uid, debt.id);
                         toast.success("Money tracker deleted");
@@ -296,10 +290,7 @@ export function DebtPillsPanel() {
                           description: err instanceof Error ? err.message : undefined,
                         });
                       }
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                    }} />
                 </div>
               );
             })}

@@ -4,10 +4,12 @@ import * as React from "react";
 import Link from "next/link";
 import { format, differenceInDays, endOfMonth } from "date-fns";
 import { Timestamp } from "firebase/firestore";
-import { BarChart3, Banknote, Pencil } from "@/components/icons";
+import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, BarChart3, Banknote } from "@/components/icons";
 import { formatMoney } from "@/lib/format";
 import { DebtPillsSummary } from "@/components/debt-pills-summary";
+import { AnimatedNumber } from "@/components/animated-number";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader, Pill, Tile, Meter } from "@/components/sonoma";
 
 type Tx = {
   id: string;
@@ -86,108 +88,83 @@ export function DashboardMinusMobile({
       .slice(0, 8);
   }, [recentTransactions]);
 
+  const status =
+    budgetPercentUsed === null
+      ? { tone: "neutral" as const, text: "No budget set" }
+      : budgetOver
+        ? { tone: "coral" as const, text: "Budget exhausted" }
+        : budgetWarning
+          ? { tone: "amber" as const, text: `${budgetPercentUsed}% of budget used` }
+          : { tone: "green" as const, text: "Budget on track" };
+
   return (
     <div className="space-y-4 md:hidden">
-      <div className="flex items-center justify-between gap-3">
-        {isLoading ? (
-          <Skeleton className="h-10 flex-1 rounded-full" />
-        ) : budgetPercentUsed !== null ? (
-          <div
-            className={`flex flex-1 items-center rounded-full px-4 py-2.5 ${
-              budgetOver
-                ? "bg-coral/16 text-coral"
-                : budgetWarning
-                  ? "bg-amber/16 text-amber"
-                  : "bg-green/16 text-green"
-            }`}
-          >
-            <span className="text-sm font-bold">
-              {budgetOver
-                ? "Budget exhausted"
-                : budgetWarning
-                  ? `${budgetPercentUsed}% used`
-                  : "Budget on track"}
-            </span>
-          </div>
-        ) : (
-          <div className="flex-1 rounded-full bg-muted px-4 py-2.5 text-sm font-medium text-muted-foreground">
-            No budget set
-          </div>
-        )}
-        <Link
-          href="/app/budgets"
-          className="motion-expressive press-expressive flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-secondary text-secondary-foreground"
-          aria-label="Budget stats"
-        >
+      <PageHeader eyebrow={format(new Date(), "MMMM yyyy")} title="Overview">
+        <Link href="/app/budgets" className="sn-icon" aria-label="Budget stats" data-compact>
           <BarChart3 className="h-5 w-5" />
         </Link>
-      </div>
+      </PageHeader>
 
       {isLoading ? (
         <div className="space-y-3">
-          <Skeleton className="h-40 w-full rounded-[2rem]" />
-          <Skeleton className="h-24 w-full rounded-[1.75rem]" />
+          <Skeleton className="h-40 w-full rounded-[24px]" />
+          <Skeleton className="h-24 w-full rounded-[24px]" />
         </div>
       ) : (
         <>
-          <div className="hero-card motion-expressive relative overflow-hidden rounded-[2.25rem] p-5">
-            <div className="absolute -right-10 -top-14 h-36 w-36 rounded-full blur-2xl" />
-            <div className="relative flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-white/75">Balance</p>
-                <p className="mt-1 truncate font-display text-[2.6rem] font-bold leading-tight tracking-tight text-white">
-                  {balanceMissingRate ? "—" : formatMoney(totalBalance, balanceCurrency)}
-                </p>
-                <p className="mt-1 text-xs text-white/70">
-                  {balanceMissingRate
-                    ? "USD rate unavailable"
-                    : `Across ${accountCount} account${accountCount !== 1 ? "s" : ""}${
-                        availablePct !== null ? ` · ${availablePct}% budget left` : ""
-                      }`}
-                </p>
-                {typeof usdToLkr === "number" && (
-                  <p className="mt-0.5 text-xs text-white/60">
-                    1 USD = {usdToLkr.toFixed(2)} {balanceCurrency}
-                  </p>
-                )}
-              </div>
-              <Link
-                href="/app/budgets"
-                aria-label="Edit budget"
-                className="motion-expressive press-expressive flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/15"
-              >
-                <Pencil className="h-4 w-4 text-white" />
-              </Link>
+          <section className="sn-panel rise-in p-5">
+            <div className="flex items-center justify-between gap-3">
+              <p className="sn-lbl">Total balance</p>
+              <Pill tone={status.tone}>{status.text}</Pill>
             </div>
+            <p className="mt-2 truncate text-[2.4rem] leading-tight font-semibold tracking-[-1px]">
+              {balanceMissingRate ? (
+                "—"
+              ) : (
+                <AnimatedNumber value={totalBalance} formatFn={(v) => formatMoney(v, balanceCurrency)} />
+              )}
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {balanceMissingRate
+                ? "USD rate unavailable"
+                : `Across ${accountCount} account${accountCount !== 1 ? "s" : ""}${
+                    availablePct !== null ? ` · ${availablePct}% budget left` : ""
+                  }`}
+            </p>
+            {budgetStatus.overallLimit ? (
+              <Meter className="mt-4" value={budgetStatus.totalSpent} max={budgetStatus.overallLimit} />
+            ) : null}
+            {typeof usdToLkr === "number" && (
+              <p className="mt-2 text-xs text-[var(--faint)]">
+                1 USD = {usdToLkr.toFixed(2)} {balanceCurrency}
+              </p>
+            )}
 
-            <div className="relative mt-5 flex items-center justify-between gap-3 border-t border-white/15 pt-3">
-              <span className="flex items-center gap-1.5 rounded-full bg-white/15 py-1.5 pl-2.5 pr-3.5 text-xs text-white">
-                <Banknote className="h-3.5 w-3.5 text-white/80" />
-                <span className="text-white/75">Cash</span>
-                <span className="font-display font-bold tabular-nums">
-                  {cashMissingRate ? "—" : formatMoney(cashInHand ?? 0, balanceCurrency)}
-                </span>
-              </span>
-              <span className="rounded-full bg-white/20 px-3.5 py-1.5 font-display text-xs font-bold text-white">
+            <div className="mt-4 flex items-center justify-between gap-3">
+              <Pill tone="blue">
+                <Banknote className="h-3.5 w-3.5" />
+                Cash {cashMissingRate ? "—" : formatMoney(cashInHand ?? 0, balanceCurrency)}
+              </Pill>
+              <Pill tone="neutral">
                 {daysLeft} day{daysLeft !== 1 ? "s" : ""} left
-              </span>
+              </Pill>
             </div>
-          </div>
+          </section>
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="motion-expressive rounded-[2rem] rounded-br-lg bg-secondary p-4 text-secondary-foreground">
-              <p className="font-display text-2xl font-bold tabular-nums">
+            <div className="sn-panel rise-in p-4">
+              <p className="sn-lbl">Daily average</p>
+              <p className="mt-2 truncate text-xl font-semibold tabular-nums tracking-[-0.3px]">
                 {formatMoney(dailyAverage, budgetStatus.overallCurrency)}
               </p>
-              <p className="mt-1 text-sm font-semibold">Daily avg</p>
-              <p className="mt-0.5 text-[11px] opacity-70">incl. upcoming bills</p>
+              <p className="mt-1 text-[11px] text-[var(--faint)]">incl. upcoming bills</p>
             </div>
-            <div className="tonal-primary motion-expressive rounded-[2rem] rounded-bl-lg p-4">
-              <p className="font-display text-2xl font-bold tabular-nums">
+            <div className="sn-panel rise-in p-4">
+              <p className="sn-lbl">Monthly average</p>
+              <p className="mt-2 truncate text-xl font-semibold tabular-nums tracking-[-0.3px]">
                 {formatMoney(monthlyAverage, budgetStatus.overallCurrency)}
               </p>
-              <p className="mt-1 text-sm font-semibold">Monthly avg</p>
-              <p className="mt-0.5 text-[11px] text-muted-foreground">projected this month</p>
+              <p className="mt-1 text-[11px] text-[var(--faint)]">projected this month</p>
             </div>
           </div>
         </>
@@ -195,59 +172,54 @@ export function DashboardMinusMobile({
 
       <DebtPillsSummary />
 
-      <div className="space-y-2">
+      <section className="sn-panel rise-in p-4">
         <div className="flex items-center justify-between px-1">
-          <span className="font-display text-base font-bold">Today</span>
-          {todayTx.length > 0 && (
-            <span className="rounded-full bg-secondary px-3 py-1 text-xs font-bold text-secondary-foreground tabular-nums">
-              {formatMoney(todayTotal)}
-            </span>
-          )}
+          <span className="sn-lbl">Today</span>
+          {todayTx.length > 0 && <Pill tone="coral">{formatMoney(todayTotal)}</Pill>}
         </div>
 
-        <div className="overflow-hidden rounded-[2rem] bg-card">
-          {isLoading ? (
-            <div className="space-y-0 p-4">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="mb-3 h-12 w-full rounded-xl" />
-              ))}
-            </div>
-          ) : todayTx.length ? (
-            <ul>
-              {todayTx.map((t, idx) => {
-                const name =
-                  t.note?.trim() ||
-                  categoryNameById.get(t.categoryId ?? "") ||
-                  (t.kind === "income" ? "Income" : "Expense");
-                const time = format(toDate(t.occurredAt), "HH:mm");
-                return (
-                  <li
-                    key={t.id}
-                    className={`flex items-center justify-between gap-3 px-4 py-3.5 ${
-                      idx > 0 ? "border-t border-border/60" : ""
+        {isLoading ? (
+          <div className="mt-3 space-y-3">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-12 w-full rounded-xl" />
+            ))}
+          </div>
+        ) : todayTx.length ? (
+          <ul className="mt-3 space-y-3">
+            {todayTx.map((t) => {
+              const name =
+                t.note?.trim() ||
+                categoryNameById.get(t.categoryId ?? "") ||
+                (t.kind === "income" ? "Income" : "Expense");
+              const time = format(toDate(t.occurredAt), "HH:mm");
+              const tone = t.kind === "income" ? "green" : t.kind === "transfer" ? "blue" : "coral";
+              const Icon = t.kind === "income" ? ArrowDownLeft : t.kind === "transfer" ? ArrowLeftRight : ArrowUpRight;
+              return (
+                <li key={t.id} className="flex items-center gap-3">
+                  <Tile tone={tone}>
+                    <Icon className="h-5 w-5" />
+                  </Tile>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold">{name}</p>
+                    <p className="text-xs text-muted-foreground">{time}</p>
+                  </div>
+                  <p
+                    className={`shrink-0 font-semibold tabular-nums ${
+                      tone === "green" ? "text-green" : tone === "coral" ? "text-coral" : ""
                     }`}
                   >
-                    <div className="min-w-0">
-                      <p className="truncate font-semibold">{name}</p>
-                      <p className="text-xs text-muted-foreground">{time}</p>
-                    </div>
-                    <p className="shrink-0 font-bold tabular-nums">
-                      {formatMoney(t.amount ?? 0)}
-                    </p>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-              No transactions today yet.
-            </div>
-          )}
-        </div>
-
-      </div>
-
-      <div className="pb-24" />
+                    {formatMoney(t.amount ?? 0)}
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+            Nothing yet today.
+          </div>
+        )}
+      </section>
     </div>
   );
 }

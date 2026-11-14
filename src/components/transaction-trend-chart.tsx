@@ -62,27 +62,39 @@ interface ChartTheme {
 function readChartTheme(): ChartTheme {
   if (typeof window === "undefined") {
     return {
-      income: "oklch(0.68 0.14 165)",
-      expense: "oklch(0.62 0.18 25)",
-      muted: "oklch(0.48 0.025 220)",
-      border: "oklch(0.88 0.015 220)",
-      card: "oklch(0.995 0.006 220)",
-      foreground: "oklch(0.2 0.02 220)",
-      primary: "oklch(0.45 0.1 200)",
+      income: "#8fe3ad",
+      expense: "#ff9d94",
+      muted: "rgba(255,255,255,0.68)",
+      border: "rgba(255,255,255,0.08)",
+      card: "#222228",
+      foreground: "#ffffff",
+      primary: "#a6c8ff",
     };
   }
   const style = getComputedStyle(document.documentElement);
   const read = (name: string, fallback: string) =>
     style.getPropertyValue(name).trim() || fallback;
   return {
-    income: read("--chart-1", "oklch(0.68 0.14 165)"),
-    expense: read("--chart-2", "oklch(0.62 0.18 25)"),
-    muted: read("--muted-foreground", "oklch(0.48 0.025 220)"),
-    border: read("--border", "oklch(0.88 0.015 220)"),
-    card: read("--card", "oklch(0.995 0.006 220)"),
-    foreground: read("--foreground", "oklch(0.2 0.02 220)"),
-    primary: read("--primary", "oklch(0.45 0.1 200)"),
+    income: read("--chart-1", "#8fe3ad"),
+    expense: read("--chart-2", "#ff9d94"),
+    muted: read("--muted-foreground", "rgba(255,255,255,0.68)"),
+    border: read("--border", "rgba(255,255,255,0.08)"),
+    card: read("--popover", "#222228"),
+    foreground: read("--foreground", "#ffffff"),
+    primary: read("--primary", "#a6c8ff"),
   };
+}
+
+function usePrefersReducedMotion() {
+  const [reduce, setReduce] = React.useState(false);
+  React.useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReduce(mq.matches);
+    const on = () => setReduce(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+  return reduce;
 }
 
 function useChartTheme(): ChartTheme {
@@ -256,6 +268,7 @@ export function TransactionTrendChart({
   showSummary = true,
 }: TransactionTrendChartProps) {
   const theme = useChartTheme();
+  const reduceMotion = usePrefersReducedMotion();
   const [isMobile, setIsMobile] = React.useState(false);
 
   React.useEffect(() => {
@@ -486,6 +499,7 @@ export function TransactionTrendChart({
                 fill={theme.income}
                 barSize={barSize}
                 radius={[999, 999, 999, 999]}
+                isAnimationActive={!reduceMotion}
                 animationDuration={650}
                 animationEasing="ease-out"
               />
@@ -495,6 +509,7 @@ export function TransactionTrendChart({
                 fill={theme.expense}
                 barSize={barSize}
                 radius={[999, 999, 999, 999]}
+                isAnimationActive={!reduceMotion}
                 animationDuration={650}
                 animationEasing="ease-out"
                 animationBegin={80}

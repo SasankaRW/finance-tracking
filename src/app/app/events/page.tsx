@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { HoldButton } from "@/components/sonoma";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -94,7 +95,8 @@ export default function EventsPage() {
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-display text-xl font-bold tracking-tight sm:text-2xl">Events</h1>
+          <p className="sn-eye">Trips and plans</p>
+          <h1 className="sn-head mt-1.5">Events<span className="sn-dot">.</span></h1>
           <p className="mt-1 hidden text-sm text-muted-foreground sm:block">
             Track event budgets separately while still deducting from real accounts
           </p>
@@ -278,13 +280,8 @@ export default function EventsPage() {
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    aria-label="Delete event"
-                    className="motion-expressive press-expressive flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                    onClick={async () => {
+                  <HoldButton small label="Delete" icon={<Trash2 className="h-4 w-4" />} onConfirm={async () => {
                       if (!user) return;
-                      if (!confirm("Delete this trip?")) return;
                       try {
                         await deleteEvent(user.uid, e.id);
                         toast.success("Event deleted");
@@ -293,10 +290,7 @@ export default function EventsPage() {
                           description: err instanceof Error ? err.message : undefined,
                         });
                       }
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                    }} />
                 </div>
 
                 <div className="mt-4 flex items-end justify-between gap-3">

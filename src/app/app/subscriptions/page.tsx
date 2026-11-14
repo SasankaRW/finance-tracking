@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { HoldButton } from "@/components/sonoma";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -299,12 +300,8 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
       <div className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${embedded ? "items-stretch sm:items-center" : ""}`}>
         {!embedded && (
           <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Bills & Loans</h1>
-              <Badge variant="secondary" className="font-mono text-[11px]">
-                Monthly
-              </Badge>
-            </div>
+            <p className="sn-eye">{"Monthly"}</p>
+              <h1 className="sn-head mt-1.5">Bills & Loans<span className="sn-dot">.</span></h1>
             <p className="hidden text-sm text-muted-foreground sm:block">
               Track subscriptions, monthly loan payments, and borrowed money
             </p>
@@ -715,11 +712,8 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                                 )}
                               </DropdownMenuItem>
                             )}
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onClick={async () => {
+                            <div className="flex items-center justify-between gap-6 px-2 py-1 text-sm text-coral" onPointerDown={(e) => e.stopPropagation()}><span>Delete</span><HoldButton small label="Delete" icon={<Trash2 className="h-4 w-4" />} onConfirm={async () => {
                                 if (!user) return;
-                                if (!confirm("Delete this monthly bill?")) return;
                                 try {
                                   await deleteSubscription(user.uid, s.id);
                                   toast.success("Monthly bill deleted");
@@ -728,11 +722,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                                     description: e instanceof Error ? e.message : undefined,
                                   });
                                 }
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
+                              }} /></div>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
@@ -990,11 +980,8 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                                 )}
                               </DropdownMenuItem>
                             )}
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onClick={async () => {
+                            <div className="flex items-center justify-between gap-6 px-2 py-1 text-sm text-coral" onPointerDown={(e) => e.stopPropagation()}><span>Delete</span><HoldButton small label="Delete" icon={<Trash2 className="h-4 w-4" />} onConfirm={async () => {
                                 if (!user) return;
-                                if (!confirm("Delete this subscription?")) return;
                                 try {
                                   await deleteSubscription(user.uid, s.id);
                                   toast.success("Subscription deleted");
@@ -1003,11 +990,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                                     description: e instanceof Error ? e.message : undefined,
                                   });
                                 }
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
+                              }} /></div>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

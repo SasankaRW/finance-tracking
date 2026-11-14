@@ -110,7 +110,8 @@ export default function EventDetailPage() {
                     </Link>
                 </Button>
                 <div className="min-w-0">
-                    <h1 className="font-display truncate text-xl font-bold tracking-tight sm:text-2xl">{event.name}</h1>
+                    <p className="sn-eye">Event</p>
+                    <h1 className="sn-head mt-1.5 truncate !text-2xl">{event.name}<span className="sn-dot">.</span></h1>
                     <div className="mt-0.5 flex items-center gap-1.5 text-sm text-muted-foreground">
                         <Calendar className="h-3.5 w-3.5 shrink-0" />
                         <span className="truncate">

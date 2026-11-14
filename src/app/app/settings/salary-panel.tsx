@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { HoldButton } from "@/components/sonoma";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -683,11 +684,8 @@ export function SalaryPanel() {
                               </>
                             )}
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onClick={async () => {
+                          <div className="flex items-center justify-between gap-6 px-2 py-1 text-sm text-coral" onPointerDown={(e) => e.stopPropagation()}><span>Delete</span><HoldButton small label="Delete" icon={<Trash2 className="h-4 w-4" />} onConfirm={async () => {
                               if (!user) return;
-                              if (!confirm("Delete this salary source?")) return;
                               try {
                                 await deleteSalaryProfile(user.uid, salary.id);
                                 toast.success("Salary deleted");
@@ -696,11 +694,7 @@ export function SalaryPanel() {
                                   description: e instanceof Error ? e.message : undefined,
                                 });
                               }
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
+                            }} /></div>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>

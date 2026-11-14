@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { HoldButton } from "@/components/sonoma";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -290,12 +291,8 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
       <div className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${embedded ? "items-stretch sm:items-center" : ""}`}>
         {!embedded && (
           <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Budgets</h1>
-              <Badge variant="secondary" className="font-mono text-[11px]">
-                {monthName}
-              </Badge>
-            </div>
+            <p className="sn-eye">{monthName}</p>
+              <h1 className="sn-head mt-1.5">Budgets<span className="sn-dot">.</span></h1>
             <p className="hidden text-sm text-muted-foreground sm:block">
               Track your spending and manage budget limits
             </p>
@@ -614,14 +611,8 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
                           </div>
                         </div>
 
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="w-full text-destructive hover:text-destructive"
-                          onClick={async () => {
+                        <div className="flex items-center justify-between rounded-2xl bg-coral/10 px-3 py-1.5 text-sm text-coral"><span>Delete budget</span><HoldButton small label="Delete" icon={<Trash2 className="h-4 w-4" />} onConfirm={async () => {
                             if (!user) return;
-                            if (!confirm("Delete this budget?")) return;
                             try {
                               await deleteBudget(user.uid, b.id);
                               toast.success("Budget deleted");
@@ -630,11 +621,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
                                 description: e instanceof Error ? e.message : undefined,
                               });
                             }
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete Budget
-                        </Button>
+                          }} /></div>
                       </CardContent>
                     </Card>
                   );
@@ -748,13 +735,8 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
                           )}
                         </TableCell>
                         <TableCell className="text-right pr-6">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 text-destructive hover:text-destructive"
-                            onClick={async () => {
+                          <HoldButton small label="Delete" icon={<Trash2 className="h-4 w-4" />} onConfirm={async () => {
                               if (!user) return;
-                              if (!confirm("Delete this budget?")) return;
                               try {
                                 await deleteBudget(user.uid, b.id);
                                 toast.success("Budget deleted");
@@ -763,10 +745,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
                                   description: e instanceof Error ? e.message : undefined,
                                 });
                               }
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                            }} />
                         </TableCell>
                       </TableRow>
                     );

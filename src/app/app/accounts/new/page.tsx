@@ -63,7 +63,8 @@ export default function NewAccountPage() {
   return (
     <div className="grid gap-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold tracking-tight">New account</h1>
+        <p className="sn-eye">Accounts</p>
+          <h1 className="sn-head mt-1.5">New account<span className="sn-dot">.</span></h1>
         <Link className="text-sm underline" href="/app/accounts">
           Back
         </Link>

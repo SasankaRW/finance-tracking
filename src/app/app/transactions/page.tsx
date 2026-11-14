@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { HoldButton } from "@/components/sonoma";
 import { useSearchParams } from "next/navigation";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -224,7 +225,6 @@ export default function TransactionsPage() {
 
   const handleDeleteCategory = async (categoryId: string) => {
     if (!user) return;
-    if (!confirm("Delete this category?")) return;
     try {
       await deleteCategory(user.uid, categoryId);
       toast.success("Category deleted");
@@ -377,7 +377,8 @@ export default function TransactionsPage() {
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-display text-xl font-bold tracking-tight sm:text-2xl">Transactions</h1>
+          <p className="sn-eye">Activity</p>
+          <h1 className="sn-head mt-1.5">Transactions<span className="sn-dot">.</span></h1>
           <p className="mt-1 hidden text-sm text-muted-foreground sm:block">
             Track and manage your financial activity
           </p>
@@ -804,14 +805,7 @@ export default function TransactionsPage() {
                                     <Tag className="h-3.5 w-3.5 text-coral" />
                                     <span className="text-sm">{c.name}</span>
                                   </div>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive"
-                                    onClick={() => handleDeleteCategory(c.id)}
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </Button>
+                                  <HoldButton small label="Delete" icon={<Trash2 className="h-4 w-4" />} onConfirm={() => handleDeleteCategory(c.id)} />
                                 </div>
                               ))
                             ) : (
@@ -838,14 +832,7 @@ export default function TransactionsPage() {
                                     <Tag className="h-3.5 w-3.5 text-green" />
                                     <span className="text-sm">{c.name}</span>
                                   </div>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive"
-                                    onClick={() => handleDeleteCategory(c.id)}
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </Button>
+                                  <HoldButton small label="Delete" icon={<Trash2 className="h-4 w-4" />} onConfirm={() => handleDeleteCategory(c.id)} />
                                 </div>
                               ))
                             ) : (
@@ -988,11 +975,8 @@ export default function TransactionsPage() {
                             <Pencil className="h-4 w-4 mr-2" />
                             Edit
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onClick={async () => {
+                          <div className="flex items-center justify-between gap-6 px-2 py-1 text-sm text-coral" onPointerDown={(e) => e.stopPropagation()}><span>Delete</span><HoldButton small label="Delete" icon={<Trash2 className="h-4 w-4" />} onConfirm={async () => {
                               if (!user) return;
-                              if (!confirm("Delete this transaction?")) return;
                               try {
                                 await deleteTransaction(user.uid, t.id, t.updatedAt);
                                 toast.success("Transaction deleted");
@@ -1001,11 +985,7 @@ export default function TransactionsPage() {
                                   description: e instanceof Error ? e.message : undefined,
                                 });
                               }
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
+                            }} /></div>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
@@ -1145,11 +1125,8 @@ export default function TransactionsPage() {
                               <Pencil className="h-4 w-4 mr-2" />
                               Edit
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onClick={async () => {
+                            <div className="flex items-center justify-between gap-6 px-2 py-1 text-sm text-coral" onPointerDown={(e) => e.stopPropagation()}><span>Delete</span><HoldButton small label="Delete" icon={<Trash2 className="h-4 w-4" />} onConfirm={async () => {
                                 if (!user) return;
-                                if (!confirm("Delete this transaction?")) return;
                                 try {
                                   await deleteTransaction(user.uid, t.id, t.updatedAt);
                                   toast.success("Transaction deleted");
@@ -1158,11 +1135,7 @@ export default function TransactionsPage() {
                                     description: e instanceof Error ? e.message : undefined,
                                   });
                                 }
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
+                              }} /></div>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

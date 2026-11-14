@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { HoldButton } from "@/components/sonoma";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -209,7 +210,8 @@ export default function AccountsPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Accounts</h1>
+          <p className="sn-eye">Money</p>
+          <h1 className="sn-head mt-1.5">Accounts<span className="sn-dot">.</span></h1>
           <p className="text-sm text-muted-foreground mt-1">
             Manage your cash, bank, and card accounts
           </p>
@@ -560,11 +562,8 @@ export default function AccountsPage() {
                               <Pencil className="h-4 w-4 mr-2" />
                               Edit
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onClick={async () => {
+                            <div className="flex items-center justify-between gap-6 px-2 py-1 text-sm text-coral" onPointerDown={(e) => e.stopPropagation()}><span>Delete</span><HoldButton small label="Delete" icon={<Trash2 className="h-4 w-4" />} onConfirm={async () => {
                                 if (!user) return;
-                                if (!confirm("Are you sure you want to delete this account?")) return;
                                 try {
                                   await deleteAccount(user.uid, a.id);
                                   toast.success("Account deleted");
@@ -573,11 +572,7 @@ export default function AccountsPage() {
                                     description: e instanceof Error ? e.message : undefined,
                                   });
                                 }
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
+                              }} /></div>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -683,11 +678,8 @@ export default function AccountsPage() {
                           <Pencil className="h-4 w-4 mr-2" />
                           Edit
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onClick={async () => {
+                        <div className="flex items-center justify-between gap-6 px-2 py-1 text-sm text-coral" onPointerDown={(e) => e.stopPropagation()}><span>Delete</span><HoldButton small label="Delete" icon={<Trash2 className="h-4 w-4" />} onConfirm={async () => {
                             if (!user) return;
-                            if (!confirm("Are you sure you want to delete this account?")) return;
                             try {
                               await deleteAccount(user.uid, a.id);
                               toast.success("Account deleted");
@@ -696,11 +688,7 @@ export default function AccountsPage() {
                                 description: e instanceof Error ? e.message : undefined,
                               });
                             }
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
+                          }} /></div>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>

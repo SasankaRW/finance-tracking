@@ -26,7 +26,8 @@ import { formatCurrencyCode, formatMoney } from "@/lib/format";
 import { DEFAULT_CURRENCY, HOME_CURRENCY } from "@/shared/currency";
 import { useFxRates } from "@/lib/fx/use-fx-rates";
 import { CreateTransactionDialog } from "@/app/app/transactions/create-transaction-dialog";
-import { Badge } from "@/components/ui/badge";
+import { AnimatedNumber } from "@/components/animated-number";
+import { Meter, PageHeader, Pill, SplitMeter, Tile, topParts } from "@/components/sonoma";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAccrualStats, useQuickStats, useSparklineData } from "@/lib/finance/use-trends";
@@ -40,11 +41,6 @@ const MoneyFlowChart = dynamic(
   { ssr: false, loading: () => null },
 );
 
-const TopSpendingPie = dynamic(
-  () => import("@/app/app/dashboard-desktop-charts").then((mod) => mod.TopSpendingPie),
-  { ssr: false, loading: () => null },
-);
-
 function toDate(value: unknown) {
   if (value instanceof Timestamp) return value.toDate();
   if (value instanceof Date) return value;
@@ -53,7 +49,6 @@ function toDate(value: unknown) {
 
 export default function DashboardPage() {
   const isDesktop = useMediaQuery("(min-width: 640px)");
-  const isLargeDesktop = useMediaQuery("(min-width: 1024px)");
   const { accounts, loading: accountsLoading } = useAccounts();
   const { data: fxUsd } = useFxRates("USD", [HOME_CURRENCY]);
   const usdToLkr = fxUsd?.rates?.[HOME_CURRENCY] ?? null;
@@ -248,13 +243,11 @@ export default function DashboardPage() {
 
   const chartData = React.useMemo(
     () => [
-      { name: "Income", value: monthTotals.income, fill: "#22c55e" },
-      { name: "Expenses", value: monthTotals.expense, fill: "#ef4444" },
+      { name: "Income", value: monthTotals.income, fill: "#8fe3ad" },
+      { name: "Expenses", value: monthTotals.expense, fill: "#ff9d94" },
     ],
     [monthTotals],
   );
-
-  const pieColors = ["#22c55e", "#3b82f6", "#f97316", "#a855f7", "#ef4444", "#14b8a6"];
 
   const categoryNameById = React.useMemo(
     () => new Map(expenseCategories.map((c: any) => [c.id, c.name])),
@@ -308,476 +301,406 @@ export default function DashboardPage() {
         cashMissingRate={cashMissingUsdRate || cashUnsupportedCurrency}
       />
 
-      <div className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-4 z-30 md:hidden">
-        <CreateTransactionDialog
-          trigger={
-            <Button
-              size="icon-lg"
-              className="motion-expressive h-16 w-16 rounded-[1.4rem] active:scale-90"
-              aria-label="Add transaction"
-            >
-              <Plus className="h-7 w-7" />
-            </Button>
-          }
-        />
-      </div>
-
-      <div className="hidden md:block space-y-4 sm:space-y-6">
-      {!isLoading && budgetPercentUsed !== null && (
-        <div
-          className={`flex items-center justify-between gap-3 rounded-full px-4 py-2.5  sm:px-5 sm:py-3 ${
-            budgetOver
-              ? "bg-coral/16 text-coral dark:text-coral"
-              : budgetWarning
-                ? "bg-amber/16 text-amber dark:text-amber"
-                : "bg-green/16 text-green dark:text-green"
-          }`}
-        >
-          <span className="truncate text-sm font-bold sm:text-base">
-            {budgetOver
-              ? "Budget exhausted"
-              : budgetWarning
-                ? `${budgetPercentUsed}% of budget used`
-                : "Budget on track"}
-          </span>
-          <Link
-            href="/app/planning"
-            className="motion-expressive press-expressive flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/50 dark:bg-black/20"
-            aria-label="Manage budget"
-          >
-            <Target className="h-4 w-4" />
-          </Link>
-        </div>
-      )}
-
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <h1 className="font-display text-xl font-bold tracking-tight sm:text-2xl">Overview</h1>
-            <Badge variant="secondary" className="font-mono text-[11px]">
-              {monthName}
-            </Badge>
+      <div className="hidden space-y-4 md:block sm:space-y-6">
+        <PageHeader eyebrow={monthName} title="Overview">
+          <div className="flex items-center gap-3">
+            {!isLoading && budgetPercentUsed !== null && (
+              <Link href="/app/planning" aria-label="Manage budget" data-compact>
+                <Pill tone={budgetOver ? "coral" : budgetWarning ? "amber" : "green"}>
+                  {budgetOver
+                    ? "Budget exhausted"
+                    : budgetWarning
+                      ? `${budgetPercentUsed}% of budget used`
+                      : "Budget on track"}
+                </Pill>
+              </Link>
+            )}
+            <CreateTransactionDialog
+              triggerLabel="New Transaction"
+              trigger={
+                <Button className="h-11">
+                  <Plus className="h-4 w-4" />
+                  Add transaction
+                </Button>
+              }
+            />
           </div>
-          <p className="hidden text-sm text-muted-foreground sm:block">
-            A clear snapshot of balances, cash flow, and spending for this month.
-          </p>
-        </div>
-        <CreateTransactionDialog
-          triggerLabel="New Transaction"
-          trigger={
-            <Button className="h-11 w-full sm:w-auto">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Transaction
-            </Button>
-          }
-        />
-      </div>
+        </PageHeader>
 
-      <Card className="hero-card relative overflow-hidden">
-        <div className="absolute -right-10 -top-12 h-36 w-36 rounded-full bg-white/8 blur-2xl" />
-        <div className="absolute -bottom-16 left-8 h-28 w-28 rounded-full blur-2xl" />
-        <CardContent className="relative space-y-4 p-4 sm:space-y-5 sm:p-6">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 space-y-1">
-              <p className="text-sm font-medium text-white/80">Total balance</p>
-              {isLoading ? (
-                <Skeleton className="h-10 w-48 bg-white/20" />
-              ) : (
-                <div className="font-display truncate text-3xl font-bold tracking-tight text-white sm:text-5xl">
-                  {missingUsdRate || hasUnsupportedCurrency
-                    ? "-"
-                    : formatMoney(totalBalanceLkr, HOME_CURRENCY)}
-                </div>
-              )}
-              {!isLoading && (
-                <p className="text-sm text-white/75">
-                  Across {accountSummary.total} account{accountSummary.total !== 1 ? "s" : ""}
-                </p>
-              )}
-            </div>
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/15 sm:h-12 sm:w-12">
-              <PiggyBank className="h-5 w-5 text-white" />
-            </div>
-          </div>
-
-          {!isLoading && sparklineData.values.length > 0 && isDesktop && (
-            <div className="rounded-2xl bg-white/10 p-3">
-              <SparklineChart
-                data={sparklineData.values}
-                color="currentColor"
-                height={42}
-              />
-            </div>
-          )}
-
-          <div className="grid grid-cols-3 gap-2">
-            <div className="rounded-xl bg-white/12 p-2.5 sm:p-3">
-              <p className="text-[10px] font-medium text-white/75 sm:text-[11px]">In</p>
-              <p className="mt-1 truncate text-sm font-bold text-white sm:text-base">
-                +{formatMoney(monthTotals.income)}
-              </p>
-              <p className="mt-0.5 text-[10px] text-white/70 sm:mt-1 sm:text-[11px]">{txCounts.income} entries</p>
-            </div>
-            <div className="rounded-xl bg-white/12 p-2.5 sm:p-3">
-              <p className="text-[10px] font-medium text-white/75 sm:text-[11px]">Out</p>
-              <p className="mt-1 truncate text-sm font-bold text-white sm:text-base">
-                -{formatMoney(monthTotals.expense)}
-              </p>
-              <p className="mt-0.5 text-[10px] text-white/70 sm:mt-1 sm:text-[11px]">{txCounts.expense} entries</p>
-            </div>
-            <div className="rounded-xl bg-white/12 p-2.5 sm:p-3">
-              <p className="text-[10px] font-medium text-white/75 sm:text-[11px]">Net</p>
-              <p className="mt-1 truncate text-sm font-bold text-white sm:text-base">
-                {monthTotals.net >= 0 ? "+" : ""}{formatMoney(monthTotals.net)}
-              </p>
-              <p className="mt-0.5 truncate text-[10px] text-white/70 sm:mt-1 sm:text-[11px]">
-                {monthStats.savingsRate === null ? "No income yet" : `${monthStats.savingsRate}% of income`}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/75">
-            <span>{txCounts.total} total transactions</span>
-            <span>{monthStats.activeDays} active day{monthStats.activeDays !== 1 ? "s" : ""}</span>
-            {usdToLkr && <span>1 USD = {usdToLkr.toFixed(0)} LKR</span>}
-          </div>
-        </CardContent>
-      </Card>
-
-      <DebtPillsSummary />
-
-      <div className="grid grid-cols-2 divide-x divide-y divide-border/60 overflow-hidden rounded-[2rem] bg-card sm:grid-cols-4 sm:divide-y-0">
-        {[
-          {
-            label: "Cash",
-            icon: Banknote,
-            iconClass: "text-green",
-            value: isLoading
-              ? "-"
-              : cashMissingUsdRate || cashUnsupportedCurrency
-                ? "-"
-                : formatMoney(cashInHandLkr, HOME_CURRENCY),
-            sub: `${accountSummary.cash} cash account${accountSummary.cash !== 1 ? "s" : ""}`,
-          },
-          {
-            label: "Daily Avg",
-            icon: Target,
-            iconClass: "text-blue",
-            value: isLoading ? "-" : formatMoney(accrualStats.accrualDailyAverage),
-            sub: "incl. upcoming bills",
-          },
-          {
-            label: "Avg Expense",
-            icon: AlertCircle,
-            iconClass: "text-amber",
-            value: isLoading ? "-" : formatMoney(monthStats.averageExpense),
-            sub: "per entry",
-          },
-          {
-            label: "Biggest",
-            icon: ArrowDownRight,
-            iconClass: "text-coral",
-            value: isLoading ? "-" : formatMoney(monthStats.largestExpense),
-            sub: "single expense",
-          },
-        ].map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <div
-              key={stat.label}
-              className="p-3 sm:p-4"
-            >
-              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
-                <Icon className={`h-3.5 w-3.5 shrink-0 ${stat.iconClass}`} />
-                {stat.label}
+        <Card className="py-5">
+          <CardContent className="space-y-5 px-5 sm:px-6">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 space-y-1">
+                <p className="sn-lbl">Total balance</p>
+                {isLoading ? (
+                  <Skeleton className="h-10 w-48" />
+                ) : (
+                  <div className="truncate text-4xl font-semibold tracking-[-1px] sm:text-5xl">
+                    {missingUsdRate || hasUnsupportedCurrency ? (
+                      "-"
+                    ) : (
+                      <AnimatedNumber
+                        value={totalBalanceLkr}
+                        formatFn={(v) => formatMoney(v, HOME_CURRENCY)}
+                      />
+                    )}
+                  </div>
+                )}
+                {!isLoading && (
+                  <p className="text-sm text-muted-foreground">
+                    Across {accountSummary.total} account{accountSummary.total !== 1 ? "s" : ""}
+                  </p>
+                )}
               </div>
-              <p className="mt-2 truncate font-display text-lg font-bold tabular-nums sm:text-2xl">
-                {stat.value}
-              </p>
-              <p className="mt-0.5 text-[11px] text-muted-foreground">
-                {stat.sub}
-              </p>
+              <Tile tone="blue">
+                <PiggyBank className="h-5 w-5" />
+              </Tile>
             </div>
-          );
-        })}
-      </div>
 
-      {balancesByCurrency.length > 1 && (
-        <Card className="surface-container py-3 sm:py-4">
-          <CardContent className="space-y-3 px-3 sm:px-4">
-            <p className="text-sm font-medium">Balances by Currency</p>
-            <div className="flex flex-wrap gap-2">
-              {balancesByCurrency.map(([cur, bal]) => (
-                <Badge key={cur} variant="outline" className="rounded-full px-3 py-1 font-mono text-xs">
-                  {formatMoney(bal, cur)}
-                </Badge>
-              ))}
+            {!isLoading && sparklineData.values.length > 0 && isDesktop && (
+              <div className="rounded-2xl bg-surface-high p-3 text-blue">
+                <SparklineChart data={sparklineData.values} color="currentColor" height={42} />
+              </div>
+            )}
+
+            <div className="grid grid-cols-3 gap-3">
+              <div className="sn-card p-3 sm:p-4">
+                <p className="sn-lbl">In</p>
+                <p className="mt-1 truncate text-sm font-semibold text-green sm:text-lg">
+                  +{formatMoney(monthTotals.income)}
+                </p>
+                <p className="mt-0.5 text-[11px] text-[var(--faint)]">{txCounts.income} entries</p>
+              </div>
+              <div className="sn-card p-3 sm:p-4">
+                <p className="sn-lbl">Out</p>
+                <p className="mt-1 truncate text-sm font-semibold text-coral sm:text-lg">
+                  -{formatMoney(monthTotals.expense)}
+                </p>
+                <p className="mt-0.5 text-[11px] text-[var(--faint)]">{txCounts.expense} entries</p>
+              </div>
+              <div className="sn-card p-3 sm:p-4">
+                <p className="sn-lbl">Net</p>
+                <p className={`mt-1 truncate text-sm font-semibold sm:text-lg ${monthTotals.net >= 0 ? "text-green" : "text-coral"}`}>
+                  {monthTotals.net >= 0 ? "+" : ""}
+                  {formatMoney(monthTotals.net)}
+                </p>
+                <p className="mt-0.5 truncate text-[11px] text-[var(--faint)]">
+                  {monthStats.savingsRate === null ? "No income yet" : `${monthStats.savingsRate}% of income`}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--faint)]">
+              <span>{txCounts.total} total transactions</span>
+              <span>
+                {monthStats.activeDays} active day{monthStats.activeDays !== 1 ? "s" : ""}
+              </span>
+              {usdToLkr && <span>1 USD = {usdToLkr.toFixed(0)} LKR</span>}
             </div>
           </CardContent>
         </Card>
-      )}
 
-      <div className="grid gap-3 sm:gap-4 lg:grid-cols-2">
-        <Card className="surface-tonal">
-          <CardHeader className="p-4 pb-2 sm:p-6 sm:pb-2">
-            <CardTitle className="text-base">Money Flow</CardTitle>
-            <CardDescription>{monthName}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 p-4 pt-0 sm:space-y-4 sm:p-6 sm:pt-0">
-            {isLoading ? (
-              <div className="space-y-3">
-                <Skeleton className="h-16 w-full rounded-2xl" />
-                <Skeleton className="h-16 w-full rounded-2xl" />
-                <Skeleton className="hidden h-40 w-full rounded-2xl sm:block" />
-              </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                  <div className="rounded-xl border bg-green/16 p-3 sm:rounded-2xl sm:p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-medium">Income</p>
-                        <p className="text-xs text-muted-foreground">{txCounts.income} transactions</p>
-                      </div>
-                      <ArrowUpRight className="h-5 w-5 text-green" />
-                    </div>
-                    <p className="mt-2 truncate text-lg font-bold text-green sm:mt-3 sm:text-xl">
-                      {formatMoney(monthTotals.income)}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border bg-coral/16 p-3 sm:rounded-2xl sm:p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-medium">Expenses</p>
-                        <p className="text-xs text-muted-foreground">{txCounts.expense} transactions</p>
-                      </div>
-                      <ArrowDownRight className="h-5 w-5 text-coral" />
-                    </div>
-                    <p className="mt-2 truncate text-lg font-bold text-coral sm:mt-3 sm:text-xl">
-                      {formatMoney(monthTotals.expense)}
-                    </p>
-                  </div>
+        <DebtPillsSummary />
+
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[
+            {
+              label: "Cash",
+              icon: Banknote,
+              tone: "blue" as const,
+              value: isLoading
+                ? "-"
+                : cashMissingUsdRate || cashUnsupportedCurrency
+                  ? "-"
+                  : formatMoney(cashInHandLkr, HOME_CURRENCY),
+              sub: `${accountSummary.cash} cash account${accountSummary.cash !== 1 ? "s" : ""}`,
+            },
+            {
+              label: "Daily average",
+              icon: Target,
+              tone: "blue" as const,
+              value: isLoading ? "-" : formatMoney(accrualStats.accrualDailyAverage),
+              sub: "incl. upcoming bills",
+            },
+            {
+              label: "Average expense",
+              icon: AlertCircle,
+              tone: "coral" as const,
+              value: isLoading ? "-" : formatMoney(monthStats.averageExpense),
+              sub: "per entry",
+            },
+            {
+              label: "Biggest",
+              icon: ArrowDownRight,
+              tone: "coral" as const,
+              value: isLoading ? "-" : formatMoney(monthStats.largestExpense),
+              sub: "single expense",
+            },
+          ].map((stat) => {
+            const Icon = stat.icon;
+            return (
+              <div key={stat.label} className="sn-panel rise-in p-4">
+                <div className="flex items-center gap-2.5">
+                  <Tile tone={stat.tone}>
+                    <Icon className="h-5 w-5" />
+                  </Tile>
+                  <span className="sn-lbl">{stat.label}</span>
                 </div>
+                <p className="mt-3 truncate text-lg font-semibold tabular-nums tracking-[-0.3px] sm:text-xl">
+                  {stat.value}
+                </p>
+                <p className="mt-0.5 text-[11px] text-[var(--faint)]">{stat.sub}</p>
+              </div>
+            );
+          })}
+        </div>
 
-                <div className={`rounded-xl border p-3 sm:rounded-2xl sm:p-4 ${monthTotals.net >= 0 ? "bg-green/16" : "bg-coral/16"}`}>
-                  <div className="flex items-center justify-between gap-3">
+        {balancesByCurrency.length > 1 && (
+          <Card className="py-4">
+            <CardContent className="space-y-3 px-5">
+              <p className="sn-lbl">Balances by currency</p>
+              <div className="flex flex-wrap gap-2">
+                {balancesByCurrency.map(([cur, bal]) => (
+                  <Pill key={cur} tone="blue">
+                    {formatMoney(bal, cur)}
+                  </Pill>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        <div className="grid gap-3 sm:gap-4 lg:grid-cols-2">
+          <Card>
+            <CardHeader className="px-5">
+              <CardTitle>Money flow</CardTitle>
+              <CardDescription>{monthName}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 px-5 sm:space-y-4">
+              {isLoading ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-16 w-full rounded-2xl" />
+                  <Skeleton className="h-16 w-full rounded-2xl" />
+                  <Skeleton className="hidden h-40 w-full rounded-2xl sm:block" />
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="sn-card p-3 sm:p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium">Income</p>
+                          <p className="text-xs text-muted-foreground">{txCounts.income} transactions</p>
+                        </div>
+                        <Tile tone="green">
+                          <ArrowUpRight className="h-5 w-5" />
+                        </Tile>
+                      </div>
+                      <p className="mt-2 truncate text-lg font-semibold text-green sm:mt-3 sm:text-xl">
+                        {formatMoney(monthTotals.income)}
+                      </p>
+                    </div>
+                    <div className="sn-card p-3 sm:p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium">Expenses</p>
+                          <p className="text-xs text-muted-foreground">{txCounts.expense} transactions</p>
+                        </div>
+                        <Tile tone="coral">
+                          <ArrowDownRight className="h-5 w-5" />
+                        </Tile>
+                      </div>
+                      <p className="mt-2 truncate text-lg font-semibold text-coral sm:mt-3 sm:text-xl">
+                        {formatMoney(monthTotals.expense)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="sn-card flex items-center justify-between gap-3 p-3 sm:p-4">
                     <div>
-                      <p className="text-sm font-medium">Monthly Net</p>
+                      <p className="text-sm font-medium">Monthly net</p>
                       <p className="text-xs text-muted-foreground">
                         {monthTotals.net >= 0 ? "You are saving this month" : "Spending is higher than income"}
                       </p>
                     </div>
-                    <p className={`shrink-0 text-lg font-bold sm:text-xl ${monthTotals.net >= 0 ? "text-green" : "text-coral"}`}>
-                      {monthTotals.net >= 0 ? "+" : ""}{formatMoney(monthTotals.net)}
+                    <p className={`shrink-0 text-lg font-semibold sm:text-xl ${monthTotals.net >= 0 ? "text-green" : "text-coral"}`}>
+                      {monthTotals.net >= 0 ? "+" : ""}
+                      {formatMoney(monthTotals.net)}
                     </p>
                   </div>
+
+                  {isDesktop && <MoneyFlowChart data={chartData} />}
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="px-5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <CardTitle>Top spending</CardTitle>
+                  <CardDescription>Largest categories this month</CardDescription>
                 </div>
-
-                {isDesktop && (
-                  <MoneyFlowChart data={chartData} />
-                )}
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="surface-tonal">
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <CardTitle className="text-base">Top Spending</CardTitle>
-                <CardDescription>Largest categories this month</CardDescription>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/app/categories" className="text-xs">
+                    View <ArrowRight className="ml-1 h-3 w-3" />
+                  </Link>
+                </Button>
               </div>
-              <Button variant="ghost" size="sm" asChild>
-                <Link href="/app/categories" className="text-xs">
-                  View <ArrowRight className="h-3 w-3 ml-1" />
-                </Link>
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="space-y-4">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <Skeleton className="h-10 w-10 rounded-full" />
-                    <div className="flex-1 space-y-2">
-                      <Skeleton className="h-4 w-28" />
-                      <Skeleton className="h-2 w-full rounded-full" />
+            </CardHeader>
+            <CardContent className="px-5">
+              {isLoading ? (
+                <div className="space-y-4">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <Skeleton className="h-9 w-9 rounded-xl" />
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-4 w-28" />
+                        <Skeleton className="h-2 w-full rounded-full" />
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : expenseByCategory.length > 0 ? (
-              <div className="grid gap-5 lg:grid-cols-[1fr_180px]">
-                <div className="space-y-3">
-                  {expenseByCategory.map((cat, idx) => {
-                    const pct = monthTotals.expense > 0
-                      ? Math.round((cat.value / monthTotals.expense) * 100)
-                      : 0;
-                    return (
-                      <div key={cat.categoryId} className="rounded-2xl border p-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex min-w-0 items-center gap-3">
-                            <div
-                              className="h-3 w-3 shrink-0 rounded-full"
-                              style={{ backgroundColor: pieColors[idx % pieColors.length] }}
-                            />
-                            <span className="truncate text-sm font-medium">{cat.name}</span>
+                  ))}
+                </div>
+              ) : expenseByCategory.length > 0 ? (
+                <div className="space-y-5">
+                  <SplitMeter
+                    parts={topParts(
+                      expenseByCategory.map((c: any) => ({ label: c.name, value: c.value })),
+                      3,
+                    )}
+                  />
+                  <ul className="space-y-3">
+                    {expenseByCategory.map((cat) => {
+                      const pct =
+                        monthTotals.expense > 0 ? Math.round((cat.value / monthTotals.expense) * 100) : 0;
+                      return (
+                        <li key={cat.categoryId} className="flex items-center gap-3">
+                          <Tile tone="coral">
+                            <ArrowDownRight className="h-5 w-5" />
+                          </Tile>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium">{cat.name}</p>
+                            <p className="text-xs text-muted-foreground">{pct}% of spending</p>
                           </div>
                           <span className="shrink-0 text-sm font-semibold tabular-nums">
                             {formatMoney(cat.value)}
                           </span>
-                        </div>
-                        <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
-                          <div
-                            className="h-full rounded-full"
-                            style={{
-                              width: `${pct}%`,
-                              backgroundColor: pieColors[idx % pieColors.length],
-                            }}
-                          />
-                        </div>
-                        <p className="mt-2 text-xs text-muted-foreground">{pct}% of spending</p>
-                      </div>
-                    );
-                  })}
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </div>
-                {isLargeDesktop && (
-                  <TopSpendingPie data={expenseByCategory} colors={pieColors} />
+              ) : (
+                <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
+                  <Tile tone="neutral">
+                    <Wallet className="h-5 w-5" />
+                  </Tile>
+                  <div>
+                    <p className="text-sm font-medium">No expenses yet</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Add expenses to see where your money goes.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader className="px-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle>Budget</CardTitle>
+                <CardDescription>Monthly spending limit</CardDescription>
+              </div>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/app/budgets" className="text-xs">
+                  Manage <ArrowRight className="ml-1 h-3 w-3" />
+                </Link>
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="px-5">
+            {isLoading ? (
+              <div className="space-y-4">
+                <Skeleton className="h-24 w-full rounded-2xl" />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {[1, 2].map((i) => (
+                    <Skeleton key={i} className="h-20 w-full rounded-2xl" />
+                  ))}
+                </div>
+              </div>
+            ) : budgetStatus.overallLimit ? (
+              <div className="space-y-4">
+                <div className="sn-card p-4 sm:p-5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-2xl font-semibold tabular-nums sm:text-3xl">
+                        {formatMoney(budgetStatus.totalSpent, budgetStatus.overallCurrency)}
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        of {formatMoney(budgetStatus.overallLimit, budgetStatus.overallCurrency)} spent
+                      </p>
+                    </div>
+                    <Pill tone={budgetOver ? "coral" : budgetWarning ? "amber" : "green"}>
+                      {budgetPercentUsed}% used
+                    </Pill>
+                  </div>
+                  <Meter className="mt-4" value={budgetStatus.totalSpent} max={budgetStatus.overallLimit} />
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    {budgetStatus.overallLimit - budgetStatus.totalSpent > 0
+                      ? `${formatMoney(budgetStatus.overallLimit - budgetStatus.totalSpent, budgetStatus.overallCurrency)} remaining`
+                      : "Budget exceeded"}
+                  </p>
+                </div>
+
+                {budgetStatus.perCategory.length > 0 && (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {budgetStatus.perCategory.slice(0, 4).map((b) => {
+                      const pct = Math.min(100, Math.round((b.spent / b.limit) * 100));
+                      const over = b.spent > b.limit;
+                      const warning = pct >= 80 && !over;
+                      return (
+                        <div key={b.id} className="sn-card p-3">
+                          <div className="mb-2 flex items-center justify-between gap-3">
+                            <span className="truncate text-sm font-medium">{b.name}</span>
+                            <span className={`text-xs font-semibold ${over ? "text-coral" : warning ? "text-amber" : ""}`}>
+                              {pct}%
+                            </span>
+                          </div>
+                          <Meter value={b.spent} max={b.limit} />
+                          <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                            <span>{formatMoney(b.spent, b.currency)}</span>
+                            <span>{formatMoney(b.limit, b.currency)}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center py-10 text-center">
-                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-                  <Wallet className="h-6 w-6 text-muted-foreground" />
+              <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
+                <Tile tone="neutral">
+                  <Target className="h-5 w-5" />
+                </Tile>
+                <div>
+                  <p className="text-sm font-medium">No budget set</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Create a budget to keep spending on track.
+                  </p>
                 </div>
-                <p className="text-sm font-medium">No expenses yet</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Add expenses to see where your money goes.
-                </p>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/app/budgets">
+                    Create budget <ArrowRight className="ml-1 h-3 w-3" />
+                  </Link>
+                </Button>
               </div>
             )}
           </CardContent>
         </Card>
-      </div>
-
-      <Card className="surface-tonal">
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <CardTitle className="text-base">Budget</CardTitle>
-              <CardDescription>Monthly spending limit</CardDescription>
-            </div>
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/app/budgets" className="text-xs">
-                Manage <ArrowRight className="h-3 w-3 ml-1" />
-              </Link>
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="space-y-4">
-              <Skeleton className="h-24 w-full rounded-2xl" />
-              <div className="grid gap-3 sm:grid-cols-2">
-                {[1, 2].map((i) => (
-                  <Skeleton key={i} className="h-20 w-full rounded-2xl" />
-                ))}
-              </div>
-            </div>
-          ) : budgetStatus.overallLimit ? (
-            <div className="space-y-4">
-              <div className="rounded-3xl bg-neutral-900 p-4 text-white dark:bg-black/40 sm:p-5">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-2xl font-bold tabular-nums sm:text-3xl">
-                      {formatMoney(budgetStatus.totalSpent, budgetStatus.overallCurrency)}
-                    </p>
-                    <p className="mt-0.5 text-xs text-white/60">
-                      of {formatMoney(budgetStatus.overallLimit, budgetStatus.overallCurrency)} spent
-                    </p>
-                  </div>
-                  <div
-                    className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold sm:px-4 sm:py-2 sm:text-sm ${
-                      budgetOver
-                        ? "bg-coral/16 text-coral"
-                        : budgetWarning
-                          ? "bg-amber/16 text-amber"
-                          : "bg-white/15 text-white"
-                    }`}
-                  >
-                    {budgetPercentUsed}% used
-                  </div>
-                </div>
-                <div className="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-white/15">
-                  <div
-                    className={`h-full rounded-full transition-all ${budgetOver
-                      ? "bg-coral"
-                      : budgetWarning
-                        ? "bg-amber"
-                        : "bg-green"
-                      }`}
-                    style={{
-                      width: `${Math.min(100, budgetPercentUsed ?? 0)}%`,
-                    }}
-                  />
-                </div>
-                <p className="mt-3 text-xs text-white/70">
-                  {budgetStatus.overallLimit - budgetStatus.totalSpent > 0
-                    ? `${formatMoney(budgetStatus.overallLimit - budgetStatus.totalSpent, budgetStatus.overallCurrency)} remaining`
-                    : "Budget exceeded"}
-                </p>
-              </div>
-
-              {budgetStatus.perCategory.length > 0 && (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {budgetStatus.perCategory.slice(0, 4).map((b) => {
-                    const pct = Math.min(100, Math.round((b.spent / b.limit) * 100));
-                    const over = b.spent > b.limit;
-                    const warning = pct >= 80 && !over;
-                    return (
-                      <div key={b.id} className="rounded-2xl border p-3">
-                        <div className="mb-2 flex items-center justify-between gap-3">
-                          <span className="truncate text-sm font-medium">{b.name}</span>
-                          <span className={`text-xs font-semibold ${over ? "text-destructive" : warning ? "text-amber" : ""}`}>
-                            {pct}%
-                          </span>
-                        </div>
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                          <div
-                            className={`h-full rounded-full transition-all ${over ? "bg-destructive" : warning ? "bg-amber" : "bg-primary"}`}
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                        <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                          <span>{formatMoney(b.spent, b.currency)}</span>
-                          <span>{formatMoney(b.limit, b.currency)}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-10 text-center">
-              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-                <Target className="h-6 w-6 text-muted-foreground" />
-              </div>
-              <p className="text-sm font-medium">No budget set</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Create a budget to keep spending on track.
-              </p>
-              <Button variant="outline" size="sm" className="mt-4" asChild>
-                <Link href="/app/budgets">
-                  Create Budget <ArrowRight className="h-3 w-3 ml-1" />
-                </Link>
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
       </div>
     </div>
   );

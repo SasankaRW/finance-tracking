@@ -19,7 +19,11 @@ export function AnimatedNumber({
     const [hasAnimated, setHasAnimated] = React.useState(false);
 
     React.useEffect(() => {
-        if (hasAnimated) {
+        // reduced motion: no settling, show the number
+        const reduce =
+            typeof window !== "undefined" &&
+            window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+        if (hasAnimated || reduce) {
             setDisplayValue(value);
             return;
         }

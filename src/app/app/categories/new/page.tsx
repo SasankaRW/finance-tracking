@@ -53,7 +53,8 @@ export default function NewCategoryPage() {
   return (
     <div className="grid gap-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold tracking-tight">New category</h1>
+        <p className="sn-eye">Categories</p>
+          <h1 className="sn-head mt-1.5">New category<span className="sn-dot">.</span></h1>
         <Link className="text-sm underline" href="/app/categories">
           Back
         </Link>
