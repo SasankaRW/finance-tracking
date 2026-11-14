@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Repeat, Target } from "lucide-react";
+import { Repeat, Target } from "@/components/icons";
 import BudgetsPage from "@/app/app/budgets/page";
 import SubscriptionsPage from "@/app/app/subscriptions/page";
 
@@ -20,7 +20,7 @@ export default function PlanningPage() {
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
                 <div className="sticky top-3 z-10 -mx-1 px-1 sm:static sm:mx-0 sm:px-0">
-                    <TabsList className="grid w-full grid-cols-2 shadow-sm sm:max-w-md">
+                    <TabsList className="grid w-full grid-cols-2 sm:max-w-md">
                         <TabsTrigger value="budgets" className="gap-2">
                             <Target className="h-4 w-4" />
                             Budgets

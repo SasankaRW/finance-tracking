@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { format, differenceInDays, endOfMonth } from "date-fns";
 import { Timestamp } from "firebase/firestore";
-import { BarChart3, Banknote, Pencil } from "lucide-react";
+import { BarChart3, Banknote, Pencil } from "@/components/icons";
 import { formatMoney } from "@/lib/format";
 import { DebtPillsSummary } from "@/components/debt-pills-summary";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -95,10 +95,10 @@ export function DashboardMinusMobile({
           <div
             className={`flex flex-1 items-center rounded-full px-4 py-2.5 ${
               budgetOver
-                ? "bg-rose-200/80 text-rose-900"
+                ? "bg-coral/16 text-coral"
                 : budgetWarning
-                  ? "bg-amber-200/80 text-amber-900"
-                  : "bg-emerald-200/80 text-emerald-900"
+                  ? "bg-amber/16 text-amber"
+                  : "bg-green/16 text-green"
             }`}
           >
             <span className="text-sm font-bold">
@@ -116,7 +116,7 @@ export function DashboardMinusMobile({
         )}
         <Link
           href="/app/budgets"
-          className="motion-expressive press-expressive flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-secondary text-secondary-foreground hover:rounded-full"
+          className="motion-expressive press-expressive flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-secondary text-secondary-foreground"
           aria-label="Budget stats"
         >
           <BarChart3 className="h-5 w-5" />
@@ -130,8 +130,8 @@ export function DashboardMinusMobile({
         </div>
       ) : (
         <>
-          <div className="hero-card motion-expressive relative overflow-hidden rounded-[2.25rem] p-5 shadow-lg">
-            <div className="hero-card-glow absolute -right-10 -top-14 h-36 w-36 rounded-full blur-2xl" />
+          <div className="hero-card motion-expressive relative overflow-hidden rounded-[2.25rem] p-5">
+            <div className="absolute -right-10 -top-14 h-36 w-36 rounded-full blur-2xl" />
             <div className="relative flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-medium text-white/75">Balance</p>
@@ -154,7 +154,7 @@ export function DashboardMinusMobile({
               <Link
                 href="/app/budgets"
                 aria-label="Edit budget"
-                className="motion-expressive press-expressive flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/15 hover:rounded-full"
+                className="motion-expressive press-expressive flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/15"
               >
                 <Pencil className="h-4 w-4 text-white" />
               </Link>
@@ -205,7 +205,7 @@ export function DashboardMinusMobile({
           )}
         </div>
 
-        <div className="overflow-hidden rounded-[2rem] bg-card shadow-sm">
+        <div className="overflow-hidden rounded-[2rem] bg-card">
           {isLoading ? (
             <div className="space-y-0 p-4">
               {[1, 2, 3].map((i) => (

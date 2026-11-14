@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { format } from "date-fns";
-import { ArrowLeft, Calendar, PiggyBank, TrendingDown, TrendingUp } from "lucide-react";
+import { ArrowLeft, Calendar, PiggyBank, TrendingDown, TrendingUp } from "@/components/icons";
 import { Timestamp } from "firebase/firestore";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { useEvents, useTransactions, useCategories } from "@/lib/finance/hooks";
@@ -125,10 +125,10 @@ export default function EventDetailPage() {
             </div>
 
             {/* Budget Overview */}
-            <div className="grid grid-cols-2 divide-x divide-y divide-border/60 overflow-hidden rounded-[2rem] bg-card shadow-sm sm:grid-cols-4 sm:divide-y-0">
+            <div className="grid grid-cols-2 divide-x divide-y divide-border/60 overflow-hidden rounded-[2rem] bg-card sm:grid-cols-4 sm:divide-y-0">
                 <div className="p-3 sm:p-4">
                     <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
-                        <PiggyBank className="h-3.5 w-3.5 text-blue-600" />
+                        <PiggyBank className="h-3.5 w-3.5 text-blue" />
                         Budget range
                     </div>
                     <p className="mt-2 truncate font-display text-lg font-bold tabular-nums sm:text-xl">
@@ -139,10 +139,10 @@ export default function EventDetailPage() {
 
                 <div className="p-3 sm:p-4">
                     <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
-                        <TrendingDown className="h-3.5 w-3.5 text-rose-600" />
+                        <TrendingDown className="h-3.5 w-3.5 text-coral" />
                         Spent
                     </div>
-                    <p className={`mt-2 truncate font-display text-lg font-bold tabular-nums sm:text-2xl ${over ? "text-destructive" : "text-rose-600"}`}>
+                    <p className={`mt-2 truncate font-display text-lg font-bold tabular-nums sm:text-2xl ${over ? "text-destructive" : "text-coral"}`}>
                         {formatMoney(totalSpent, currency)}
                     </p>
                     <p className="mt-0.5 text-[11px] text-muted-foreground">
@@ -152,10 +152,10 @@ export default function EventDetailPage() {
 
                 <div className="p-3 sm:p-4">
                     <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
-                        <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
+                        <TrendingUp className="h-3.5 w-3.5 text-green" />
                         Remaining
                     </div>
-                    <p className={`mt-2 truncate font-display text-lg font-bold tabular-nums sm:text-2xl ${over ? "text-destructive" : "text-emerald-600"}`}>
+                    <p className={`mt-2 truncate font-display text-lg font-bold tabular-nums sm:text-2xl ${over ? "text-destructive" : "text-green"}`}>
                         {over ? "-" : ""}{formatMoney(Math.abs(remaining), currency)}
                     </p>
                     <p className="mt-0.5 text-[11px] text-muted-foreground">
@@ -222,7 +222,7 @@ export default function EventDetailPage() {
                     {eventTransactions.length > 0 ? (
                         <>
                             {/* Mobile list */}
-                            <ul className="mx-4 mb-4 overflow-hidden rounded-[2rem] bg-card shadow-sm md:hidden">
+                            <ul className="mx-4 mb-4 overflow-hidden rounded-[2rem] bg-card md:hidden">
                                 {eventTransactions.map((t: any, idx: number) => {
                                     const date = t.occurredAt instanceof Timestamp ? t.occurredAt.toDate() : new Date(t.occurredAt);
                                     const catName = expenseCategories.find((c: any) => c.id === t.categoryId)?.name ?? "Uncategorized";

@@ -3,7 +3,7 @@
 import * as React from "react";
 import { format } from "date-fns";
 import { Timestamp } from "firebase/firestore";
-import { ArrowDownLeft, ArrowUpRight, Check, HandCoins } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Check, HandCoins } from "@/components/icons";
 import { useDebts } from "@/lib/finance/hooks";
 import { formatCurrencyCode, formatMoney } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
@@ -40,7 +40,7 @@ export function DebtPillsSummary() {
   if (loading || activeDebts.length === 0) return null;
 
   return (
-    <Card className="surface-tonal py-3 shadow-sm sm:py-4">
+    <Card className="surface-tonal py-3 sm:py-4">
       <CardHeader className="px-3 pb-2 sm:px-4">
         <div className="flex items-center justify-between gap-3">
           <CardTitle className="flex items-center gap-2 text-base">
@@ -50,13 +50,13 @@ export function DebtPillsSummary() {
           <div className="hidden flex-wrap gap-2 sm:flex">
             {totals.owedToMe > 0 && (
               <Badge variant="secondary" className="rounded-full">
-                <ArrowDownLeft className="h-3.5 w-3.5 mr-1 text-emerald-600" />
+                <ArrowDownLeft className="h-3.5 w-3.5 mr-1 text-green" />
                 Owes me {formatMoney(totals.owedToMe)}
               </Badge>
             )}
             {totals.iOwe > 0 && (
               <Badge variant="outline" className="rounded-full">
-                <ArrowUpRight className="h-3.5 w-3.5 mr-1 text-rose-600" />
+                <ArrowUpRight className="h-3.5 w-3.5 mr-1 text-coral" />
                 I owe {formatMoney(totals.iOwe)}
               </Badge>
             )}
@@ -67,13 +67,13 @@ export function DebtPillsSummary() {
         <div className="flex flex-wrap gap-2 sm:hidden">
           {totals.owedToMe > 0 && (
             <Badge variant="secondary" className="rounded-full">
-              <ArrowDownLeft className="h-3.5 w-3.5 mr-1 text-emerald-600" />
+              <ArrowDownLeft className="h-3.5 w-3.5 mr-1 text-green" />
               Owes me {formatMoney(totals.owedToMe)}
             </Badge>
           )}
           {totals.iOwe > 0 && (
             <Badge variant="outline" className="rounded-full">
-              <ArrowUpRight className="h-3.5 w-3.5 mr-1 text-rose-600" />
+              <ArrowUpRight className="h-3.5 w-3.5 mr-1 text-coral" />
               I owe {formatMoney(totals.iOwe)}
             </Badge>
           )}
@@ -88,10 +88,10 @@ export function DebtPillsSummary() {
             return (
               <div
                 key={debt.id}
-                className={`flex max-w-full items-center gap-2 rounded-full border py-2 pl-3 pr-2 text-sm shadow-sm ${
+                className={`flex max-w-full items-center gap-2 rounded-full border py-2 pl-3 pr-2 text-sm  ${
                   isReceivable
-                    ? "bg-emerald-500/10 border-emerald-500/20"
-                    : "bg-rose-500/10 border-rose-500/20"
+                    ? "bg-green/16 border-transparent"
+                    : "bg-coral/16 border-transparent"
                 }`}
               >
                 <span className="truncate font-medium">{debt.personName}</span>
@@ -109,8 +109,8 @@ export function DebtPillsSummary() {
                   onClick={() => setSettlingDebt(debt)}
                   className={`motion-expressive press-expressive flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
                     isReceivable
-                      ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
-                      : "bg-rose-500/20 text-rose-700 dark:text-rose-300"
+                      ? "bg-green/16 text-green dark:text-green"
+                      : "bg-coral/16 text-coral dark:text-coral"
                   }`}
                 >
                   <Check className="h-3.5 w-3.5" />

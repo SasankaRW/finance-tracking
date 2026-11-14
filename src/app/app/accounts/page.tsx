@@ -17,7 +17,7 @@ import {
   PiggyBank,
   ArrowRight,
   EyeOff,
-} from "lucide-react";
+} from "@/components/icons";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { useAccounts } from "@/lib/finance/hooks";
 import { createAccount } from "@/lib/finance/mutations";
@@ -233,7 +233,7 @@ export default function AccountsPage() {
               <DialogBody className="space-y-5">
                 {/* Account Type Selector */}
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                  <Label className="text-xs text-muted-foreground">
                     Account Type
                   </Label>
                   <div className="grid grid-cols-3 gap-2">
@@ -267,7 +267,7 @@ export default function AccountsPage() {
 
                 {/* Account Name */}
                 <div className="space-y-2">
-                  <Label htmlFor="name" className="text-xs text-muted-foreground uppercase tracking-wider">
+                  <Label htmlFor="name" className="text-xs text-muted-foreground">
                     Account Name
                   </Label>
                   <Input
@@ -281,7 +281,7 @@ export default function AccountsPage() {
                 {/* Currency & Initial Balance */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                    <Label className="text-xs text-muted-foreground">
                       Currency
                     </Label>
                     <Select
@@ -306,7 +306,7 @@ export default function AccountsPage() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="initialBalance" className="text-xs text-muted-foreground uppercase tracking-wider">
+                    <Label htmlFor="initialBalance" className="text-xs text-muted-foreground">
                       Initial Balance
                     </Label>
                     <Input
@@ -388,8 +388,8 @@ export default function AccountsPage() {
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 Cash
               </CardTitle>
-              <div className="h-8 w-8 rounded-full bg-emerald-500/10 flex items-center justify-center">
-                <Wallet className="h-4 w-4 text-emerald-600" />
+              <div className="h-8 w-8 rounded-full bg-green/16 flex items-center justify-center">
+                <Wallet className="h-4 w-4 text-green" />
               </div>
             </div>
           </CardHeader>
@@ -405,8 +405,8 @@ export default function AccountsPage() {
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 Bank
               </CardTitle>
-              <div className="h-8 w-8 rounded-full bg-blue-500/10 flex items-center justify-center">
-                <Building2 className="h-4 w-4 text-blue-600" />
+              <div className="h-8 w-8 rounded-full bg-blue/16 flex items-center justify-center">
+                <Building2 className="h-4 w-4 text-blue" />
               </div>
             </div>
           </CardHeader>
@@ -422,8 +422,8 @@ export default function AccountsPage() {
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 Cards
               </CardTitle>
-              <div className="h-8 w-8 rounded-full bg-purple-500/10 flex items-center justify-center">
-                <CreditCard className="h-4 w-4 text-purple-600" />
+              <div className="h-8 w-8 rounded-full bg-violet/16 flex items-center justify-center">
+                <CreditCard className="h-4 w-4 text-violet" />
               </div>
             </div>
           </CardHeader>
@@ -478,10 +478,10 @@ export default function AccountsPage() {
                       <TableCell className="pl-6">
                         <div className="flex items-center gap-3">
                           <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${a.type === "cash"
-                              ? "bg-emerald-500/10 text-emerald-600"
+                              ? "bg-green/16 text-green"
                               : a.type === "bank"
-                                ? "bg-blue-500/10 text-blue-600"
-                                : "bg-purple-500/10 text-purple-600"
+                                ? "bg-blue/16 text-blue"
+                                : "bg-violet/16 text-violet"
                             }`}>
                             {getAccountIcon(a.type)}
                           </div>
@@ -626,10 +626,10 @@ export default function AccountsPage() {
                 <CardContent className="p-4 flex items-center gap-4">
                   <div
                     className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border ${a.type === "cash"
-                        ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600"
+                        ? "bg-green/16 border-transparent text-green"
                         : a.type === "bank"
-                          ? "bg-blue-500/10 border-blue-500/20 text-blue-600"
-                          : "bg-purple-500/10 border-purple-500/20 text-purple-600"
+                          ? "bg-blue/16 border-transparent text-blue"
+                          : "bg-violet/16 border-transparent text-violet"
                       }`}
                   >
                     {getAccountIcon(a.type)}
@@ -744,7 +744,7 @@ export default function AccountsPage() {
             <DialogBody className="space-y-5">
               {/* Account Type */}
               <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                <Label className="text-xs text-muted-foreground">
                   Account Type
                 </Label>
                 <div className="grid grid-cols-3 gap-2">
@@ -778,7 +778,7 @@ export default function AccountsPage() {
 
               {/* Account Name */}
               <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                <Label className="text-xs text-muted-foreground">
                   Account Name
                 </Label>
                 <Input
@@ -790,7 +790,7 @@ export default function AccountsPage() {
               {/* Currency & Balance */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                  <Label className="text-xs text-muted-foreground">
                     Currency
                   </Label>
                   <Select
@@ -815,7 +815,7 @@ export default function AccountsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="balance" className="text-xs text-muted-foreground uppercase tracking-wider">
+                  <Label htmlFor="balance" className="text-xs text-muted-foreground">
                     Balance
                   </Label>
                   <Input

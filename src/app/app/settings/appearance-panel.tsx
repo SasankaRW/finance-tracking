@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { RotateCcw, Smartphone } from "lucide-react";
+import { RotateCcw, Smartphone } from "@/components/icons";
 import { useThemeColor } from "@/lib/theme/theme-color-provider";
 import {
   DEFAULT_PRIMARY_COLOR,
@@ -102,7 +102,7 @@ export function AppearancePanel() {
             {useSystemColor && (
               <div className="mt-3 flex items-center gap-3 rounded-xl bg-muted/50 p-3">
                 <span
-                  className="h-10 w-10 shrink-0 rounded-xl border shadow-sm"
+                  className="h-10 w-10 shrink-0 rounded-xl border"
                   style={{ backgroundColor: color }}
                   aria-hidden
                 />
@@ -120,7 +120,7 @@ export function AppearancePanel() {
         >
           <div className="flex items-center gap-4">
             <div
-              className="h-14 w-14 shrink-0 rounded-2xl border shadow-sm"
+              className="h-14 w-14 shrink-0 rounded-2xl border"
               style={{ backgroundColor: color }}
               aria-hidden
             />
@@ -173,7 +173,7 @@ export function AppearancePanel() {
                 onBlur={commitHex}
                 onKeyDown={handleHexKeyDown}
                 placeholder="#000000"
-                className={`h-11 font-mono uppercase ${hexError ? "border-destructive" : ""}`}
+                className={`h-11 font-mono  ${hexError ? "border-destructive" : ""}`}
                 spellCheck={false}
                 autoComplete="off"
               />
@@ -209,7 +209,7 @@ export function AppearancePanel() {
                 aria-label={`Use ${preset}`}
               >
                 <span
-                  className="h-4 w-4 rounded-full border shadow-sm"
+                  className="h-4 w-4 rounded-full border"
                   style={{ backgroundColor: preset }}
                 />
                 {preset}

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Check, Delete } from "lucide-react";
+import { Check, Delete } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
 type NumpadProps = {
@@ -30,7 +30,7 @@ function NumpadButton({
       aria-label={ariaLabel}
       onClick={onClick}
       className={cn(
-        "motion-expressive press-expressive flex aspect-square w-full items-center justify-center rounded-full bg-card text-2xl font-semibold shadow-sm transition-all active:scale-95",
+        "motion-expressive press-expressive flex aspect-square w-full items-center justify-center rounded-full bg-card text-2xl font-semibold  transition-all active:scale-95",
         className,
       )}
     >
@@ -59,7 +59,7 @@ export function Numpad({
       <NumpadButton
         onClick={onBackspace}
         ariaLabel="Backspace"
-        className="bg-violet-200/80 text-violet-900 dark:bg-violet-900/40 dark:text-violet-200"
+        className="bg-violet/16 text-violet dark:bg-violet/16 dark:text-violet"
       >
         <Delete className="h-6 w-6" />
       </NumpadButton>
@@ -74,7 +74,7 @@ export function Numpad({
         disabled={confirmDisabled || confirmLoading}
         onClick={onConfirm}
         aria-label="Save transaction"
-        className="motion-expressive press-expressive row-span-2 flex items-center justify-center rounded-[2rem] bg-sky-300 text-sky-950 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 dark:bg-sky-600 dark:text-white"
+        className="motion-expressive press-expressive row-span-2 flex items-center justify-center rounded-[2rem] bg-blue/16 text-blue transition-all active:scale-[0.98] disabled:opacity-50 dark:bg-blue dark:text-white"
       >
         {confirmLoading ? (
           <span className="text-sm font-bold">…</span>

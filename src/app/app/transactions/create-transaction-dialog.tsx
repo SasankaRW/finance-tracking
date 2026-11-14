@@ -18,7 +18,7 @@ import {
   CreditCard,
   StickyNote,
   MapPin,
-} from "lucide-react";
+} from "@/components/icons";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { useAccounts, useCategories, useEvents } from "@/lib/finance/hooks";
 import { createIncomeOrExpense, createTransfer } from "@/lib/finance/mutations";
@@ -82,9 +82,9 @@ const createSchema = z
 type CreateValues = z.infer<typeof createSchema>;
 
 const transactionTypes = [
-  { value: "expense", label: "Expense", icon: ArrowDownRight, color: "text-rose-700", pill: "bg-rose-200/90 text-rose-900" },
-  { value: "income", label: "Income", icon: ArrowUpRight, color: "text-emerald-700", pill: "bg-emerald-200/90 text-emerald-900" },
-  { value: "transfer", label: "Transfer", icon: ArrowLeftRight, color: "text-sky-700", pill: "bg-sky-200/90 text-sky-900" },
+  { value: "expense", label: "Expense", icon: ArrowDownRight, color: "text-coral", pill: "bg-coral/16 text-coral" },
+  { value: "income", label: "Income", icon: ArrowUpRight, color: "text-green", pill: "bg-green/16 text-green" },
+  { value: "transfer", label: "Transfer", icon: ArrowLeftRight, color: "text-blue", pill: "bg-blue/16 text-blue" },
 ] as const;
 
 function round2(x: number) {
@@ -398,7 +398,7 @@ export function CreateTransactionDialog({
             {kind !== "transfer" && (
               <div className="absolute right-3 top-3">
                 <Select value={currency} onValueChange={setCurrency}>
-                  <SelectTrigger className="h-7 w-auto gap-1 rounded-full border-0 bg-card px-2.5 text-xs font-semibold shadow-sm">
+                  <SelectTrigger className="h-7 w-auto gap-1 rounded-full border-0 bg-card px-2.5 text-xs font-semibold">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent align="end">

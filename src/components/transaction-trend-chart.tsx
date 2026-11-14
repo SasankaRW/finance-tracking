@@ -20,7 +20,7 @@ import {
   LabelList,
 } from "recharts";
 import { formatMoney } from "@/lib/format";
-import { TrendingUp, TrendingDown, Scale } from "lucide-react";
+import { TrendingUp, TrendingDown, Scale } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import { ChartContainer } from "@/components/chart-container";
 
@@ -298,16 +298,16 @@ export function TransactionTrendChart({
     <div className={cn("space-y-3 sm:space-y-4", className)}>
       {showSummary && (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
-          <div className="rounded-2xl border bg-card p-3 shadow-sm">
+          <div className="rounded-2xl border bg-card p-3">
             <div className="flex items-center justify-between gap-2">
               <span className="text-[11px] font-medium text-muted-foreground sm:text-xs">
                 Total income
               </span>
-              <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-emerald-500/10">
-                <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
+              <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-green/16">
+                <TrendingUp className="h-3.5 w-3.5 text-green" />
               </div>
             </div>
-            <p className="mt-2 truncate text-base font-bold tabular-nums text-emerald-600 sm:text-lg">
+            <p className="mt-2 truncate text-base font-bold tabular-nums text-green sm:text-lg">
               +{formatMoney(totalIncome)}
             </p>
             <p className="mt-1 text-[10px] text-muted-foreground sm:text-xs">
@@ -315,16 +315,16 @@ export function TransactionTrendChart({
             </p>
           </div>
 
-          <div className="rounded-2xl border bg-card p-3 shadow-sm">
+          <div className="rounded-2xl border bg-card p-3">
             <div className="flex items-center justify-between gap-2">
               <span className="text-[11px] font-medium text-muted-foreground sm:text-xs">
                 Total expense
               </span>
-              <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-rose-500/10">
-                <TrendingDown className="h-3.5 w-3.5 text-rose-600" />
+              <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-coral/16">
+                <TrendingDown className="h-3.5 w-3.5 text-coral" />
               </div>
             </div>
-            <p className="mt-2 truncate text-base font-bold tabular-nums text-rose-600 sm:text-lg">
+            <p className="mt-2 truncate text-base font-bold tabular-nums text-coral sm:text-lg">
               -{formatMoney(totalExpense)}
             </p>
             <p className="mt-1 text-[10px] text-muted-foreground sm:text-xs">
@@ -334,8 +334,8 @@ export function TransactionTrendChart({
 
           <div
             className={cn(
-              "col-span-2 rounded-2xl border bg-card p-3 shadow-sm sm:col-span-1",
-              netChange >= 0 ? "border-emerald-500/20" : "border-rose-500/20",
+              "col-span-2 rounded-2xl border bg-card p-3  sm:col-span-1",
+              netChange >= 0 ? "border-transparent" : "border-transparent",
             )}
           >
             <div className="flex items-center justify-between gap-2">
@@ -345,13 +345,13 @@ export function TransactionTrendChart({
               <div
                 className={cn(
                   "flex h-7 w-7 items-center justify-center rounded-xl",
-                  netChange >= 0 ? "bg-emerald-500/10" : "bg-rose-500/10",
+                  netChange >= 0 ? "bg-green/16" : "bg-coral/16",
                 )}
               >
                 <Scale
                   className={cn(
                     "h-3.5 w-3.5",
-                    netChange >= 0 ? "text-emerald-600" : "text-rose-600",
+                    netChange >= 0 ? "text-green" : "text-coral",
                   )}
                 />
               </div>
@@ -359,7 +359,7 @@ export function TransactionTrendChart({
             <p
               className={cn(
                 "mt-2 truncate text-base font-bold tabular-nums sm:text-lg",
-                netChange >= 0 ? "text-emerald-600" : "text-rose-600",
+                netChange >= 0 ? "text-green" : "text-coral",
               )}
             >
               {netChange >= 0 ? "+" : ""}
@@ -429,7 +429,7 @@ export function TransactionTrendChart({
                   const data = payload[0].payload as ChartDataPoint;
                   return (
                     <div
-                      className="min-w-38 rounded-2xl border p-3 shadow-lg"
+                      className="min-w-38 rounded-2xl border p-3"
                       style={{
                         backgroundColor: theme.card,
                         borderColor: theme.border,

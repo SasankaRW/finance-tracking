@@ -27,7 +27,7 @@ import {
   TrendingUp,
   TrendingDown,
   PiggyBank,
-} from "lucide-react";
+} from "@/components/icons";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { useBudgets, useCategories, useTransactions } from "@/lib/finance/hooks";
 import { createBudget, deleteBudget } from "@/lib/finance/budget-mutations";
@@ -321,7 +321,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
                 {/* Month & Currency */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                    <Label className="text-xs text-muted-foreground">
                       Month
                     </Label>
                     <Input
@@ -332,7 +332,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                    <Label className="text-xs text-muted-foreground">
                       Currency
                     </Label>
                     <Select
@@ -360,7 +360,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
 
                 {/* Category */}
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                  <Label className="text-xs text-muted-foreground">
                     Category
                   </Label>
                   <Select
@@ -388,7 +388,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
 
                 {/* Limit Amount */}
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                  <Label className="text-xs text-muted-foreground">
                     Spending Limit
                   </Label>
                   <Input
@@ -417,7 +417,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
 
       {/* Period Selector Tabs */}
       <Tabs value={mode} onValueChange={(v) => setMode(v as SummaryMode)} className="space-y-4 sm:space-y-6">
-        <Card className="surface-tonal py-3 shadow-sm sm:py-4">
+        <Card className="surface-tonal py-3 sm:py-4">
           <CardContent className="space-y-3 px-3 sm:px-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <TabsList className="grid w-full grid-cols-4 sm:w-fit">
@@ -463,13 +463,13 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
 
         {/* Summary Cards */}
         <TabsContent value={mode} className="mt-0">
-          <div className="grid grid-cols-2 divide-x divide-y divide-border/60 overflow-hidden rounded-[2rem] bg-card shadow-sm sm:grid-cols-4 sm:divide-y-0">
+          <div className="grid grid-cols-2 divide-x divide-y divide-border/60 overflow-hidden rounded-[2rem] bg-card sm:grid-cols-4 sm:divide-y-0">
             <div className="p-3 sm:p-4">
               <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
-                <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
+                <TrendingUp className="h-3.5 w-3.5 text-green" />
                 Income
               </div>
-              <p className="mt-2 truncate font-display text-lg font-bold tabular-nums text-emerald-600 sm:text-2xl">
+              <p className="mt-2 truncate font-display text-lg font-bold tabular-nums text-green sm:text-2xl">
                 {summary.missingUsdRate || summary.unsupportedCurrency
                   ? "-"
                   : `+${formatMoney(summary.incomeLkr, HOME_CURRENCY)}`}
@@ -481,10 +481,10 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
 
             <div className="p-3 sm:p-4">
               <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
-                <TrendingDown className="h-3.5 w-3.5 text-rose-600" />
+                <TrendingDown className="h-3.5 w-3.5 text-coral" />
                 Expenses
               </div>
-              <p className="mt-2 truncate font-display text-lg font-bold tabular-nums text-rose-600 sm:text-2xl">
+              <p className="mt-2 truncate font-display text-lg font-bold tabular-nums text-coral sm:text-2xl">
                 {summary.missingUsdRate || summary.unsupportedCurrency
                   ? "-"
                   : `-${formatMoney(summary.expenseLkr, HOME_CURRENCY)}`}
@@ -499,7 +499,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
                 <PiggyBank className="h-3.5 w-3.5 text-primary" />
                 Net
               </div>
-              <p className={`mt-2 truncate font-display text-lg font-bold tabular-nums sm:text-2xl ${summary.netLkr >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+              <p className={`mt-2 truncate font-display text-lg font-bold tabular-nums sm:text-2xl ${summary.netLkr >= 0 ? "text-green" : "text-coral"}`}>
                 {summary.missingUsdRate || summary.unsupportedCurrency
                   ? "-"
                   : `${summary.netLkr >= 0 ? "+" : ""}${formatMoney(summary.netLkr, HOME_CURRENCY)}`}
@@ -511,7 +511,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
 
             <div className="p-3 sm:p-4">
               <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
-                <Target className="h-3.5 w-3.5 text-sky-600" />
+                <Target className="h-3.5 w-3.5 text-blue" />
                 Budgets
               </div>
               <p className="mt-2 font-display text-lg font-bold tabular-nums sm:text-2xl">{budgetRows.length}</p>
@@ -533,7 +533,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
 
       {/* Budgets Table - Only in Monthly View */}
       {mode === "monthly" && (
-        <Card className="surface-tonal shadow-sm">
+        <Card className="surface-tonal">
           <CardHeader className="p-4 pb-2 sm:p-6 sm:pb-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -561,16 +561,16 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
                 budgetRows.map((b) => {
                   const over = b.remaining < 0;
                   const warning = b.percent >= 80 && !over;
-                  const tone = over ? "text-destructive" : warning ? "text-amber-600" : "text-primary";
+                  const tone = over ? "text-destructive" : warning ? "text-amber" : "text-primary";
 
                   return (
-                    <Card key={b.id} className="surface-container-high py-0 shadow-sm">
+                    <Card key={b.id} className="surface-container-high py-0">
                       <CardContent className="space-y-4 p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
                               <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl ${
-                                over ? "bg-destructive/10" : warning ? "bg-amber-500/10" : "bg-primary/10"
+                                over ? "bg-destructive/10" : warning ? "bg-amber/16" : "bg-primary/10"
                               }`}>
                                 <Target className={`h-4 w-4 ${tone}`} />
                               </div>
@@ -599,7 +599,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
                           <div className="h-2.5 overflow-hidden rounded-full bg-muted">
                             <div
                               className={`h-full rounded-full transition-all ${
-                                over ? "bg-destructive" : warning ? "bg-amber-500" : "bg-primary"
+                                over ? "bg-destructive" : warning ? "bg-amber" : "bg-primary"
                               }`}
                               style={{ width: `${b.percent}%` }}
                             />
@@ -691,10 +691,10 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
                         <TableCell className="pl-6">
                           <div className="flex items-center gap-3">
                             <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-                              over ? "bg-destructive/10" : warning ? "bg-amber-500/10" : "bg-primary/10"
+                              over ? "bg-destructive/10" : warning ? "bg-amber/16" : "bg-primary/10"
                             }`}>
                               <Target className={`h-4 w-4 ${
-                                over ? "text-destructive" : warning ? "text-amber-600" : "text-primary"
+                                over ? "text-destructive" : warning ? "text-amber" : "text-primary"
                               }`} />
                             </div>
                             <div>
@@ -723,14 +723,14 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
                                   ? "—"
                                   : formatMoney(b.spentInBudgetCurrency, b.currency)}
                               </span>
-                              <span className={`font-medium ${over ? "text-destructive" : warning ? "text-amber-600" : ""}`}>
+                              <span className={`font-medium ${over ? "text-destructive" : warning ? "text-amber" : ""}`}>
                                 {b.percent}%
                               </span>
                             </div>
                             <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
                               <div
                                 className={`h-full rounded-full transition-all ${
-                                  over ? "bg-destructive" : warning ? "bg-amber-500" : "bg-primary"
+                                  over ? "bg-destructive" : warning ? "bg-amber" : "bg-primary"
                                 }`}
                                 style={{ width: `${b.percent}%` }}
                               />

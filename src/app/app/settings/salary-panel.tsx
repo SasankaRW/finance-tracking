@@ -19,7 +19,7 @@ import {
   Plus,
   Trash2,
   Wallet,
-} from "lucide-react";
+} from "@/components/icons";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { useAccounts, useCategories, useSalaryProfiles } from "@/lib/finance/hooks";
 import {
@@ -149,7 +149,7 @@ function SalaryFormFields({
   return (
     <DialogBody className="space-y-5">
       <div className="space-y-2">
-        <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+        <Label className="text-xs text-muted-foreground">
           Salary Source
         </Label>
         <Input
@@ -161,7 +161,7 @@ function SalaryFormFields({
 
       <div className="grid grid-cols-3 gap-3">
         <div className="col-span-2 space-y-2">
-          <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+          <Label className="text-xs text-muted-foreground">
             Amount
           </Label>
           <Input
@@ -174,7 +174,7 @@ function SalaryFormFields({
           />
         </div>
         <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+          <Label className="text-xs text-muted-foreground">
             Currency
           </Label>
           <Select
@@ -202,7 +202,7 @@ function SalaryFormFields({
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+          <Label className="text-xs text-muted-foreground">
             Deposit Account
           </Label>
           <Select
@@ -228,7 +228,7 @@ function SalaryFormFields({
         </div>
 
         <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+          <Label className="text-xs text-muted-foreground">
             Income Category
           </Label>
           <Select
@@ -255,7 +255,7 @@ function SalaryFormFields({
       </div>
 
       <div className="space-y-2">
-        <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+        <Label className="text-xs text-muted-foreground">
           Deposit Option
         </Label>
         <Select
@@ -322,7 +322,7 @@ function SalaryFormFields({
       )}
 
       <div className="space-y-2">
-        <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+        <Label className="text-xs text-muted-foreground">
           Next Payday
         </Label>
         <Popover>
@@ -536,16 +536,16 @@ export function SalaryPanel() {
         <SettingsStatTile
           label="Active"
           icon={CheckCircle2}
-          iconWrapClassName="bg-emerald-500/10"
-          iconClassName="text-emerald-600"
+          iconWrapClassName="bg-green/16"
+          iconClassName="text-green"
           value={stats.active}
           sub="salary sources"
         />
         <SettingsStatTile
           label="Due Soon"
           icon={Clock}
-          iconWrapClassName="bg-amber-500/10"
-          iconClassName="text-amber-600"
+          iconWrapClassName="bg-amber/16"
+          iconClassName="text-amber"
           value={stats.dueSoon}
           sub="within 7 days or overdue"
         />
@@ -611,12 +611,12 @@ export function SalaryPanel() {
                 return (
                   <div
                     key={salary.id}
-                    className={`motion-expressive press-expressive rounded-3xl border bg-card/80 p-4 shadow-sm ${isPaused ? "opacity-70" : ""}`}
+                    className={`motion-expressive press-expressive rounded-3xl border bg-card/80 p-4  ${isPaused ? "opacity-70" : ""}`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex min-w-0 items-start gap-3">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/10">
-                          <Wallet className="h-5 w-5 text-emerald-600" />
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-green/16">
+                          <Wallet className="h-5 w-5 text-green" />
                         </div>
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
@@ -713,9 +713,9 @@ export function SalaryPanel() {
                         </p>
                       </div>
                       {depositMode === "convert_to_account_currency" && currency !== accountCurrency && (
-                        <div className="rounded-2xl bg-emerald-500/10 p-3">
+                        <div className="rounded-2xl bg-green/16 p-3">
                           <p className="text-xs text-muted-foreground">Today&apos;s Deposit</p>
-                          <p className="mt-1 text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                          <p className="mt-1 text-sm font-semibold text-green dark:text-green">
                             {estimatedDeposit !== null
                               ? formatMoney(estimatedDeposit, accountCurrency)
                               : "Rate unavailable"}
@@ -728,9 +728,9 @@ export function SalaryPanel() {
                         </div>
                       )}
                       {depositMode === "keep_salary_currency" && currency !== HOME_CURRENCY && (
-                        <div className="rounded-2xl bg-blue-500/10 p-3">
+                        <div className="rounded-2xl bg-blue/16 p-3">
                           <p className="text-xs text-muted-foreground">Current LKR Value</p>
-                          <p className="mt-1 text-sm font-semibold text-blue-700 dark:text-blue-400">
+                          <p className="mt-1 text-sm font-semibold text-blue dark:text-blue">
                             {currentHomeValue !== null
                               ? formatMoney(currentHomeValue, HOME_CURRENCY)
                               : "Rate unavailable"}
@@ -828,7 +828,7 @@ export function SalaryPanel() {
             />
             <DialogBody className="pt-0">
               <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                <Label className="text-xs text-muted-foreground">
                   Status
                 </Label>
                 <Select

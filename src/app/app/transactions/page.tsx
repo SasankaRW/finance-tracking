@@ -25,7 +25,7 @@ import {
   Settings2,
   CalendarIcon,
   Search,
-} from "lucide-react";
+} from "@/components/icons";
 import { Timestamp } from "firebase/firestore";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { useAccounts, useCategories, useEvents, useTransactions } from "@/lib/finance/hooks";
@@ -282,11 +282,11 @@ export default function TransactionsPage() {
   const getTransactionIcon = (txKind: string) => {
     switch (txKind) {
       case "income":
-        return <ArrowUpRight className="h-4 w-4 text-emerald-600" />;
+        return <ArrowUpRight className="h-4 w-4 text-green" />;
       case "expense":
-        return <ArrowDownRight className="h-4 w-4 text-rose-600" />;
+        return <ArrowDownRight className="h-4 w-4 text-coral" />;
       case "transfer":
-        return <ArrowLeftRight className="h-4 w-4 text-blue-600" />;
+        return <ArrowLeftRight className="h-4 w-4 text-blue" />;
       default:
         return null;
     }
@@ -478,13 +478,13 @@ export default function TransactionsPage() {
       </div>
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-2 divide-x divide-y divide-border/60 overflow-hidden rounded-[2rem] bg-card shadow-sm sm:grid-cols-4 sm:divide-y-0">
+      <div className="grid grid-cols-2 divide-x divide-y divide-border/60 overflow-hidden rounded-[2rem] bg-card sm:grid-cols-4 sm:divide-y-0">
         <div className="p-3 sm:p-4">
           <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
-            <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
+            <TrendingUp className="h-3.5 w-3.5 text-green" />
             Income
           </div>
-          <p className="mt-2 truncate font-display text-lg font-bold tabular-nums text-emerald-600 sm:text-2xl">
+          <p className="mt-2 truncate font-display text-lg font-bold tabular-nums text-green sm:text-2xl">
             +{formatMoney(summaryStats.totalIncome)}
           </p>
           <p className="mt-0.5 text-[11px] text-muted-foreground">
@@ -494,10 +494,10 @@ export default function TransactionsPage() {
 
         <div className="p-3 sm:p-4">
           <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
-            <TrendingDown className="h-3.5 w-3.5 text-rose-600" />
+            <TrendingDown className="h-3.5 w-3.5 text-coral" />
             Expenses
           </div>
-          <p className="mt-2 truncate font-display text-lg font-bold tabular-nums text-rose-600 sm:text-2xl">
+          <p className="mt-2 truncate font-display text-lg font-bold tabular-nums text-coral sm:text-2xl">
             -{formatMoney(summaryStats.totalExpense)}
           </p>
           <p className="mt-0.5 text-[11px] text-muted-foreground">
@@ -510,7 +510,7 @@ export default function TransactionsPage() {
             <ArrowLeftRight className="h-3.5 w-3.5 text-primary" />
             Net
           </div>
-          <p className={`mt-2 truncate font-display text-lg font-bold tabular-nums sm:text-2xl ${summaryStats.netChange >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+          <p className={`mt-2 truncate font-display text-lg font-bold tabular-nums sm:text-2xl ${summaryStats.netChange >= 0 ? "text-green" : "text-coral"}`}>
             {summaryStats.netChange >= 0 ? "+" : ""}{formatMoney(summaryStats.netChange)}
           </p>
           <p className="mt-0.5 text-[11px] text-muted-foreground">
@@ -520,7 +520,7 @@ export default function TransactionsPage() {
 
         <div className="p-3 sm:p-4">
           <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
-            <ArrowLeftRight className="h-3.5 w-3.5 text-blue-600" />
+            <ArrowLeftRight className="h-3.5 w-3.5 text-blue" />
             Transfers
           </div>
           <p className="mt-2 font-display text-lg font-bold tabular-nums sm:text-2xl">{summaryStats.transferCount}</p>
@@ -647,7 +647,7 @@ export default function TransactionsPage() {
           placeholder="Search transactions..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="h-12 rounded-full border-0 bg-card pl-11 pr-5 shadow-sm sm:max-w-md"
+          className="h-12 rounded-full border-0 bg-card pl-11 pr-5 sm:max-w-md"
         />
       </div>
 
@@ -677,7 +677,7 @@ export default function TransactionsPage() {
           {/* Filters */}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+              <Label className="text-xs text-muted-foreground">
                 Account
               </Label>
               <Select
@@ -699,7 +699,7 @@ export default function TransactionsPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+              <Label className="text-xs text-muted-foreground">
                 Trip
               </Label>
               <Select
@@ -731,7 +731,7 @@ export default function TransactionsPage() {
 
             <div className="col-span-2 space-y-1.5 sm:col-span-1">
               <div className="flex items-center justify-between">
-                <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                <Label className="text-xs text-muted-foreground">
                   Category
                 </Label>
                 <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
@@ -789,7 +789,7 @@ export default function TransactionsPage() {
                         {/* Expense Categories */}
                         <div>
                           <div className="flex items-center gap-2 mb-2">
-                            <TrendingDown className="h-4 w-4 text-rose-600" />
+                            <TrendingDown className="h-4 w-4 text-coral" />
                             <span className="text-sm font-medium">Expenses</span>
                             <Badge variant="secondary" className="text-xs">{expenseCats.length}</Badge>
                           </div>
@@ -801,7 +801,7 @@ export default function TransactionsPage() {
                                   className="flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-muted group"
                                 >
                                   <div className="flex items-center gap-2">
-                                    <Tag className="h-3.5 w-3.5 text-rose-600" />
+                                    <Tag className="h-3.5 w-3.5 text-coral" />
                                     <span className="text-sm">{c.name}</span>
                                   </div>
                                   <Button
@@ -823,7 +823,7 @@ export default function TransactionsPage() {
                         {/* Income Categories */}
                         <div>
                           <div className="flex items-center gap-2 mb-2">
-                            <TrendingUp className="h-4 w-4 text-emerald-600" />
+                            <TrendingUp className="h-4 w-4 text-green" />
                             <span className="text-sm font-medium">Income</span>
                             <Badge variant="secondary" className="text-xs">{incomeCats.length}</Badge>
                           </div>
@@ -835,7 +835,7 @@ export default function TransactionsPage() {
                                   className="flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-muted group"
                                 >
                                   <div className="flex items-center gap-2">
-                                    <Tag className="h-3.5 w-3.5 text-emerald-600" />
+                                    <Tag className="h-3.5 w-3.5 text-green" />
                                     <span className="text-sm">{c.name}</span>
                                   </div>
                                   <Button
@@ -890,7 +890,7 @@ export default function TransactionsPage() {
               Loading transactions…
             </div>
           ) : filteredTransactions.length ? (
-            <ul className="overflow-hidden rounded-[2rem] bg-card shadow-sm">
+            <ul className="overflow-hidden rounded-[2rem] bg-card">
               {(filteredTransactions as any[]).map((t, idx) => {
                 const occurredAt = t.occurredAt instanceof Timestamp ? t.occurredAt.toDate() : new Date();
                 const accountName = t.accountId ? accounts.find((a: any) => a.id === t.accountId)?.name : null;
@@ -915,10 +915,10 @@ export default function TransactionsPage() {
                     {/* Left: Icon, Details, Meta */}
                     <div className="flex min-w-0 flex-1 gap-3">
                       <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${t.kind === "income"
-                          ? "bg-emerald-500/10"
+                          ? "bg-green/16"
                           : t.kind === "expense"
-                            ? "bg-rose-500/10"
-                            : "bg-blue-500/10"
+                            ? "bg-coral/16"
+                            : "bg-blue/16"
                         }`}>
                         {getTransactionIcon(t.kind)}
                       </div>
@@ -949,9 +949,9 @@ export default function TransactionsPage() {
                     {/* Right: Amount & Actions */}
                     <div className="flex shrink-0 items-center gap-1">
                       <div className={`max-w-[112px] truncate text-sm font-bold tabular-nums ${t.kind === "income"
-                          ? "text-emerald-600"
+                          ? "text-green"
                           : t.kind === "expense"
-                            ? "text-rose-600"
+                            ? "text-coral"
                             : ""
                         }`}>
                         {t.kind === "expense" ? "-" : t.kind === "income" ? "+" : ""}
@@ -1074,10 +1074,10 @@ export default function TransactionsPage() {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${t.kind === "income"
-                            ? "bg-emerald-500/10"
+                            ? "bg-green/16"
                             : t.kind === "expense"
-                              ? "bg-rose-500/10"
-                              : "bg-blue-500/10"
+                              ? "bg-coral/16"
+                              : "bg-blue/16"
                             }`}>
                             {getTransactionIcon(t.kind)}
                           </div>
@@ -1105,9 +1105,9 @@ export default function TransactionsPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <span className={`font-semibold tabular-nums ${t.kind === "income"
-                          ? "text-emerald-600"
+                          ? "text-green"
                           : t.kind === "expense"
-                            ? "text-rose-600"
+                            ? "text-coral"
                             : ""
                           }`}>
                           {t.kind === "expense" ? "-" : t.kind === "income" ? "+" : ""}
@@ -1204,7 +1204,7 @@ export default function TransactionsPage() {
             <DialogBody className="space-y-5">
               {/* Amount */}
               <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                <Label className="text-xs text-muted-foreground">
                   Amount
                 </Label>
                 <Input
@@ -1220,7 +1220,7 @@ export default function TransactionsPage() {
               {form.watch("kind") !== "transfer" && (
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                    <Label className="text-xs text-muted-foreground">
                       Category
                     </Label>
                     <Select
@@ -1245,7 +1245,7 @@ export default function TransactionsPage() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                    <Label className="text-xs text-muted-foreground">
                       Trip <span className="normal-case font-normal">(optional)</span>
                     </Label>
                     <Select
@@ -1276,7 +1276,7 @@ export default function TransactionsPage() {
 
               {/* Note */}
               <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                <Label className="text-xs text-muted-foreground">
                   Note <span className="normal-case font-normal">(optional)</span>
                 </Label>
                 <Input

@@ -13,7 +13,7 @@ import {
   MoreHorizontal,
   Pencil,
   Trash2,
-} from "lucide-react";
+} from "@/components/icons";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { useCategories } from "@/lib/finance/hooks";
 import {
@@ -120,12 +120,12 @@ function CategoryTable({ kind }: { kind: "income" | "expense" }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${
-            isIncome ? "bg-emerald-500/10" : "bg-rose-500/10"
+            isIncome ? "bg-green/16" : "bg-coral/16"
           }`}>
             {isIncome ? (
-              <TrendingUp className="h-5 w-5 text-emerald-600" />
+              <TrendingUp className="h-5 w-5 text-green" />
             ) : (
-              <TrendingDown className="h-5 w-5 text-rose-600" />
+              <TrendingDown className="h-5 w-5 text-coral" />
             )}
           </div>
           <div>
@@ -154,7 +154,7 @@ function CategoryTable({ kind }: { kind: "income" | "expense" }) {
             <form onSubmit={submitCreate}>
               <DialogBody className="space-y-4">
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                  <Label className="text-xs text-muted-foreground">
                     Category Name
                   </Label>
                   <Input
@@ -207,9 +207,9 @@ function CategoryTable({ kind }: { kind: "income" | "expense" }) {
                     <TableCell className="pl-6">
                       <div className="flex items-center gap-3">
                         <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${
-                          isIncome ? "bg-emerald-500/10" : "bg-rose-500/10"
+                          isIncome ? "bg-green/16" : "bg-coral/16"
                         }`}>
-                          <Tag className={`h-4 w-4 ${isIncome ? "text-emerald-600" : "text-rose-600"}`} />
+                          <Tag className={`h-4 w-4 ${isIncome ? "text-green" : "text-coral"}`} />
                         </div>
                         <span className="font-medium">{c.name}</span>
                       </div>
@@ -263,9 +263,9 @@ function CategoryTable({ kind }: { kind: "income" | "expense" }) {
                   <TableCell colSpan={2} className="h-32 text-center">
                     <div className="flex flex-col items-center gap-2">
                       <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                        isIncome ? "bg-emerald-500/10" : "bg-rose-500/10"
+                        isIncome ? "bg-green/16" : "bg-coral/16"
                       }`}>
-                        <Tag className={`h-5 w-5 ${isIncome ? "text-emerald-600" : "text-rose-600"}`} />
+                        <Tag className={`h-5 w-5 ${isIncome ? "text-green" : "text-coral"}`} />
                       </div>
                       <p className="font-medium">No categories yet</p>
                       <p className="text-sm text-muted-foreground">
@@ -296,7 +296,7 @@ function CategoryTable({ kind }: { kind: "income" | "expense" }) {
           <form onSubmit={submitEdit}>
             <DialogBody className="space-y-4">
               <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                <Label className="text-xs text-muted-foreground">
                   Category Name
                 </Label>
                 <Input className="h-11" {...editForm.register("name")} autoFocus />
@@ -339,8 +339,8 @@ export default function CategoriesPage() {
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 Expense Categories
               </CardTitle>
-              <div className="h-8 w-8 rounded-full bg-rose-500/10 flex items-center justify-center">
-                <TrendingDown className="h-4 w-4 text-rose-600" />
+              <div className="h-8 w-8 rounded-full bg-coral/16 flex items-center justify-center">
+                <TrendingDown className="h-4 w-4 text-coral" />
               </div>
             </div>
           </CardHeader>
@@ -355,8 +355,8 @@ export default function CategoriesPage() {
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 Income Categories
               </CardTitle>
-              <div className="h-8 w-8 rounded-full bg-emerald-500/10 flex items-center justify-center">
-                <TrendingUp className="h-4 w-4 text-emerald-600" />
+              <div className="h-8 w-8 rounded-full bg-green/16 flex items-center justify-center">
+                <TrendingUp className="h-4 w-4 text-green" />
               </div>
             </div>
           </CardHeader>

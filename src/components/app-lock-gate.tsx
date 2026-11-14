@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Delete, Fingerprint, LockKeyhole, ShieldCheck } from "lucide-react";
+import { Delete, Fingerprint, LockKeyhole, ShieldCheck } from "@/components/icons";
 import type { User } from "firebase/auth";
 import {
   getAppLockSettings,
@@ -192,7 +192,7 @@ export function AppLockGate({
 
       <section className="relative mx-auto flex w-full max-w-sm flex-col">
         <div className="flex flex-1 flex-col items-center justify-center text-center">
-          <div className="mb-8 flex h-24 w-24 items-center justify-center rounded-[2rem] bg-primary text-primary-foreground shadow-2xl shadow-primary/25">
+          <div className="mb-8 flex h-24 w-24 items-center justify-center rounded-[2rem] bg-primary text-primary-foreground">
             {biometricReady && !showPinEntry ? (
               <Fingerprint className="h-11 w-11" />
             ) : (
@@ -200,7 +200,7 @@ export function AppLockGate({
             )}
           </div>
 
-          <p className="mb-2 text-sm font-semibold uppercase tracking-[0.24em] text-primary">
+          <p className="mb-2 text-sm font-semibold tracking-[0.24em] text-primary">
             Cashly locked
           </p>
           <h1 className="text-3xl font-bold tracking-tight">
@@ -223,7 +223,7 @@ export function AppLockGate({
           {biometricReady && !showPinEntry && (
             <Button
               type="button"
-              className="h-14 w-full rounded-full text-base shadow-lg shadow-primary/20"
+              className="h-14 w-full rounded-full text-base"
               disabled={busy}
               onClick={() => void unlockWithBiometric()}
             >
@@ -271,7 +271,7 @@ export function AppLockGate({
                       key={index}
                       className={`h-3.5 w-3.5 rounded-full transition-all ${
                         index < pin.length
-                          ? "scale-110 bg-primary shadow-md shadow-primary/25"
+                          ? "scale-110 bg-primary  "
                           : "bg-muted-foreground/20"
                       }`}
                     />
@@ -285,7 +285,7 @@ export function AppLockGate({
                       type="button"
                       disabled={busy}
                       onClick={() => appendPinDigit(digit)}
-                      className="press-expressive h-16 rounded-full bg-background/70 text-2xl font-semibold shadow-sm ring-1 ring-border/70 backdrop-blur transition-colors hover:bg-background disabled:opacity-50"
+                      className="press-expressive h-16 rounded-full bg-background/70 text-2xl font-semibold ring-1 ring-border/70 transition-colors hover:bg-background disabled:opacity-50"
                     >
                       {digit}
                     </button>
@@ -295,7 +295,7 @@ export function AppLockGate({
                     type="button"
                     disabled={busy}
                     onClick={() => appendPinDigit("0")}
-                    className="press-expressive h-16 rounded-full bg-background/70 text-2xl font-semibold shadow-sm ring-1 ring-border/70 backdrop-blur transition-colors hover:bg-background disabled:opacity-50"
+                    className="press-expressive h-16 rounded-full bg-background/70 text-2xl font-semibold ring-1 ring-border/70 transition-colors hover:bg-background disabled:opacity-50"
                   >
                     0
                   </button>
@@ -303,7 +303,7 @@ export function AppLockGate({
                     type="button"
                     disabled={busy || pin.length === 0}
                     onClick={deletePinDigit}
-                    className="press-expressive flex h-16 items-center justify-center rounded-full bg-background/70 shadow-sm ring-1 ring-border/70 backdrop-blur transition-colors hover:bg-background disabled:opacity-40"
+                    className="press-expressive flex h-16 items-center justify-center rounded-full bg-background/70 ring-1 ring-border/70 transition-colors hover:bg-background disabled:opacity-40"
                     aria-label="Delete last PIN digit"
                   >
                     <Delete className="h-5 w-5" />
@@ -313,7 +313,7 @@ export function AppLockGate({
 
               <Button
                 type="submit"
-                className="h-14 w-full rounded-full text-base shadow-lg shadow-primary/20"
+                className="h-14 w-full rounded-full text-base"
                 disabled={busy || pin.length < 4}
               >
                 <ShieldCheck className="h-4 w-4" />

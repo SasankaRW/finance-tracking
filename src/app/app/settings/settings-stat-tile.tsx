@@ -1,4 +1,4 @@
-import type { LucideIcon } from "lucide-react";
+import type { LucideIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
 interface SettingsStatTileProps {
@@ -23,7 +23,7 @@ export function SettingsStatTile({
   return (
     <div
       className={cn(
-        "min-w-0 rounded-2xl border bg-card p-3 shadow-sm",
+        "min-w-0 rounded-2xl border bg-card p-3 ",
         highlighted && "border-primary/25 bg-primary/5",
       )}
     >

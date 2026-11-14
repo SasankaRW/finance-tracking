@@ -20,7 +20,7 @@ import {
   ArrowRight,
   AlertCircle,
   Plus,
-} from "lucide-react";
+} from "@/components/icons";
 import { useAccounts, useBudgets, useCategories, useSubscriptions, useTransactions } from "@/lib/finance/hooks";
 import { formatCurrencyCode, formatMoney } from "@/lib/format";
 import { DEFAULT_CURRENCY, HOME_CURRENCY } from "@/shared/currency";
@@ -313,7 +313,7 @@ export default function DashboardPage() {
           trigger={
             <Button
               size="icon-lg"
-              className="motion-expressive h-16 w-16 rounded-[1.4rem] shadow-xl active:scale-90 active:rounded-full"
+              className="motion-expressive h-16 w-16 rounded-[1.4rem] active:scale-90"
               aria-label="Add transaction"
             >
               <Plus className="h-7 w-7" />
@@ -325,12 +325,12 @@ export default function DashboardPage() {
       <div className="hidden md:block space-y-4 sm:space-y-6">
       {!isLoading && budgetPercentUsed !== null && (
         <div
-          className={`flex items-center justify-between gap-3 rounded-full px-4 py-2.5 shadow-sm sm:px-5 sm:py-3 ${
+          className={`flex items-center justify-between gap-3 rounded-full px-4 py-2.5  sm:px-5 sm:py-3 ${
             budgetOver
-              ? "bg-rose-500/15 text-rose-700 dark:text-rose-300"
+              ? "bg-coral/16 text-coral dark:text-coral"
               : budgetWarning
-                ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
-                : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                ? "bg-amber/16 text-amber dark:text-amber"
+                : "bg-green/16 text-green dark:text-green"
           }`}
         >
           <span className="truncate text-sm font-bold sm:text-base">
@@ -373,9 +373,9 @@ export default function DashboardPage() {
         />
       </div>
 
-      <Card className="hero-card relative overflow-hidden shadow-lg">
+      <Card className="hero-card relative overflow-hidden">
         <div className="absolute -right-10 -top-12 h-36 w-36 rounded-full bg-white/8 blur-2xl" />
-        <div className="hero-card-glow absolute -bottom-16 left-8 h-28 w-28 rounded-full blur-2xl" />
+        <div className="absolute -bottom-16 left-8 h-28 w-28 rounded-full blur-2xl" />
         <CardContent className="relative space-y-4 p-4 sm:space-y-5 sm:p-6">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 space-y-1">
@@ -412,21 +412,21 @@ export default function DashboardPage() {
 
           <div className="grid grid-cols-3 gap-2">
             <div className="rounded-xl bg-white/12 p-2.5 sm:p-3">
-              <p className="text-[10px] font-medium uppercase tracking-wide text-white/75 sm:text-[11px]">In</p>
+              <p className="text-[10px] font-medium text-white/75 sm:text-[11px]">In</p>
               <p className="mt-1 truncate text-sm font-bold text-white sm:text-base">
                 +{formatMoney(monthTotals.income)}
               </p>
               <p className="mt-0.5 text-[10px] text-white/70 sm:mt-1 sm:text-[11px]">{txCounts.income} entries</p>
             </div>
             <div className="rounded-xl bg-white/12 p-2.5 sm:p-3">
-              <p className="text-[10px] font-medium uppercase tracking-wide text-white/75 sm:text-[11px]">Out</p>
+              <p className="text-[10px] font-medium text-white/75 sm:text-[11px]">Out</p>
               <p className="mt-1 truncate text-sm font-bold text-white sm:text-base">
                 -{formatMoney(monthTotals.expense)}
               </p>
               <p className="mt-0.5 text-[10px] text-white/70 sm:mt-1 sm:text-[11px]">{txCounts.expense} entries</p>
             </div>
             <div className="rounded-xl bg-white/12 p-2.5 sm:p-3">
-              <p className="text-[10px] font-medium uppercase tracking-wide text-white/75 sm:text-[11px]">Net</p>
+              <p className="text-[10px] font-medium text-white/75 sm:text-[11px]">Net</p>
               <p className="mt-1 truncate text-sm font-bold text-white sm:text-base">
                 {monthTotals.net >= 0 ? "+" : ""}{formatMoney(monthTotals.net)}
               </p>
@@ -446,12 +446,12 @@ export default function DashboardPage() {
 
       <DebtPillsSummary />
 
-      <div className="grid grid-cols-2 divide-x divide-y divide-border/60 overflow-hidden rounded-[2rem] bg-card shadow-sm sm:grid-cols-4 sm:divide-y-0">
+      <div className="grid grid-cols-2 divide-x divide-y divide-border/60 overflow-hidden rounded-[2rem] bg-card sm:grid-cols-4 sm:divide-y-0">
         {[
           {
             label: "Cash",
             icon: Banknote,
-            iconClass: "text-emerald-600",
+            iconClass: "text-green",
             value: isLoading
               ? "-"
               : cashMissingUsdRate || cashUnsupportedCurrency
@@ -462,21 +462,21 @@ export default function DashboardPage() {
           {
             label: "Daily Avg",
             icon: Target,
-            iconClass: "text-sky-600",
+            iconClass: "text-blue",
             value: isLoading ? "-" : formatMoney(accrualStats.accrualDailyAverage),
             sub: "incl. upcoming bills",
           },
           {
             label: "Avg Expense",
             icon: AlertCircle,
-            iconClass: "text-amber-600",
+            iconClass: "text-amber",
             value: isLoading ? "-" : formatMoney(monthStats.averageExpense),
             sub: "per entry",
           },
           {
             label: "Biggest",
             icon: ArrowDownRight,
-            iconClass: "text-rose-600",
+            iconClass: "text-coral",
             value: isLoading ? "-" : formatMoney(monthStats.largestExpense),
             sub: "single expense",
           },
@@ -518,7 +518,7 @@ export default function DashboardPage() {
       )}
 
       <div className="grid gap-3 sm:gap-4 lg:grid-cols-2">
-        <Card className="surface-tonal shadow-sm">
+        <Card className="surface-tonal">
           <CardHeader className="p-4 pb-2 sm:p-6 sm:pb-2">
             <CardTitle className="text-base">Money Flow</CardTitle>
             <CardDescription>{monthName}</CardDescription>
@@ -533,33 +533,33 @@ export default function DashboardPage() {
             ) : (
               <>
                 <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                  <div className="rounded-xl border bg-emerald-500/5 p-3 sm:rounded-2xl sm:p-4">
+                  <div className="rounded-xl border bg-green/16 p-3 sm:rounded-2xl sm:p-4">
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <p className="text-sm font-medium">Income</p>
                         <p className="text-xs text-muted-foreground">{txCounts.income} transactions</p>
                       </div>
-                      <ArrowUpRight className="h-5 w-5 text-emerald-600" />
+                      <ArrowUpRight className="h-5 w-5 text-green" />
                     </div>
-                    <p className="mt-2 truncate text-lg font-bold text-emerald-600 sm:mt-3 sm:text-xl">
+                    <p className="mt-2 truncate text-lg font-bold text-green sm:mt-3 sm:text-xl">
                       {formatMoney(monthTotals.income)}
                     </p>
                   </div>
-                  <div className="rounded-xl border bg-rose-500/5 p-3 sm:rounded-2xl sm:p-4">
+                  <div className="rounded-xl border bg-coral/16 p-3 sm:rounded-2xl sm:p-4">
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <p className="text-sm font-medium">Expenses</p>
                         <p className="text-xs text-muted-foreground">{txCounts.expense} transactions</p>
                       </div>
-                      <ArrowDownRight className="h-5 w-5 text-rose-600" />
+                      <ArrowDownRight className="h-5 w-5 text-coral" />
                     </div>
-                    <p className="mt-2 truncate text-lg font-bold text-rose-600 sm:mt-3 sm:text-xl">
+                    <p className="mt-2 truncate text-lg font-bold text-coral sm:mt-3 sm:text-xl">
                       {formatMoney(monthTotals.expense)}
                     </p>
                   </div>
                 </div>
 
-                <div className={`rounded-xl border p-3 sm:rounded-2xl sm:p-4 ${monthTotals.net >= 0 ? "bg-emerald-500/5" : "bg-rose-500/5"}`}>
+                <div className={`rounded-xl border p-3 sm:rounded-2xl sm:p-4 ${monthTotals.net >= 0 ? "bg-green/16" : "bg-coral/16"}`}>
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-medium">Monthly Net</p>
@@ -567,7 +567,7 @@ export default function DashboardPage() {
                         {monthTotals.net >= 0 ? "You are saving this month" : "Spending is higher than income"}
                       </p>
                     </div>
-                    <p className={`shrink-0 text-lg font-bold sm:text-xl ${monthTotals.net >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                    <p className={`shrink-0 text-lg font-bold sm:text-xl ${monthTotals.net >= 0 ? "text-green" : "text-coral"}`}>
                       {monthTotals.net >= 0 ? "+" : ""}{formatMoney(monthTotals.net)}
                     </p>
                   </div>
@@ -581,7 +581,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="surface-tonal shadow-sm">
+        <Card className="surface-tonal">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -662,7 +662,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <Card className="surface-tonal shadow-sm">
+      <Card className="surface-tonal">
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -701,9 +701,9 @@ export default function DashboardPage() {
                   <div
                     className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold sm:px-4 sm:py-2 sm:text-sm ${
                       budgetOver
-                        ? "bg-rose-500/25 text-rose-200"
+                        ? "bg-coral/16 text-coral"
                         : budgetWarning
-                          ? "bg-amber-500/25 text-amber-200"
+                          ? "bg-amber/16 text-amber"
                           : "bg-white/15 text-white"
                     }`}
                   >
@@ -713,10 +713,10 @@ export default function DashboardPage() {
                 <div className="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-white/15">
                   <div
                     className={`h-full rounded-full transition-all ${budgetOver
-                      ? "bg-rose-400"
+                      ? "bg-coral"
                       : budgetWarning
-                        ? "bg-amber-400"
-                        : "bg-emerald-400"
+                        ? "bg-amber"
+                        : "bg-green"
                       }`}
                     style={{
                       width: `${Math.min(100, budgetPercentUsed ?? 0)}%`,
@@ -740,13 +740,13 @@ export default function DashboardPage() {
                       <div key={b.id} className="rounded-2xl border p-3">
                         <div className="mb-2 flex items-center justify-between gap-3">
                           <span className="truncate text-sm font-medium">{b.name}</span>
-                          <span className={`text-xs font-semibold ${over ? "text-destructive" : warning ? "text-amber-600" : ""}`}>
+                          <span className={`text-xs font-semibold ${over ? "text-destructive" : warning ? "text-amber" : ""}`}>
                             {pct}%
                           </span>
                         </div>
                         <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                           <div
-                            className={`h-full rounded-full transition-all ${over ? "bg-destructive" : warning ? "bg-amber-500" : "bg-primary"}`}
+                            className={`h-full rounded-full transition-all ${over ? "bg-destructive" : warning ? "bg-amber" : "bg-primary"}`}
                             style={{ width: `${pct}%` }}
                           />
                         </div>

@@ -19,7 +19,7 @@ import {
   AlertTriangle,
   Clock,
   HandCoins,
-} from "lucide-react";
+} from "@/components/icons";
 import { Timestamp } from "firebase/firestore";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { useAccounts, useCategories, useSubscriptions } from "@/lib/finance/hooks";
@@ -329,7 +329,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
               <DialogBody className="space-y-5">
                 {/* Type */}
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                  <Label className="text-xs text-muted-foreground">
                     Type
                   </Label>
                   <Select
@@ -353,7 +353,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
 
                 {/* Name */}
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                  <Label className="text-xs text-muted-foreground">
                     Name
                   </Label>
                   <Input
@@ -366,7 +366,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                 {/* Amount & Currency */}
                 <div className="grid grid-cols-3 gap-3">
                   <div className="col-span-2 space-y-2">
-                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                    <Label className="text-xs text-muted-foreground">
                       {createKind === "loan" ? "Monthly Payment" : "Amount"}
                     </Label>
                     <Input
@@ -379,7 +379,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                    <Label className="text-xs text-muted-foreground">
                       Currency
                     </Label>
                     <Select
@@ -413,7 +413,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                 {createKind === "loan" && (
                   <div className="grid grid-cols-2 gap-3 rounded-3xl border bg-muted/30 p-3">
                     <div className="space-y-2">
-                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                      <Label className="text-xs text-muted-foreground">
                         Total Months
                       </Label>
                       <Input
@@ -426,7 +426,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                      <Label className="text-xs text-muted-foreground">
                         Already Paid
                       </Label>
                       <Input
@@ -444,7 +444,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                 {/* Account & Category */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                    <Label className="text-xs text-muted-foreground">
                       Account
                     </Label>
                     <Select
@@ -469,7 +469,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                    <Label className="text-xs text-muted-foreground">
                       Category
                     </Label>
                     <Select
@@ -497,7 +497,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
 
                 {/* Next Due Date */}
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                  <Label className="text-xs text-muted-foreground">
                     Next Due Date
                   </Label>
                   <Popover>
@@ -539,7 +539,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 divide-x divide-y divide-border/60 overflow-hidden rounded-[2rem] bg-card shadow-sm sm:grid-cols-4 sm:divide-y-0">
+      <div className="grid grid-cols-2 divide-x divide-y divide-border/60 overflow-hidden rounded-[2rem] bg-card sm:grid-cols-4 sm:divide-y-0">
         <div className="p-3 sm:p-4">
           <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
             <Repeat className="h-3.5 w-3.5 text-primary" />
@@ -553,7 +553,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
 
         <div className="p-3 sm:p-4">
           <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
-            <Play className="h-3.5 w-3.5 text-emerald-600" />
+            <Play className="h-3.5 w-3.5 text-green" />
             Active
           </div>
           <p className="mt-2 font-display text-lg font-bold tabular-nums sm:text-2xl">{active}</p>
@@ -562,7 +562,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
 
         <div className="p-3 sm:p-4">
           <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
-            <HandCoins className="h-3.5 w-3.5 text-amber-600" />
+            <HandCoins className="h-3.5 w-3.5 text-amber" />
             Monthly Loans
           </div>
           <p className="mt-2 font-display text-lg font-bold tabular-nums sm:text-2xl">{loans}</p>
@@ -571,7 +571,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
 
         <div className="p-3 sm:p-4">
           <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
-            <Clock className="h-3.5 w-3.5 text-sky-600" />
+            <Clock className="h-3.5 w-3.5 text-blue" />
             Due This Week
           </div>
           <p className="mt-2 font-display text-lg font-bold tabular-nums sm:text-2xl">{dueThisWeek}</p>
@@ -580,7 +580,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
       </div>
 
       {/* Monthly Bills Table */}
-      <Card className="surface-tonal shadow-sm">
+      <Card className="surface-tonal">
         <CardHeader className="p-4 pb-2 sm:p-6 sm:pb-2">
           <CardTitle className="text-base">Monthly Bills</CardTitle>
           <CardDescription>Manage subscriptions and loan payments</CardDescription>
@@ -608,7 +608,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                 const loanProgress = isLoan ? getLoanProgress(s) : null;
 
                 return (
-                  <Card key={s.id} className={`surface-container-high py-0 shadow-sm ${isPaused ? "opacity-70" : ""}`}>
+                  <Card key={s.id} className={`surface-container-high py-0  ${isPaused ? "opacity-70" : ""}`}>
                     <CardContent className="space-y-4 p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex min-w-0 items-start gap-3">
@@ -1056,7 +1056,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
             <DialogBody className="space-y-5">
               {/* Type */}
               <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                <Label className="text-xs text-muted-foreground">
                   Type
                 </Label>
                 <Select
@@ -1080,7 +1080,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
 
               {/* Name */}
               <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                <Label className="text-xs text-muted-foreground">
                   Name
                 </Label>
                 <Input className="h-11" {...editForm.register("name")} />
@@ -1089,7 +1089,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
               {/* Amount & Currency & Status */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                  <Label className="text-xs text-muted-foreground">
                     {editKind === "loan" ? "Monthly Payment" : "Amount"}
                   </Label>
                   <Input
@@ -1101,7 +1101,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                  <Label className="text-xs text-muted-foreground">
                     Currency
                   </Label>
                   <Select
@@ -1126,7 +1126,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                  <Label className="text-xs text-muted-foreground">
                     Status
                   </Label>
                   <Select
@@ -1160,7 +1160,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
               {editKind === "loan" && (
                 <div className="grid grid-cols-2 gap-3 rounded-3xl border bg-muted/30 p-3">
                   <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                    <Label className="text-xs text-muted-foreground">
                       Total Months
                     </Label>
                     <Input
@@ -1173,7 +1173,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                    <Label className="text-xs text-muted-foreground">
                       Paid Months
                     </Label>
                     <Input
@@ -1191,7 +1191,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
               {/* Account & Category */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                  <Label className="text-xs text-muted-foreground">
                     Account
                   </Label>
                   <Select
@@ -1216,7 +1216,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                  <Label className="text-xs text-muted-foreground">
                     Category
                   </Label>
                   <Select
@@ -1244,7 +1244,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
 
               {/* Next Due Date */}
               <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                <Label className="text-xs text-muted-foreground">
                   Next Due Date
                 </Label>
                 <Popover>

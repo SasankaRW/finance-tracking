@@ -3,7 +3,7 @@
 import * as React from "react";
 import { format } from "date-fns";
 import { Timestamp } from "firebase/firestore";
-import { ArrowDownLeft, ArrowUpRight, CheckCircle2, HandCoins, Plus, Trash2 } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, CheckCircle2, HandCoins, Plus, Trash2 } from "@/components/icons";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { createDebt, deleteDebt } from "@/lib/finance/debt-mutations";
@@ -232,11 +232,11 @@ export function DebtPillsPanel() {
       <CardContent className="space-y-4">
         <div className="flex flex-wrap gap-2">
           <Badge variant="secondary" className="rounded-full px-3 py-1">
-            <ArrowDownLeft className="h-3.5 w-3.5 mr-1 text-emerald-600" />
+            <ArrowDownLeft className="h-3.5 w-3.5 mr-1 text-green" />
             Owes me {formatMoney(totals.owedToMe)}
           </Badge>
           <Badge variant="outline" className="rounded-full px-3 py-1">
-            <ArrowUpRight className="h-3.5 w-3.5 mr-1 text-rose-600" />
+            <ArrowUpRight className="h-3.5 w-3.5 mr-1 text-coral" />
             I owe {formatMoney(totals.iOwe)}
           </Badge>
         </div>
@@ -253,13 +253,13 @@ export function DebtPillsPanel() {
               return (
                 <div
                   key={debt.id}
-                  className={`flex max-w-full items-center gap-2 rounded-full border px-3 py-2 text-sm shadow-sm ${
+                  className={`flex max-w-full items-center gap-2 rounded-full border px-3 py-2 text-sm  ${
                     isReceivable
-                      ? "bg-emerald-500/10 border-emerald-500/20"
-                      : "bg-rose-500/10 border-rose-500/20"
+                      ? "bg-green/16 border-transparent"
+                      : "bg-coral/16 border-transparent"
                   }`}
                 >
-                  <HandCoins className={`h-4 w-4 shrink-0 ${isReceivable ? "text-emerald-600" : "text-rose-600"}`} />
+                  <HandCoins className={`h-4 w-4 shrink-0 ${isReceivable ? "text-green" : "text-coral"}`} />
                   <span className="truncate font-medium">{debt.personName}</span>
                   <span className="shrink-0 font-semibold tabular-nums">
                     {formatMoney(debt.amount ?? 0, cur)}
