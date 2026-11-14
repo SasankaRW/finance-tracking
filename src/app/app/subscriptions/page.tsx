@@ -434,7 +434,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                       })
                     }
                   >
-                    <SelectTrigger className="h-11">
+                    <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -485,7 +485,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                         })
                       }
                     >
-                      <SelectTrigger className="h-11">
+                      <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -550,7 +550,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                         })
                       }
                     >
-                      <SelectTrigger className="h-11">
+                      <SelectTrigger>
                         <SelectValue placeholder="Select" />
                       </SelectTrigger>
                       <SelectContent>
@@ -575,7 +575,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                         })
                       }
                     >
-                      <SelectTrigger className="h-11">
+                      <SelectTrigger>
                         <SelectValue placeholder="Select" />
                       </SelectTrigger>
                       <SelectContent>
@@ -950,7 +950,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                     })
                   }
                 >
-                  <SelectTrigger className="h-11">
+                  <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -966,7 +966,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                 <Label className="text-xs text-muted-foreground">
                   Name
                 </Label>
-                <Input className="h-11" {...editForm.register("name")} />
+                <Input {...editForm.register("name")} />
               </div>
 
               {/* Amount & Currency & Status */}
@@ -996,7 +996,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                       })
                     }
                   >
-                    <SelectTrigger className="h-11">
+                    <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1021,7 +1021,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                       })
                     }
                   >
-                    <SelectTrigger className="h-11">
+                    <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1086,7 +1086,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                       })
                     }
                   >
-                    <SelectTrigger className="h-11">
+                    <SelectTrigger>
                       <SelectValue placeholder="Select" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1111,7 +1111,7 @@ export default function SubscriptionsPage({ embedded = false }: { embedded?: boo
                       })
                     }
                   >
-                    <SelectTrigger className="h-11">
+                    <SelectTrigger>
                       <SelectValue placeholder="Select" />
                     </SelectTrigger>
                     <SelectContent>

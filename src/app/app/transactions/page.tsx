@@ -660,7 +660,7 @@ export default function TransactionsPage() {
           value={filters.accountId ?? "all"}
           onValueChange={(v) => setFilters((f) => ({ ...f, accountId: v === "all" ? undefined : v }))}
         >
-          <SelectTrigger className="h-10 rounded-xl px-3">
+          <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -688,7 +688,7 @@ export default function TransactionsPage() {
             }))
           }
         >
-          <SelectTrigger className="h-10 rounded-xl px-3">
+          <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -773,7 +773,7 @@ export default function TransactionsPage() {
                       value={newCategoryKind}
                       onValueChange={(v) => setNewCategoryKind(v as "expense" | "income")}
                     >
-                      <SelectTrigger className="h-10 flex-1">
+                      <SelectTrigger className="flex-1">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -881,7 +881,7 @@ export default function TransactionsPage() {
           value={filters.categoryId ?? "all"}
           onValueChange={(v) => setFilters((f) => ({ ...f, categoryId: v === "all" ? undefined : v }))}
         >
-          <SelectTrigger className="h-10 rounded-xl px-3">
+          <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -912,7 +912,7 @@ export default function TransactionsPage() {
         <div className="flex shrink-0 items-center gap-2">
           <PasteMessageDialog
             trigger={
-              <Button variant="outline" size="sm" className="h-10 rounded-xl px-3">
+              <Button variant="outline" size="sm" className="h-10 ">
                 <MailPlus className="h-4 w-4 mr-1" />
                 <span className="hidden sm:inline">Add from message</span>
               </Button>
@@ -949,7 +949,7 @@ export default function TransactionsPage() {
               toast.success("CSV exported");
             }}
             disabled={loading || !(filteredTransactions as any[]).length}
-            className="h-10 rounded-xl px-3"
+            className="h-10 "
           >
             <Download className="h-4 w-4 mr-1" />
             <span className="hidden sm:inline">Export</span>
@@ -1523,7 +1523,7 @@ export default function TransactionsPage() {
                         })
                       }
                     >
-                      <SelectTrigger className="h-11">
+                      <SelectTrigger>
                         <SelectValue placeholder="Select category" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1547,7 +1547,7 @@ export default function TransactionsPage() {
                         })
                       }
                     >
-                      <SelectTrigger className="h-11">
+                      <SelectTrigger>
                         <SelectValue placeholder="No trip" />
                       </SelectTrigger>
                       <SelectContent>

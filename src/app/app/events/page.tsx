@@ -144,7 +144,7 @@ export default function EventsPage({ embedded = false }: { embedded?: boolean })
                       value={form.watch("currency")}
                       onValueChange={(v) => form.setValue("currency", v, { shouldDirty: true })}
                     >
-                      <SelectTrigger className="h-11">
+                      <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>

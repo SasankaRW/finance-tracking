@@ -32,7 +32,8 @@ export function SparklineChart({
           stroke={color}
           strokeWidth={1.5}
           dot={false}
-          isAnimationActive={false}
+          animationDuration={900}
+          animationEasing="ease-out"
         />
       </LineChart>
     </ChartContainer>

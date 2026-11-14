@@ -263,7 +263,7 @@ export function CreateTransactionDialog({
             {kind !== "transfer" && (
               <div className="absolute right-3 top-3">
                 <Select value={currency} onValueChange={setCurrency}>
-                  <SelectTrigger className="h-7 w-auto gap-1 rounded-full border-0 bg-card px-2.5 text-xs font-semibold">
+                  <SelectTrigger className="min-h-0 data-[size=default]:h-7 w-auto gap-1 rounded-full border-0 bg-card px-2.5 text-xs font-semibold">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent align="end">
@@ -356,14 +356,13 @@ export function CreateTransactionDialog({
           <div className={`mt-2 grid gap-2 ${kind === "transfer" ? "grid-cols-1" : "grid-cols-2"}`}>
             <Popover>
               <PopoverTrigger asChild>
-                <Button
+                <button
                   type="button"
-                  variant="outline"
-                  className="h-11 w-full justify-start gap-2 rounded-2xl px-3 font-normal"
+                  className="sn-field flex h-14 w-full items-center gap-2 text-left text-sm"
                 >
                   <CalendarIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
                   <span className="truncate">{format(occurredAt, "MMM d, yyyy")}</span>
-                </Button>
+                </button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
                 <Calendar
@@ -380,7 +379,7 @@ export function CreateTransactionDialog({
                 value={form.watch("eventId") ?? "none"}
                 onValueChange={(v) => form.setValue("eventId", v === "none" ? undefined : v)}
               >
-                <SelectTrigger className="h-11 w-full gap-2 rounded-2xl px-3">
+                <SelectTrigger className="w-full gap-2">
                   <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" />
                   <SelectValue placeholder="Trip">
                     {events.find((e: any) => e.id === form.watch("eventId"))?.name}
@@ -402,7 +401,7 @@ export function CreateTransactionDialog({
             <StickyNote className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Add a note (optional)"
-              className="h-11 rounded-2xl pl-10"
+              className="pl-11"
               {...form.register("note")}
             />
           </div>

@@ -400,27 +400,26 @@ a[href],
   .sn-fab-float { display: none; }
 }
 
-/* ---- text fields: no box, 1px underline, 2px accent line grows from the centre ---- */
+/* ---- text fields: filled surface-high field, radius 16, no border; 2px accent underline only while focused ---- */
 @layer components {
 .sn-field {
-  min-height: 44px;
+  min-height: 56px;
   border: 0;
-  border-radius: 0;
-  padding: 10px 4px;
+  border-radius: 16px;
+  padding: 0 16px;
   color: #fff;
-  background-color: transparent;
-  background-image: linear-gradient(var(--primary), var(--primary));
-  background-position: center bottom;
-  background-repeat: no-repeat;
-  background-size: 0% 2px;
-  box-shadow: inset 0 -1px 0 var(--hairline);
-  transition: background-size 300ms var(--out-cubic), box-shadow 200ms var(--m3-std);
+  background-color: #1f1f24;
+  background-image: none;
+  box-shadow: none;
+  transition: box-shadow 200ms var(--m3-std), background-color 200ms var(--m3-std);
   outline: 0;
 }
+textarea.sn-field { padding-top: 16px; padding-bottom: 16px; }
 .sn-field::placeholder { color: rgba(255, 255, 255, 0.55); }
 .sn-field:focus,
-.sn-field:focus-visible { background-size: 100% 2px; box-shadow: inset 0 -1px 0 transparent; outline: 0; }
-.sn-field[aria-invalid="true"] { box-shadow: inset 0 -2px 0 #ff9d94; animation: sn-shake 350ms var(--m3-std); }
+.sn-field:focus-visible,
+.sn-field[data-state="open"] { box-shadow: 0 0 0 2px var(--primary); outline: 0; }
+.sn-field[aria-invalid="true"] { box-shadow: 0 0 0 2px #ff9d94; animation: sn-shake 350ms var(--m3-std); }
 .sn-field:disabled { opacity: 0.5; }
 }
 
@@ -498,4 +497,51 @@ html { scroll-behavior: smooth; }
 }
 @media (prefers-reduced-motion: reduce) {
   .animate-ios-in, .animate-ios-fade { animation: none; }
+}
+
+/* ---- alive: entrance, press, ripple, live dots (transform/opacity only; off under reduced motion) ---- */
+@keyframes sn-slide-in { from { opacity: 0; transform: translate3d(-16px, 0, 0); } }
+@keyframes sn-drop-in { from { opacity: 0; transform: translate3d(0, -14px, 0) scale(0.98); } }
+@keyframes sn-fab-pop { 0% { opacity: 0; transform: scale(0.4); } 70% { transform: scale(1.08); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes sn-ind-in { from { opacity: 0.4; transform: scaleX(0.35); } }
+@keyframes sn-ripple { from { opacity: 0.35; transform: scale(0.4); } to { opacity: 0; transform: scale(1.1); } }
+@keyframes sn-pulse-dot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(0.7); } }
+@keyframes sn-sheet-up { from { transform: translate3d(0, 100%, 0); } }
+@keyframes sn-spin { to { transform: rotate(360deg); } }
+/* main-page panels and rows: fade up 12px, 70 ms stagger */
+main > div > * { animation: sn-rise 650ms var(--out-cubic) backwards; }
+main > div > *:nth-child(2) { animation-delay: 70ms; }
+main > div > *:nth-child(3) { animation-delay: 140ms; }
+main > div > *:nth-child(4) { animation-delay: 210ms; }
+main > div > *:nth-child(5) { animation-delay: 280ms; }
+main > div > *:nth-child(n + 6) { animation-delay: 350ms; }
+main :is(ul, ol) > li,
+main [data-row] { animation: sn-slide-in 420ms var(--out-cubic) backwards; }
+main :is(ul, ol) > li:nth-child(2), main [data-row]:nth-child(2) { animation-delay: 50ms; }
+main :is(ul, ol) > li:nth-child(3), main [data-row]:nth-child(3) { animation-delay: 100ms; }
+main :is(ul, ol) > li:nth-child(4), main [data-row]:nth-child(4) { animation-delay: 150ms; }
+main :is(ul, ol) > li:nth-child(5), main [data-row]:nth-child(5) { animation-delay: 200ms; }
+main :is(ul, ol) > li:nth-child(n + 6), main [data-row]:nth-child(n + 6) { animation-delay: 250ms; }
+/* a new row at the top of a list drops in (rows are keyed, so only inserted ones mount) */
+main :is(ul, ol) > li:first-child:not(:only-child) { animation-name: sn-drop-in; }
+.sn-fab-float { animation: sn-fab-pop 520ms cubic-bezier(0.34, 1.56, 0.64, 1) 400ms backwards; }
+.sn-tab.on .sn-ind { animation: sn-ind-in 320ms var(--out-cubic); }
+.sn-tab:active .sn-ind { transform: scale(0.94); }
+.sn-tab .sn-ind { transition: background-color 300ms var(--m3-std), transform 160ms var(--m3-std); }
+.sn-chip, .sn-btn, .sn-icon { transition: transform 160ms var(--m3-std), background-color 200ms var(--m3-std), box-shadow 200ms var(--m3-std); }
+
+.press-expressive:active::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.3), transparent 70%);
+  animation: sn-ripple 420ms var(--out-cubic);
+}
+.sn-pulse-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--primary); animation: sn-pulse-dot 1.6s ease-in-out infinite; }
+.sn-live-dot { width: 8px; height: 8px; border-radius: 50%; background: #7bdc9a; color: #7bdc9a; animation: sn-ping 2.4s ease-out infinite; }
+.sn-spinner { width: 18px; height: 18px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.2); border-top-color: var(--primary); animation: sn-spin 700ms linear infinite; }
+[data-slot="sheet-content"], [data-slot="dialog-content"][data-state="open"] { animation-timing-function: cubic-bezier(0.05, 0.7, 0.1, 1); }
+[data-slot="sheet-overlay"][data-state="open"], [data-slot="dialog-overlay"][data-state="open"] { animation: fade-in 240ms linear both; }
+.meter-fill { transform-origin: left center; }
+@media (prefers-reduced-motion: reduce) {
+  main > div > *, main :is(ul, ol) > li, main [data-row], .sn-fab-float, .sn-tab.on .sn-ind, .sn-pulse-dot, .sn-live-dot, .sn-spinner { animation: none !important; }
+  .press-expressive:active::after { animation: none; }
 }

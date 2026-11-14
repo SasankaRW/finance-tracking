@@ -86,9 +86,9 @@ const updateSchema = z.object({
 type UpdateValues = z.infer<typeof updateSchema>;
 
 const accountTypes = [
-  { value: "cash", label: "Cash", icon: Wallet, description: "Physical currency", pill: "bg-green/90 text-green" },
-  { value: "bank", label: "Bank", icon: Building2, description: "Bank account", pill: "bg-blue/90 text-blue" },
-  { value: "card", label: "Card", icon: CreditCard, description: "Credit/Debit", pill: "bg-violet/90 text-violet" },
+  { value: "cash", label: "Cash", icon: Wallet, description: "Physical currency", pill: "bg-green/18 text-green" },
+  { value: "bank", label: "Bank", icon: Building2, description: "Bank account", pill: "bg-blue/18 text-blue" },
+  { value: "card", label: "Card", icon: CreditCard, description: "Credit/Debit", pill: "bg-violet/18 text-violet" },
 ] as const;
 
 function AccountTypeSelector({ form }: { form: any }) {
@@ -337,7 +337,7 @@ export function AccountsPanel() {
                         })
                       }
                     >
-                      <SelectTrigger className="h-11">
+                      <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -728,7 +728,7 @@ export function AccountsPanel() {
                       })
                     }
                   >
-                    <SelectTrigger className="h-11">
+                    <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

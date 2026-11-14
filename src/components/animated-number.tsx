@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { useSpring, animated } from "@react-spring/web";
-import { SPRING_IOS, easeIos } from "@/lib/motion/easings";
 import { getReducedMotion } from "@/lib/motion/reduced-motion";
 
 interface AnimatedNumberProps {
@@ -18,12 +17,12 @@ interface AnimatedNumberProps {
 export function AnimatedNumber({ value, duration, formatFn, className = "" }: AnimatedNumberProps) {
   const { value: animatedValue } = useSpring({
     value,
-    config: duration ? { duration, easing: easeIos } : SPRING_IOS,
+    config: { duration: duration ?? 600, easing: (t: number) => 1 - Math.pow(1 - t, 3) },
     immediate: getReducedMotion(),
   });
 
   return (
-    <animated.span className={className}>
+    <animated.span className={`tabular-nums ${className}`}>
       {animatedValue.to((v) => (formatFn ? formatFn(v) : Math.round(v).toLocaleString()))}
     </animated.span>
   );

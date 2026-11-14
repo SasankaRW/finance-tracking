@@ -125,6 +125,7 @@ export function PendingImportsPanel() {
                       : "bg-amber/16"
                   }`}
                 >
+                  <span className="sn-pulse-dot" aria-hidden />
                   {matched ? (
                     <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                   ) : (

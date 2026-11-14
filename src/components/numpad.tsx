@@ -30,7 +30,7 @@ function NumpadButton({
       aria-label={ariaLabel}
       onClick={onClick}
       className={cn(
-        "motion-expressive press-expressive flex aspect-square w-full items-center justify-center rounded-full bg-card text-2xl font-semibold  transition-all active:scale-95",
+        "motion-expressive press-expressive relative overflow-hidden flex aspect-square w-full items-center justify-center rounded-full bg-card text-2xl font-semibold  transition-all active:scale-95",
         className,
       )}
     >
@@ -74,7 +74,7 @@ export function Numpad({
         disabled={confirmDisabled || confirmLoading}
         onClick={onConfirm}
         aria-label="Save transaction"
-        className="motion-expressive press-expressive row-span-2 flex items-center justify-center rounded-[2rem] bg-blue/16 text-blue transition-all active:scale-[0.98] disabled:opacity-50 dark:bg-blue dark:text-white"
+        className="motion-expressive press-expressive relative overflow-hidden row-span-2 flex items-center justify-center rounded-[2rem] transition-all active:scale-[0.98] disabled:opacity-100 bg-primary text-[#141418] disabled:bg-primary/35 disabled:text-white/85"
       >
         {confirmLoading ? (
           <span className="text-sm font-bold">…</span>

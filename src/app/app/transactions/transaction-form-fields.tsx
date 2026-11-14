@@ -63,7 +63,7 @@ export function AccountSelect({
 
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className="h-11 w-full gap-2 rounded-2xl px-3">
+      <SelectTrigger className="w-full gap-2">
         <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
         <SelectValue placeholder={label}>{selected?.name}</SelectValue>
       </SelectTrigger>
@@ -99,7 +99,7 @@ export function CategorySelect({
 
   return (
     <Select value={value ?? ""} onValueChange={onChange}>
-      <SelectTrigger className="h-11 w-full gap-2 rounded-2xl px-3">
+      <SelectTrigger className="w-full gap-2">
         <Tag className="h-4 w-4 shrink-0 text-muted-foreground" />
         <SelectValue placeholder="Category">{selected?.name}</SelectValue>
       </SelectTrigger>
@@ -115,7 +115,7 @@ export function CategorySelect({
 }
 
 export const transactionTypes = [
-  { value: "expense", label: "Expense", icon: ArrowDownRight, color: "text-coral", pill: "bg-coral/90 text-coral" },
-  { value: "income", label: "Income", icon: ArrowUpRight, color: "text-green", pill: "bg-green/90 text-green" },
-  { value: "transfer", label: "Transfer", icon: ArrowLeftRight, color: "text-blue", pill: "bg-blue/90 text-blue" },
+  { value: "expense", label: "Expense", icon: ArrowDownRight, color: "text-coral", pill: "bg-coral/18 text-coral" },
+  { value: "income", label: "Income", icon: ArrowUpRight, color: "text-green", pill: "bg-green/18 text-green" },
+  { value: "transfer", label: "Transfer", icon: ArrowLeftRight, color: "text-blue", pill: "bg-blue/18 text-blue" },
 ] as const;

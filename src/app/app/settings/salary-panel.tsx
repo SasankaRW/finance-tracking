@@ -236,7 +236,7 @@ function SalaryFormFields({
               })
             }
           >
-            <SelectTrigger className="h-12">
+            <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -264,7 +264,7 @@ function SalaryFormFields({
               });
             }}
           >
-            <SelectTrigger className="h-11">
+            <SelectTrigger>
               <SelectValue placeholder="Select account" />
             </SelectTrigger>
             <SelectContent>
@@ -290,7 +290,7 @@ function SalaryFormFields({
               })
             }
           >
-            <SelectTrigger className="h-11">
+            <SelectTrigger>
               <SelectValue placeholder="Select category" />
             </SelectTrigger>
             <SelectContent>
@@ -317,7 +317,7 @@ function SalaryFormFields({
             })
           }
         >
-          <SelectTrigger className="h-11">
+          <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -1033,7 +1033,7 @@ export function SalaryPanel() {
                     })
                   }
                 >
-                  <SelectTrigger className="h-11">
+                  <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

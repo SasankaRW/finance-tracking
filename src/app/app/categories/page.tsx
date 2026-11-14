@@ -319,7 +319,7 @@ function CategoryTable({ kind }: { kind: "income" | "expense" }) {
                     fallback={{ name: editForm.watch("name"), kind: edit?.kind }}
                     onChange={(key) => editForm.setValue("icon", key)}
                   />
-                  <Input className="h-11 flex-1" {...editForm.register("name")} autoFocus />
+                  <Input className="flex-1" {...editForm.register("name")} autoFocus />
                 </div>
               </div>
             </DialogBody>

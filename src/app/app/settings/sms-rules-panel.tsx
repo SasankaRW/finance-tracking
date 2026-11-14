@@ -235,7 +235,7 @@ function RuleFormFields({
             type="button"
             onClick={() => onChange({ kind: "expense" })}
             className={`motion-expressive press-expressive inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition-all ${
-              value.kind === "expense" ? "bg-coral/90 text-coral" : "bg-white/[.07] text-white/68"
+              value.kind === "expense" ? "bg-coral/18 text-coral" : "bg-white/[.07] text-white/68"
             }`}
           >
             <ArrowDownRight className="h-3.5 w-3.5" />
@@ -245,7 +245,7 @@ function RuleFormFields({
             type="button"
             onClick={() => onChange({ kind: "income" })}
             className={`motion-expressive press-expressive inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition-all ${
-              value.kind === "income" ? "bg-green/90 text-green" : "bg-white/[.07] text-white/68"
+              value.kind === "income" ? "bg-green/18 text-green" : "bg-white/[.07] text-white/68"
             }`}
           >
             <ArrowUpRight className="h-3.5 w-3.5" />
@@ -255,7 +255,7 @@ function RuleFormFields({
             type="button"
             onClick={() => onChange({ kind: "transfer" })}
             className={`motion-expressive press-expressive inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition-all ${
-              value.kind === "transfer" ? "bg-blue/90 text-blue" : "bg-white/[.07] text-white/68"
+              value.kind === "transfer" ? "bg-blue/18 text-blue" : "bg-white/[.07] text-white/68"
             }`}
           >
             <ArrowLeftRight className="h-3.5 w-3.5" />
@@ -277,7 +277,7 @@ function RuleFormFields({
               onChange({ pattern: preset.pattern, kind: preset.kind });
             }}
           >
-            <SelectTrigger className="h-7 w-auto gap-1 rounded-full border-0 bg-muted px-2.5 text-xs font-semibold shadow-none">
+            <SelectTrigger className="min-h-0 data-[size=default]:h-7 w-auto gap-1 rounded-full border-0 bg-muted px-2.5 text-xs font-semibold shadow-none">
               <SelectValue placeholder="Start from a preset" />
             </SelectTrigger>
             <SelectContent align="end">

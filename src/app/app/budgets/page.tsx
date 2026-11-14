@@ -366,7 +366,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
                         })
                       }
                     >
-                      <SelectTrigger className="h-11">
+                      <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -394,7 +394,7 @@ export default function BudgetsPage({ embedded = false }: { embedded?: boolean }
                       })
                     }
                   >
-                    <SelectTrigger className="h-11">
+                    <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
